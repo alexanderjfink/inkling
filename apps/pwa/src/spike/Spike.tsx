@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import type { Durability } from '../storage/idb'
 import { formatBytes } from '../storage/hash'
 
 interface BenchResult {
@@ -26,7 +25,10 @@ interface StorageManagerExt {
 
 const COUNT = 2000
 
-async function benchIndexedDb(count: number, durability: Durability): Promise<BenchResult> {
+async function benchIndexedDb(
+  count: number,
+  durability: 'default' | 'strict',
+): Promise<BenchResult> {
   const name = 'inkling-spike'
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(name, 1)
@@ -120,42 +122,34 @@ export function Spike() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm text-zinc-400">
-        Decision (2026-10, Pixel-class Android):{' '}
-        <strong className="text-zinc-200">IndexedDB</strong> — 10.3k writes/s vs OPFS 806/s. The log
-        stays on IndexedDB; re-run this after changing the storage layer.
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-ink-soft">
+        The log lives on IndexedDB: measured at 10.3k writes/s against OPFS at 806/s on the Android
+        phone. Re-run this after changing the storage layer.
       </p>
       <button
         type="button"
-        onClick={run}
+        onClick={() => void run()}
         disabled={running}
-        className="rounded-xl bg-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900 disabled:opacity-40"
+        className="self-start rounded-full border border-line px-4 py-2 text-xs font-medium disabled:opacity-40"
       >
         {running ? 'Running…' : 'Run storage spike'}
       </button>
 
       {env.length > 0 ? (
-        <pre className="overflow-x-auto rounded-xl border border-zinc-800 p-3 text-xs whitespace-pre-wrap text-zinc-400">
+        <pre className="overflow-x-auto rounded-2xl bg-canvas p-3 text-[11px] whitespace-pre-wrap text-ink-faint">
           {env.join('\n')}
         </pre>
       ) : null}
 
-      {results.length > 0 ? (
-        <div className="flex flex-col gap-2">
-          {results.map((r) => (
-            <div
-              key={r.label}
-              className={`rounded-xl border p-3 text-sm ${r.ok ? 'border-zinc-800' : 'border-amber-900'}`}
-            >
-              <div className="font-medium text-zinc-200">
-                {r.ok ? '✓' : '⚠'} {r.label}
-              </div>
-              <div className="text-xs text-zinc-400">{r.detail}</div>
-            </div>
-          ))}
+      {results.map((result) => (
+        <div key={result.label} className="text-xs">
+          <span className={result.ok ? 'text-good' : 'text-warn'}>
+            {result.ok ? '✓' : '⚠'} {result.label}
+          </span>
+          <span className="text-ink-faint"> — {result.detail}</span>
         </div>
-      ) : null}
+      ))}
     </div>
   )
 }

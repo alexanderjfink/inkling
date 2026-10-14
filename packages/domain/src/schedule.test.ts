@@ -1,6 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import type { Blip, BlipEvent, BlipEventBody, BlipType } from '../src/index'
-import { buildDailyFeed, isDue, newId, project, scoreBlip, snoozeUntil } from '../src/index'
+import {
+  buildDailyFeed,
+  deferUntil,
+  isDue,
+  newId,
+  project,
+  scoreBlip,
+  snoozeUntil,
+} from '../src/index'
 
 const DEVICE = 'deviceA'
 const NOW = new Date('2026-03-01T12:00:00Z')
@@ -101,5 +109,42 @@ describe('scheduler', () => {
     const skipped3 = Date.parse(snoozeUntil('skipped', NOW, 3))
     expect(engaged3).toBeGreaterThan(engaged0)
     expect(skipped3).toBeLessThan(engaged0)
+  })
+
+  test('a blip sent to the desktop goes first, even against a much older one', () => {
+    const { events } = blipFrom('carry me to the mac', '2026-02-28T12:00:00Z')
+    const plain = only(events)
+    const pinned = only([
+      ...events,
+      ev({ t: 'promoteToDesktop', id: plain.id }, 1, '2026-03-01T00:00:00Z'),
+    ])
+
+    const older = only(blipFrom('an older thing', '2026-01-01T00:00:00Z').events)
+    const feed = buildDailyFeed([older, pinned], { now: NOW })
+
+    expect(feed[0]?.id).toBe(pinned.id)
+    expect(feed.map((blip) => blip.id)).toContain(older.id)
+  })
+
+  test('deferral choices are floors, in the future, in order', () => {
+    const tomorrow = Date.parse(deferUntil('tomorrow', NOW))
+    const fewDays = Date.parse(deferUntil('few-days', NOW))
+    const nextWeek = Date.parse(deferUntil('next-week', NOW))
+    const nextMonth = Date.parse(deferUntil('next-month', NOW))
+
+    expect(tomorrow).toBeGreaterThan(NOW.getTime())
+    expect(tomorrow).toBeLessThan(fewDays)
+    expect(fewDays).toBeLessThan(nextWeek)
+    expect(nextWeek).toBeLessThan(nextMonth)
+  })
+
+  test('a deferred blip is not due until its floor', () => {
+    const { id, events } = blipFrom('later', '2026-02-28T12:00:00Z')
+    const deferred = only([
+      ...events,
+      ev({ t: 'snoozed', id, until: deferUntil('next-month', NOW) }, 1, '2026-03-01T00:00:00Z'),
+    ])
+    expect(isDue(deferred, NOW)).toBe(false)
+    expect(isDue(deferred, new Date(NOW.getTime() + 31 * 86_400_000))).toBe(true)
   })
 })

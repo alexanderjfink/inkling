@@ -20,7 +20,7 @@ companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 | Review loop — decision per blip, session receipt, sessions frozen | done |
 | Retire / attic / revive | done |
 | Sync — append-only log union, byte-offset watermarks, content-addressed blobs | done, tested |
-| Handoff — "send to desktop" → Desk view → action reflects back | done |
+| Handoff — "Send to Mac" puts a blip first in the queue, on any device | done |
 | State digest — convergence check across devices | done, tested |
 | **Moves** — a 22-move playbook, time-boxed, goal-bearing, no repeats | done, tested |
 | **Models** — a provider registry: OpenCode Go by default, plus hosted and local | done, tested |
@@ -68,7 +68,7 @@ inkling/
         ├── llm/          ProxyProvider — the client's view of the model
         ├── embeddings.ts cached vectors, by content hash
         ├── state/        useInkling(), useSync(), useRelated(), usePromote()
-        ├── components/   Capture, Feed, Desk, AllBlips, SyncPanel, MoveCard
+        ├── screens/      Home, Add, Review, AllBlips, Settings
         └── spike/        in-app storage benchmark
 ```
 
@@ -90,13 +90,12 @@ bun run build                      # production build
 
 ## Try it
 
-1. **Capture** a few things you noticed — text, a URL, an image.
-2. **Today** gives a finite feed. Add a note, not now, send to desktop, or retire —
-   each blip resolves to a decision, and clearing the list shows a receipt.
-3. **Desk** holds the blips you sent over for a flow state, and acting there pushes
-   the change back to the server.
-4. **All** shows Active / Snoozed / Attic, with Revive in the attic.
-5. **Sync** configures the server, runs a pass on demand, and reports the state digest.
+1. **Add a blip** — text, a URL, an image, or ramble into the microphone.
+2. **Review** — one blip at a time. Add an entry, send it to the Mac, or put it down
+   for a while. Clearing the queue shows what you did: *nothing lost*.
+3. **Settings** — server, model, reminders, backup, storage.
+4. **All blips** (from the bottom of Home) — everything, including the attic, where you
+   can revive what you let go of.
 
 ## Sync
 

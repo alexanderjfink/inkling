@@ -3,15 +3,20 @@ import { useEffect, useState } from 'react'
 import type { CaptureDraft } from '../capture'
 import { useSpeech } from '../state/useSpeech'
 
-export function Capture({
+const inputClass =
+  'w-full rounded-2xl border border-line bg-surface p-4 text-ink outline-none focus:border-accent'
+
+export function Add({
   onCapture,
   initial,
   onConsumed,
+  onDone,
 }: {
   onCapture: (draft: CaptureDraft) => Promise<unknown>
   /** Content handed over by the OS share sheet. */
   initial?: { text?: string; url?: string } | null
   onConsumed?: () => void
+  onDone: () => void
 }) {
   const [text, setText] = useState(initial?.text ?? '')
   const [url, setUrl] = useState(initial?.url ?? '')
@@ -24,7 +29,6 @@ export function Capture({
     setText((current) => (current.trim() ? `${current.trim()} ${spoken}` : spoken)),
   )
 
-  // The share content has been taken into state; tell the app it can forget it.
   useEffect(() => {
     if (initial) onConsumed?.()
   }, [initial, onConsumed])
@@ -48,14 +52,15 @@ export function Capture({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-1 flex-col gap-3">
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         placeholder="What did you notice?"
-        rows={4}
-        className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-base text-zinc-100 outline-none focus:border-zinc-600"
+        rows={6}
+        className={`${inputClass} resize-none text-lg`}
       />
+
       <input
         value={url}
         onChange={(event) => setUrl(event.target.value)}
@@ -63,11 +68,11 @@ export function Capture({
         inputMode="url"
         autoCapitalize="none"
         autoCorrect="off"
-        className="w-full rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-300 outline-none focus:border-zinc-600"
+        className={`${inputClass} text-sm`}
       />
 
-      <div className="flex items-center gap-2">
-        <label className="flex-1 cursor-pointer rounded-xl border border-dashed border-zinc-700 px-3 py-2 text-center text-sm text-zinc-400">
+      <div className="flex items-center gap-3">
+        <label className="flex-1 cursor-pointer rounded-2xl border border-dashed border-line bg-surface/60 px-3 py-3 text-center text-sm text-ink-soft">
           {file ? file.name : 'Add an image'}
           <input
             type="file"
@@ -79,9 +84,9 @@ export function Capture({
         <select
           value={type}
           onChange={(event) => setType(event.target.value as BlipType | 'auto')}
-          className="rounded-xl border border-zinc-800 bg-zinc-900/60 px-2 py-2 text-sm text-zinc-300 outline-none"
+          className="rounded-2xl border border-line bg-surface px-3 py-3 text-sm text-ink-soft outline-none"
         >
-          <option value="auto">auto type</option>
+          <option value="auto">auto</option>
           {BLIP_TYPES.map((option) => (
             <option key={option} value={option}>
               {option}
@@ -90,39 +95,34 @@ export function Capture({
         </select>
       </div>
 
-      <div className="flex gap-2">
+      <div className="mt-auto flex items-center gap-3 pt-2">
         <button
           type="button"
           onClick={() => (speech.listening ? speech.stop() : speech.start())}
           disabled={!speech.supported}
-          className={`rounded-xl border px-3 py-3 text-sm disabled:opacity-40 ${
-            speech.listening
-              ? 'border-red-800 bg-red-950/40 text-red-200'
-              : 'border-zinc-700 text-zinc-300'
-          }`}
+          className={`circle h-[4.25rem] w-[4.25rem] ${speech.listening ? 'circle--accent' : ''}`}
+          title="Ramble, and it transcribes as you talk"
         >
-          {speech.listening ? '◉ Stop' : '🎙 Ramble'}
+          <span className="text-xl">🎙</span>
         </button>
+        <span className="text-xs text-ink-faint">
+          {speech.listening ? 'listening — ramble away' : 'or ramble'}
+        </span>
+
         <button
           type="button"
-          onClick={submit}
+          onClick={() => (saved > 0 ? onDone() : submit())}
           disabled={!canSubmit || busy}
-          className="flex-1 rounded-xl bg-zinc-100 px-4 py-3 text-sm font-semibold text-zinc-900 disabled:opacity-40"
+          className="ml-auto rounded-full bg-ink px-7 py-4 text-sm font-semibold text-surface disabled:opacity-40"
         >
-          {busy ? 'Saving…' : 'Capture'}
+          {busy ? 'Saving…' : saved > 0 ? 'Done' : 'Keep it'}
         </button>
       </div>
 
-      {speech.listening ? (
-        <p className="text-center text-xs text-red-300">
-          listening — ramble, and it will appear above as you talk
-        </p>
-      ) : null}
-      {speech.error ? <p className="text-center text-xs text-amber-300">{speech.error}</p> : null}
-
-      <p className="text-center text-xs text-zinc-500">
+      {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
+      <p className="text-center text-xs text-ink-faint">
         Written to this device instantly — never blocked on the network.
-        {saved > 0 ? ` ${saved} captured this session.` : ''}
+        {saved > 0 ? ` ${saved} captured.` : ''}
       </p>
     </div>
   )

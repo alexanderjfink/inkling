@@ -54,4 +54,13 @@ export {
 export type { Blip, BlipStatus, MoveHistoryEntry, ScheduleState } from './project'
 export { liveBlips, project } from './project'
 export type { FeedContext } from './schedule'
-export { buildDailyFeed, DEFAULT_FEED_SIZE, isDue, scoreBlip, snoozeUntil } from './schedule'
+export type { DeferralChoice, SnoozeReason } from './schedule'
+export {
+  buildDailyFeed,
+  DEFERRAL_CHOICES,
+  DEFAULT_FEED_SIZE,
+  deferUntil,
+  isDue,
+  scoreBlip,
+  snoozeUntil,
+} from './schedule'

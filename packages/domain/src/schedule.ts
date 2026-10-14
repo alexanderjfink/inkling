@@ -29,6 +29,7 @@ function daysSince(iso: string, now: Date): number {
 export function isDue(blip: Blip, now: Date, activeTopics: string[] = []): boolean {
   if (blip.deleted) return false
   if (blip.status === 'retired' || blip.status === 'promoted') return false
+
   // A matching topic overrides a snooze: "show me this when I'm thinking about X
   // again" is exactly the safety the design depends on. Explicit triggers are
   // honoured, and so are auto-extracted topics — otherwise you would have to curate
@@ -36,10 +37,14 @@ export function isDue(blip: Blip, now: Date, activeTopics: string[] = []): boole
   const triggers = blip.schedule.triggers ?? []
   if (triggers.length && triggers.some((t) => activeTopics.includes(t))) return true
   if (activeTopics.length && blip.topics.some((t) => activeTopics.includes(t))) return true
-  if (blip.status !== 'active') return false
-  if (!blip.schedule.nextEarliest) return true
-  const due = Date.parse(blip.schedule.nextEarliest)
-  return Number.isNaN(due) || due <= now.getTime()
+
+  // A snooze is a floor, not a state. Active and snoozed behave identically here:
+  // when the floor passes, the blip is back. Treating "snoozed" as a reason to stay
+  // hidden meant a deferred blip could never return at all.
+  const floor = blip.schedule.nextEarliest
+  if (!floor) return true
+  const at = Date.parse(floor)
+  return Number.isNaN(at) || at <= now.getTime()
 }
 
 /**
@@ -79,7 +84,15 @@ export function buildDailyFeed(blips: Blip[], ctx: FeedContext): Blip[] {
   const ranked = blips
     .filter((b) => isDue(b, ctx.now, topics))
     .map((b) => ({ blip: b, score: scoreBlip(b, ctx) }))
-    .sort((x, y) => y.score - x.score || (x.blip.created < y.blip.created ? -1 : 1))
+    // A blip sent to the desktop goes first, unconditionally. "Send to Mac" means
+    // "this one, next" — a score nudge would let a merely older blip outrank it,
+    // which is not what the gesture promises.
+    .sort(
+      (x, y) =>
+        Number(y.blip.desktopPinned) - Number(x.blip.desktopPinned) ||
+        y.score - x.score ||
+        (x.blip.created < y.blip.created ? -1 : 1),
+    )
 
   const chosen: Blip[] = []
   const counts = new Map<string, number>()
@@ -103,6 +116,33 @@ export function buildDailyFeed(blips: Blip[], ctx: FeedContext): Blip[] {
 }
 
 export type SnoozeReason = 'engaged' | 'skipped' | 'shown'
+
+/** How long "not now" means, when you do not want to think about it. */
+export type DeferralChoice = 'tomorrow' | 'few-days' | 'next-week' | 'next-month'
+
+export const DEFERRAL_CHOICES: DeferralChoice[] = [
+  'tomorrow',
+  'few-days',
+  'next-week',
+  'next-month',
+]
+
+const DEFERRAL_DAYS: Record<DeferralChoice, number> = {
+  tomorrow: 1,
+  'few-days': 3,
+  'next-week': 7,
+  'next-month': 30,
+}
+
+/**
+ * When a deferred blip should come back.
+ *
+ * A floor, never a deadline: the scheduler treats a future date as "not before
+ * this", so nothing ever becomes overdue.
+ */
+export function deferUntil(choice: DeferralChoice, from: Date): string {
+  return new Date(from.getTime() + DEFERRAL_DAYS[choice] * DAY_MS).toISOString()
+}
 
 /**
  * Compute when a blip should next surface. Engagement stretches the interval

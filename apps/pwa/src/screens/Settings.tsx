@@ -48,6 +48,91 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   )
 }
 
+const CUSTOM = '__custom__'
+
+/**
+ * A model field that becomes a real dropdown once the list is known.
+ *
+ * A `<datalist>` looks like a dropdown in a design tool and behaves like one almost
+ * nowhere, especially on a phone. This is an actual `<select>`, with a way back to
+ * typing for models the provider does not list — which happens with local runners.
+ */
+function ModelPicker({
+  label,
+  value,
+  options,
+  onChange,
+  custom,
+  onCustomChange,
+  loading,
+  onLoad,
+  placeholder,
+}: {
+  label: string
+  value: string
+  options: string[]
+  onChange: (value: string) => void
+  custom: boolean
+  onCustomChange: (custom: boolean) => void
+  loading: boolean
+  onLoad: () => void
+  placeholder: string
+}) {
+  const listed = value && !options.includes(value) ? [value, ...options] : options
+
+  return (
+    <Field label={options.length > 0 ? `${label} · ${options.length} available` : label}>
+      {options.length > 0 && !custom ? (
+        <select
+          value={value}
+          onChange={(event) => {
+            if (event.target.value === CUSTOM) {
+              onCustomChange(true)
+              return
+            }
+            onChange(event.target.value)
+          }}
+          className={inputClass}
+        >
+          {value ? null : <option value="">— choose a model —</option>}
+          {listed.map((id) => (
+            <option key={id} value={id}>
+              {id}
+            </option>
+          ))}
+          <option value={CUSTOM}>— type a model that is not listed —</option>
+        </select>
+      ) : (
+        <input
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          placeholder={placeholder}
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          className={inputClass}
+        />
+      )}
+
+      <span className="flex gap-3 text-[11px] text-ink-faint">
+        <button
+          type="button"
+          onClick={onLoad}
+          disabled={loading}
+          className="underline disabled:opacity-40"
+        >
+          {loading ? 'loading…' : options.length > 0 ? 'reload the list' : 'load the models'}
+        </button>
+        {custom && options.length > 0 ? (
+          <button type="button" onClick={() => onCustomChange(false)} className="underline">
+            back to the list
+          </button>
+        ) : null}
+      </span>
+    </Field>
+  )
+}
+
 export function Settings({
   syncState,
   events,
@@ -68,6 +153,8 @@ export function Settings({
   const [saved, setSaved] = useState<string | null>(null)
   const [chatModels, setChatModels] = useState<string[]>([])
   const [embedModels, setEmbedModels] = useState<string[]>([])
+  const [customChat, setCustomChat] = useState(false)
+  const [customEmbed, setCustomEmbed] = useState(false)
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
   const modelTools = useModelTools(syncState.serverUrl)
 
@@ -83,22 +170,34 @@ export function Settings({
     )
   }
 
-  async function loadModels(kind: 'chat' | 'embed') {
+  async function loadModels(kind: 'chat' | 'embed', quiet = false) {
     const result = await modelTools.loadModels(kind)
     if (result.ok && result.models) {
       if (kind === 'chat') setChatModels(result.models)
       else setEmbedModels(result.models)
-      setNote({
-        ok: true,
-        text:
-          result.models.length === 0
-            ? 'the provider listed no models'
-            : `${result.models.length} models — pick one from the dropdown`,
-      })
-    } else {
+      if (!quiet) {
+        setNote({
+          ok: true,
+          text:
+            result.models.length === 0
+              ? 'the provider listed no models'
+              : `${result.models.length} models — choose one below`,
+        })
+      }
+    } else if (!quiet) {
       setNote({ ok: false, text: result.error ?? 'could not list models' })
     }
   }
+
+  // Load the list as soon as the screen knows which provider is saved, so a dropdown
+  // is simply there rather than something you have to go and ask for.
+  const providerKey = `${config?.provider ?? ''}|${config?.embedProvider ?? ''}`
+  useEffect(() => {
+    if (!config) return
+    void loadModels('chat', true)
+    if (config.embedProvider) void loadModels('embed', true)
+    // loadModels is stable enough; keyed on the saved providers on purpose.
+  }, [providerKey])
 
   // Editable copies of the server settings.
   const [provider, setProvider] = useState('')
@@ -170,6 +269,9 @@ export function Settings({
       setEmbedApiKey('')
       setSaved('model')
       await syncState.refreshModel()
+      // A new provider or key means a new list of models.
+      void loadModels('chat', true)
+      void loadModels('embed', true)
     }
   }
 
@@ -318,23 +420,17 @@ export function Settings({
               </select>
             </Field>
 
-            <Field label="Model">
-              <input
-                value={model}
-                onChange={(event) => setModel(event.target.value)}
-                list="inkling-chat-models"
-                placeholder={config.model ?? ''}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                className={inputClass}
-              />
-              <datalist id="inkling-chat-models">
-                {chatModels.map((id) => (
-                  <option key={id} value={id} />
-                ))}
-              </datalist>
-            </Field>
+            <ModelPicker
+              label="Model"
+              value={model}
+              options={chatModels}
+              onChange={setModel}
+              custom={customChat}
+              onCustomChange={setCustomChat}
+              loading={modelTools.listing === 'chat'}
+              onLoad={() => void loadModels('chat')}
+              placeholder={config.model ?? ''}
+            />
 
             <Field label={`API key ${config.apiKeySet ? '(set)' : '(not set)'}`}>
               <input
@@ -362,23 +458,17 @@ export function Settings({
               </select>
             </Field>
 
-            <Field label="Embedding model">
-              <input
-                value={embedModel}
-                onChange={(event) => setEmbedModel(event.target.value)}
-                list="inkling-embed-models"
-                placeholder={config.embedModel ?? ''}
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                className={inputClass}
-              />
-              <datalist id="inkling-embed-models">
-                {embedModels.map((id) => (
-                  <option key={id} value={id} />
-                ))}
-              </datalist>
-            </Field>
+            <ModelPicker
+              label="Embedding model"
+              value={embedModel}
+              options={embedModels}
+              onChange={setEmbedModel}
+              custom={customEmbed}
+              onCustomChange={setCustomEmbed}
+              loading={modelTools.listing === 'embed'}
+              onLoad={() => void loadModels('embed')}
+              placeholder={config.embedModel ?? ''}
+            />
 
             <Field label={`Embedding key ${config.embedApiKeySet ? '(set)' : '(not set)'}`}>
               <input

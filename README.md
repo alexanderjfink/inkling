@@ -266,14 +266,19 @@ Saved settings override the server's environment, which still supplies anything 
 settings do not mention. **Keys are write-only**: the server reports whether one is set
 and never returns it, so nothing secret round-trips through the browser.
 
-Under **Model** there are also four tools, because "saved" and "works" are different
-things:
+Under **Model**, the model fields are **real dropdowns**. The list is loaded
+automatically from the saved provider, so once the endpoint and key are in place you
+just pick one — OpenCode Go returns 40, oMLX returns 4. Each field also offers
+*"type a model that is not listed"*, because local runners often serve something the
+endpoint does not advertise.
+
+Alongside them:
 
 | | |
 |---|---|
-| **Load models** | asks the provider what it serves and puts the list in the model field as a dropdown. OpenCode Go returns 40 |
 | **Test model** | one real round trip, reported with its latency and the reply |
-| **Load embedding models** / **Test embeddings** | the same, for the embedding provider |
+| **Test embeddings** | the same, for the embedding provider |
+| **reload the list** | re-asks the provider, after changing provider or key |
 
 They act on what is saved, so save before testing.
 

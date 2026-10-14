@@ -13,6 +13,7 @@ import {
   describeProvider,
   findPreset,
   readOpencodeAuth,
+  resolveEmbedProvider,
   resolveProvider,
 } from './providerConfig'
 
@@ -186,6 +187,82 @@ describe('resolveProvider', () => {
     const resolved = resolveProvider({ INKLING_PROVIDER: 'ollama' }, { authPath: NO_AUTH })
     expect(describeProvider(resolved)).toContain('Ollama')
     expect(describeProvider(resolved)).toContain('llama3.2')
+  })
+})
+
+describe('resolveEmbedProvider', () => {
+  test('is absent unless asked for, so nothing changes by default', () => {
+    expect(resolveEmbedProvider({}, { authPath: NO_AUTH })).toBeNull()
+    expect(
+      resolveEmbedProvider({ INKLING_PROVIDER: 'opencode-go' }, { authPath: NO_AUTH }),
+    ).toBeNull()
+  })
+
+  test('picks a local preset for embeddings while chat stays elsewhere', () => {
+    const embed = resolveEmbedProvider({ INKLING_EMBED_PROVIDER: 'omlx' }, { authPath: NO_AUTH })
+    expect(embed?.preset.id).toBe('omlx')
+    expect(embed?.baseUrl).toBe('http://127.0.0.1:8000/v1')
+    expect(embed?.embedModel).toBe('granite-embedding-small-english-r2')
+    expect(embed?.configured).toBe(true)
+
+    // And the chat provider is untouched by it.
+    const chat = resolveProvider({}, { authPath: NO_AUTH })
+    expect(chat.preset.id).toBe('opencode-go')
+    expect(chat.embedModel).toBeNull()
+  })
+
+  test('an explicit embedding model wins over the preset default', () => {
+    const embed = resolveEmbedProvider(
+      { INKLING_EMBED_PROVIDER: 'ollama', INKLING_EMBED_MODEL: 'mxbai-embed-large' },
+      { authPath: NO_AUTH },
+    )
+    expect(embed?.embedModel).toBe('mxbai-embed-large')
+  })
+
+  test('a custom embedding endpoint needs only a base url', () => {
+    const embed = resolveEmbedProvider(
+      {
+        INKLING_EMBED_BASE_URL: 'http://192.168.1.9:8080/v1/',
+        INKLING_EMBED_MODEL: 'some-embed',
+        INKLING_EMBED_API_KEY: 'k',
+      },
+      { authPath: NO_AUTH },
+    )
+    expect(embed?.baseUrl).toBe('http://192.168.1.9:8080/v1')
+    expect(embed?.embedModel).toBe('some-embed')
+    expect(embed?.apiKey).toBe('k')
+    expect(embed?.configured).toBe(true)
+  })
+
+  test('refuses a provider that has no embeddings API at all', () => {
+    expect(
+      resolveEmbedProvider({ INKLING_EMBED_PROVIDER: 'anthropic' }, { authPath: NO_AUTH }),
+    ).toBeNull()
+  })
+
+  test('modelStatus credits the embedding provider, not the chat one', () => {
+    const chat = resolveProvider({}, { authPath: NO_AUTH })
+    const embed = resolveEmbedProvider({ INKLING_EMBED_PROVIDER: 'omlx' }, { authPath: NO_AUTH })
+
+    const withEmbed = modelStatus(chat, embed)
+    expect(withEmbed.embeddings).toBe(true)
+    expect(withEmbed.embedProvider).toBe('omlx')
+    expect(withEmbed.embedModel).toBe('granite-embedding-small-english-r2')
+    expect(withEmbed.provider).toBe('opencode-go')
+
+    const withoutEmbed = modelStatus(chat)
+    expect(withoutEmbed.embeddings).toBe(false)
+    expect(withoutEmbed.embedProvider).toBeNull()
+  })
+
+  test('falls back to the chat provider when it can embed on its own', () => {
+    const resolved = resolveProvider(
+      { INKLING_PROVIDER: 'openai', OPENAI_API_KEY: 'k' },
+      { authPath: NO_AUTH },
+    )
+    const status = modelStatus(resolved)
+    expect(status.embeddings).toBe(true)
+    expect(status.embedProvider).toBe('openai')
   })
 })
 

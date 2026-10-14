@@ -29,10 +29,11 @@ export {
   selectMove,
   toMoveSpec,
 } from './moves'
-export type { RelatedBlip, RelatednessOptions } from './related'
+export type { RelatedBlip, RelatednessContext, RelatednessOptions } from './related'
 export {
   blipText,
   cosine,
+  DEFAULT_SIMILARITY_FLOOR,
   jaccard,
   relatedness,
   sharedTopics,

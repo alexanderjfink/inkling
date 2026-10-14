@@ -102,7 +102,7 @@ describe('relatedness', () => {
       ['a', [1, 0, 0]],
       ['b', [0.99, 0.1, 0]],
     ])
-    const withVectors = relatedness(a, b, embeddings)
+    const withVectors = relatedness(a, b, { embeddings })
     expect(withVectors.score).toBeGreaterThan(0)
     expect(withVectors.reasons).toContain('similar in meaning')
   })
@@ -114,7 +114,36 @@ describe('relatedness', () => {
       ['a', [1, 0]],
       ['b', [0.4, 0.9]],
     ])
-    expect(relatedness(a, b, embeddings).score).toBe(0)
+    expect(relatedness(a, b, { embeddings }).score).toBe(0)
+  })
+
+  test('the floor is calibrated for models with a high baseline', () => {
+    // Measured with granite-embedding-small: unrelated text sits around 0.65,
+    // a near-paraphrase around 0.89. A 0.6 floor would call unrelated text related.
+    const a = blip('a', 'first')
+    const b = blip('b', 'second')
+    const unrelated = new Map([
+      ['a', [1, 0]],
+      ['b', [0.65, Math.sqrt(1 - 0.65 * 0.65)]],
+    ])
+    expect(relatedness(a, b, { embeddings: unrelated }).score).toBe(0)
+
+    const paraphrase = new Map([
+      ['a', [1, 0]],
+      ['b', [0.89, Math.sqrt(1 - 0.89 * 0.89)]],
+    ])
+    expect(relatedness(a, b, { embeddings: paraphrase }).score).toBeGreaterThan(0)
+  })
+
+  test('the floor can be tuned for a model with a different baseline', () => {
+    const a = blip('a', 'first')
+    const b = blip('b', 'second')
+    const embeddings = new Map([
+      ['a', [1, 0]],
+      ['b', [0.65, Math.sqrt(1 - 0.65 * 0.65)]],
+    ])
+    expect(relatedness(a, b, { embeddings }).score).toBe(0)
+    expect(relatedness(a, b, { embeddings, similarityFloor: 0.6 }).score).toBeGreaterThan(0)
   })
 })
 

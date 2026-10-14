@@ -15,7 +15,27 @@ export interface RelatednessOptions {
   limit?: number
   /** Include blips that are already explicitly linked. */
   includeLinked?: boolean
+  /** Cosine above which two vectors count as similar. See the note below. */
+  similarityFloor?: number
 }
+
+export interface RelatednessContext {
+  embeddings?: Map<string, number[]>
+  similarityFloor?: number
+}
+
+/**
+ * Where "similar in meaning" starts.
+ *
+ * Model-dependent, and measured rather than guessed: with
+ * `granite-embedding-small-english-r2`, genuinely unrelated text sits at 0.61–0.66
+ * and a near-paraphrase reaches 0.89. A naive 0.6 threshold therefore calls
+ * unrelated blips related. The default is deliberately conservative — precision
+ * matters more here, because topics and links already provide recall.
+ *
+ * Override per deployment with INKLING_EMBED_SIMILARITY.
+ */
+export const DEFAULT_SIMILARITY_FLOOR = 0.75
 
 export interface RelatedBlip {
   blip: Blip
@@ -136,7 +156,7 @@ export function sharedTopics(a: Blip, b: Blip): string[] {
 export function relatedness(
   a: Blip,
   b: Blip,
-  embeddings?: Map<string, number[]>,
+  context: RelatednessContext = {},
 ): { score: number; reasons: string[] } {
   const reasons: string[] = []
   let score = 0
@@ -152,12 +172,13 @@ export function relatedness(
     reasons.push(`shared topic: ${topics.join(', ')}`)
   }
 
-  const vectorA = embeddings?.get(a.id)
-  const vectorB = embeddings?.get(b.id)
+  const vectorA = context.embeddings?.get(a.id)
+  const vectorB = context.embeddings?.get(b.id)
   if (vectorA && vectorB) {
+    const floor = context.similarityFloor ?? DEFAULT_SIMILARITY_FLOOR
     const similarity = cosine(vectorA, vectorB)
-    if (similarity > 0.6) {
-      score += WEIGHT_MEANING * ((similarity - 0.6) / 0.4)
+    if (similarity > floor) {
+      score += WEIGHT_MEANING * ((similarity - floor) / (1 - floor))
       reasons.push('similar in meaning')
     }
   }
@@ -184,7 +205,10 @@ export function topRelated(
   for (const other of all) {
     if (other.id === blip.id || other.deleted) continue
     if (!options.includeLinked && linked.has(other.id)) continue
-    const { score, reasons } = relatedness(blip, other, options.embeddings)
+    const { score, reasons } = relatedness(blip, other, {
+      embeddings: options.embeddings,
+      similarityFloor: options.similarityFloor,
+    })
     if (score < MIN_SCORE) continue
     results.push({ blip: other, score, reasons })
   }

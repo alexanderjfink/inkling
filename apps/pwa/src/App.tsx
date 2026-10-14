@@ -24,7 +24,12 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('today')
   const { ready, blips, actions } = useInkling()
   const syncState = useSync()
-  const related = useRelated(blips, syncState.provider, syncState.model?.embeddings ?? false)
+  const related = useRelated(
+    blips,
+    syncState.provider,
+    syncState.model?.embeddings ?? false,
+    syncState.model?.embedSimilarity ?? null,
+  )
   const promoteState = usePromote()
 
   const onPromote = useCallback(

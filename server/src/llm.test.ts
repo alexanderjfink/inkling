@@ -169,6 +169,37 @@ describe('llm and fetch routes', () => {
     ).toBe(503)
   })
 
+  test('embeddings go to the embedding provider, completions to the chat provider', async () => {
+    const asked: string[] = []
+    const chat = fakeLlm({
+      completeStructured: async () => {
+        asked.push('chat')
+        return '{"ok":true}'
+      },
+    })
+    const embedder = fakeLlm({
+      name: 'local-embed',
+      embed: async (texts) => {
+        asked.push('embed')
+        return texts.map(() => [9, 9])
+      },
+    })
+
+    const handle = createHandler(new FileStore(dir), { llm: chat, embed: embedder })
+    const vectors = await handle(
+      new Request(`${BASE}/llm/embed`, { method: 'POST', body: JSON.stringify({ texts: ['a'] }) }),
+    )
+    await handle(
+      new Request(`${BASE}/llm/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ prompt: 'p' }),
+      }),
+    )
+
+    expect((await vectors.json()).vectors).toEqual([[9, 9]])
+    expect(asked).toEqual(['embed', 'chat'])
+  })
+
   test('llm health reports whether a model is configured', async () => {
     const without = createHandler(new FileStore(dir))
     const a = await without(new Request(`${BASE}/llm/health`))
@@ -186,6 +217,9 @@ describe('llm and fetch routes', () => {
       providerName: 'OpenCode Go',
       model: 'kimi-k2.6',
       embedModel: null,
+      embedProvider: null,
+      embedProviderName: null,
+      embedSimilarity: null,
       configured: true,
       keySource: 'opencode-auth' as const,
       embeddings: false,

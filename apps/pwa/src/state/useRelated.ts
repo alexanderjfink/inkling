@@ -14,6 +14,7 @@ export function useRelated(
   blips: Blip[],
   provider: LLMProvider,
   useEmbeddings: boolean,
+  similarityFloor?: number | null,
 ): Map<string, RelatedBlip[]> {
   const [embeddings, setEmbeddings] = useState<Map<string, number[]>>(new Map())
 
@@ -31,8 +32,15 @@ export function useRelated(
   return useMemo(() => {
     const map = new Map<string, RelatedBlip[]>()
     for (const blip of blips) {
-      map.set(blip.id, topRelated(blip, blips, { embeddings, limit: 3 }))
+      map.set(
+        blip.id,
+        topRelated(blip, blips, {
+          embeddings,
+          limit: 3,
+          similarityFloor: similarityFloor ?? undefined,
+        }),
+      )
     }
     return map
-  }, [blips, embeddings])
+  }, [blips, embeddings, similarityFloor])
 }

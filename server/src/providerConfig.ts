@@ -113,6 +113,17 @@ export const PRESETS: ProviderPreset[] = [
     note: 'Start it with OLLAMA_HOST=0.0.0.0 if the server is not on the same machine.',
   },
   {
+    id: 'omlx',
+    name: 'oMLX (local)',
+    kind: 'openai-compatible',
+    baseUrl: 'http://127.0.0.1:8000/v1',
+    keyEnv: ['OMLX_API_KEY'],
+    keyOptional: true,
+    defaultModel: 'gemma-4-e4b-it-4bit',
+    defaultEmbedModel: 'granite-embedding-small-english-r2',
+    note: 'Set OMLX_API_KEY if the server requires one. Good as a local embedding source.',
+  },
+  {
     id: 'vllm',
     name: 'vLLM (local)',
     kind: 'openai-compatible',
@@ -243,12 +254,66 @@ export function resolveProvider(
   }
 }
 
+/** Cosine floor for "similar in meaning". Model-dependent, so it is configurable. */
+export function embedSimilarityFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): number | null {
+  const raw = env.INKLING_EMBED_SIMILARITY?.trim()
+  if (!raw) return null
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value <= 0 || value >= 1) return null
+  return value
+}
+
 export function describeProvider(resolved: ResolvedProvider): string {
   if (!resolved.configured) {
     return `${resolved.preset.name}: not configured (${missingReason(resolved)})`
   }
   const key = resolved.keySource === 'opencode-auth' ? 'key from OpenCode' : 'key from env'
   return `${resolved.preset.name} · ${resolved.model} · ${key}`
+}
+
+/**
+ * A second provider, used only for embeddings.
+ *
+ * Worth having on its own because the two jobs have different constraints: the chat
+ * provider is chosen for judgement and may have no embeddings API at all (OpenCode
+ * Go, Anthropic), while embeddings are cheap, private, and best served by something
+ * local. Splitting them means semantic relatedness can be on without changing which
+ * model writes the moves.
+ */
+export function resolveEmbedProvider(
+  env: Record<string, string | undefined> = process.env,
+  options: ResolveOptions = {},
+): ResolvedProvider | null {
+  const providerId = env.INKLING_EMBED_PROVIDER?.trim()
+  const baseUrl = env.INKLING_EMBED_BASE_URL?.trim()
+  if (!providerId && !baseUrl) return null
+
+  const model = env.INKLING_EMBED_MODEL?.trim()
+  const embedEnv: Record<string, string | undefined> = {
+    ...env,
+    INKLING_PROVIDER: providerId || 'custom',
+    INKLING_BASE_URL: baseUrl,
+    INKLING_API_KEY: env.INKLING_EMBED_API_KEY,
+    // For an embedding-only provider, the model *is* the embedding model.
+    INKLING_MODEL: model,
+    INKLING_EMBED_MODEL: undefined,
+  }
+
+  const resolved = resolveProvider(embedEnv, options)
+  if (resolved.preset.noEmbeddings) return null
+
+  const embedModel = model || resolved.preset.defaultEmbedModel || resolved.model
+  if (!embedModel) return null
+  return { ...resolved, embedModel }
+}
+
+export function describeEmbedProvider(resolved: ResolvedProvider): string {
+  if (!resolved.configured) {
+    return `${resolved.preset.name}: not configured (${missingReason(resolved)})`
+  }
+  return `${resolved.preset.name} · ${resolved.embedModel ?? 'no model'}`
 }
 
 function missingReason(resolved: ResolvedProvider): string {

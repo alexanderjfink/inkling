@@ -175,22 +175,35 @@ export interface ModelStatus {
   providerName: string
   model: string
   embedModel: string | null
+  /** The provider serving embeddings, which may not be the one serving completions. */
+  embedProvider: string | null
+  embedProviderName: string | null
   configured: boolean
   keySource: KeySource
-  /** Whether this provider can produce embeddings at all. */
+  /** Whether embeddings are available at all, from either provider. */
   embeddings: boolean
+  /** Cosine floor above which two vectors count as similar. */
+  embedSimilarity: number | null
   note?: string
 }
 
-export function modelStatus(resolved: ResolvedProvider): ModelStatus {
+export function modelStatus(
+  resolved: ResolvedProvider,
+  embed?: ResolvedProvider | null,
+  embedSimilarity?: number | null,
+): ModelStatus {
+  const embedSource = embed ?? (resolved.embedModel ? resolved : null)
   return {
     provider: resolved.preset.id,
     providerName: resolved.preset.name,
     model: resolved.model,
-    embedModel: resolved.embedModel,
+    embedModel: embedSource?.embedModel ?? null,
+    embedProvider: embedSource ? embedSource.preset.id : null,
+    embedProviderName: embedSource ? embedSource.preset.name : null,
     configured: resolved.configured,
     keySource: resolved.keySource,
-    embeddings: Boolean(resolved.embedModel),
+    embeddings: Boolean(embedSource?.embedModel),
+    embedSimilarity: embedSimilarity ?? null,
     note: resolved.preset.note,
   }
 }

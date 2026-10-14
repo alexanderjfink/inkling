@@ -51,6 +51,8 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
  */
 export interface HandlerOptions {
   llm?: LLMProvider
+  /** Serves embeddings when set; otherwise the main provider is asked. */
+  embed?: LLMProvider
   model?: ModelStatus
   vault?: VaultConfig
 }
@@ -59,7 +61,7 @@ export function createHandler(
   store: Store,
   options: HandlerOptions = {},
 ): (request: Request) => Promise<Response> {
-  const { llm, model: status, vault } = options
+  const { llm, embed, model: status, vault } = options
   return async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname
@@ -89,6 +91,9 @@ export function createHandler(
         providerName: status?.providerName ?? null,
         model: status?.model ?? null,
         embedModel: status?.embedModel ?? null,
+        embedProvider: status?.embedProvider ?? null,
+        embedProviderName: status?.embedProviderName ?? null,
+        embedSimilarity: status?.embedSimilarity ?? null,
         embeddings: status?.embeddings ?? false,
         keySource: status?.keySource ?? null,
         note: status?.note ?? null,
@@ -187,11 +192,12 @@ export function createHandler(
           ? body.texts.filter((entry): entry is string => typeof entry === 'string').slice(0, 64)
           : []
         if (texts.length === 0) return json({ error: 'texts is required' }, 400)
-        if (!llm || !(await llm.available())) {
-          return json({ error: 'no language model configured' }, 503)
+        const embedder = embed ?? llm
+        if (!embedder || !(await embedder.available())) {
+          return json({ error: 'no embedding model configured' }, 503)
         }
         try {
-          return json({ vectors: await llm.embed(texts) })
+          return json({ vectors: await embedder.embed(texts) })
         } catch (error) {
           return json({ error: error instanceof Error ? error.message : 'embedding failed' }, 502)
         }

@@ -10,8 +10,12 @@ export interface ModelHealth {
   providerName: string | null
   model: string | null
   embedModel: string | null
-  /** Whether the server's provider can produce embeddings at all. */
+  embedProvider: string | null
+  embedProviderName: string | null
+  /** Whether the server can produce embeddings at all. */
   embeddings: boolean
+  /** Cosine floor for "similar in meaning"; model-dependent. */
+  embedSimilarity: number | null
   keySource: string | null
   note: string | null
 }
@@ -22,7 +26,10 @@ const UNKNOWN: ModelHealth = {
   providerName: null,
   model: null,
   embedModel: null,
+  embedProvider: null,
+  embedProviderName: null,
   embeddings: false,
+  embedSimilarity: null,
   keySource: null,
   note: null,
 }

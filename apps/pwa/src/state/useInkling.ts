@@ -27,6 +27,8 @@ export interface InklingActions {
   recordMoveShown(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
   /** Finish a move: keep the result, mark the move done, and stretch the interval. */
   completeMove(id: string, moveId: string, text: string): Promise<BlipEvent>
+  /** A blip has been written out as a note; the path is where it landed. */
+  promote(id: string, notePath: string): Promise<BlipEvent>
   classify(id: string, type: BlipType): Promise<BlipEvent>
   link(id: string, otherId: string, reason?: string): Promise<BlipEvent>
 }
@@ -116,6 +118,9 @@ export function useInkling() {
       },
       unpinFromDesktop(id) {
         return storage().append({ t: 'unpinFromDesktop', id })
+      },
+      promote(id, notePath) {
+        return storage().append({ t: 'promoted', id, notePath })
       },
       recordMoveShown(id, moveSpec) {
         return storage().append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })

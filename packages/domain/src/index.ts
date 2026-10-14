@@ -39,6 +39,17 @@ export {
   tokens,
   topRelated,
 } from './related'
+export type { NextStepsDraft, NoteOptions } from './obsidian'
+export {
+  buildNextStepsPrompt,
+  draftNextSteps,
+  heuristicNextSteps,
+  noteFilename,
+  notePath,
+  parseNextSteps,
+  renderObsidianNote,
+  slugify,
+} from './obsidian'
 export type { Blip, BlipStatus, MoveHistoryEntry, ScheduleState } from './project'
 export { liveBlips, project } from './project'
 export type { FeedContext } from './schedule'

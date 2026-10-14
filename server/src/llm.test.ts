@@ -98,7 +98,7 @@ describe('llm and fetch routes', () => {
   })
 
   test('completion proxies through the provider when one is configured', async () => {
-    const handle = createHandler(new FileStore(dir), fakeLlm())
+    const handle = createHandler(new FileStore(dir), { llm: fakeLlm() })
     const res = await handle(
       new Request(`${BASE}/llm/complete`, {
         method: 'POST',
@@ -110,14 +110,13 @@ describe('llm and fetch routes', () => {
   })
 
   test('completion reports an upstream failure as 502, not as a crash', async () => {
-    const handle = createHandler(
-      new FileStore(dir),
-      fakeLlm({
+    const handle = createHandler(new FileStore(dir), {
+      llm: fakeLlm({
         completeStructured: async () => {
           throw new Error('upstream exploded')
         },
       }),
-    )
+    })
     const res = await handle(
       new Request(`${BASE}/llm/complete`, {
         method: 'POST',
@@ -129,7 +128,7 @@ describe('llm and fetch routes', () => {
   })
 
   test('completion rejects an empty prompt and a non-json body', async () => {
-    const handle = createHandler(new FileStore(dir), fakeLlm())
+    const handle = createHandler(new FileStore(dir), { llm: fakeLlm() })
     expect(
       (
         await handle(
@@ -147,7 +146,7 @@ describe('llm and fetch routes', () => {
   })
 
   test('embedding returns vectors, and 503 when unconfigured', async () => {
-    const configured = createHandler(new FileStore(dir), fakeLlm())
+    const configured = createHandler(new FileStore(dir), { llm: fakeLlm() })
     const ok = await configured(
       new Request(`${BASE}/llm/embed`, {
         method: 'POST',
@@ -175,7 +174,7 @@ describe('llm and fetch routes', () => {
     const a = await without(new Request(`${BASE}/llm/health`))
     expect((await a.json()).configured).toBe(false)
 
-    const withModel = createHandler(new FileStore(dir), fakeLlm())
+    const withModel = createHandler(new FileStore(dir), { llm: fakeLlm() })
     const body = await withModel(new Request(`${BASE}/llm/health`)).then((res) => res.json())
     expect(body.configured).toBe(true)
     expect(body.provider).toBe('fake')
@@ -191,7 +190,7 @@ describe('llm and fetch routes', () => {
       keySource: 'opencode-auth' as const,
       embeddings: false,
     }
-    const handle = createHandler(new FileStore(dir), fakeLlm(), status)
+    const handle = createHandler(new FileStore(dir), { llm: fakeLlm(), model: status })
     const body = await handle(new Request(`${BASE}/llm/health`)).then((res) => res.json())
     expect(body).toMatchObject({
       configured: true,

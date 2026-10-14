@@ -22,6 +22,11 @@ export interface ProviderPreset {
   opencodeAuthId?: string
   /** Local servers need no key at all. */
   keyOptional?: boolean
+  /**
+   * Gateways that route by conversation and require a stable session id header.
+   * OpenCode Go rejects requests without it.
+   */
+  requiresSession?: boolean
   defaultModel: string
   defaultEmbedModel?: string
   /** True when the provider has no embeddings API. */
@@ -37,8 +42,9 @@ export const PRESETS: ProviderPreset[] = [
     baseUrl: 'https://opencode.ai/inference/go/v1',
     keyEnv: ['OPENCODE_API_KEY'],
     opencodeAuthId: 'opencode-go',
+    requiresSession: true,
     defaultModel: 'kimi-k2.6',
-    note: 'The OpenCode Go gateway. Reuses the key OpenCode itself already has.',
+    note: 'Requires x-opencode-session, which is sent automatically. Only the models listed against /v1/chat/completions work here.',
   },
   {
     id: 'opencode',
@@ -47,6 +53,7 @@ export const PRESETS: ProviderPreset[] = [
     baseUrl: 'https://opencode.ai/inference/v1',
     keyEnv: ['OPENCODE_API_KEY'],
     opencodeAuthId: 'opencode',
+    requiresSession: true,
     defaultModel: 'gpt-5.4',
   },
   {
@@ -169,6 +176,8 @@ export interface ResolvedProvider {
   embedModel: string | null
   configured: boolean
   keySource: KeySource
+  /** Sent as x-opencode-session when the preset requires one. */
+  sessionId: string | null
 }
 
 export interface ResolveOptions {
@@ -228,6 +237,9 @@ export function resolveProvider(
     configured:
       Boolean(baseUrl) && Boolean(model) && (apiKey !== null || Boolean(preset.keyOptional)),
     keySource,
+    // A stable id per server process. Gateways use it for routing and prompt
+    // caching, so it should not change on every request.
+    sessionId: preset.requiresSession ? env.INKLING_SESSION?.trim() || crypto.randomUUID() : null,
   }
 }
 

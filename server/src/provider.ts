@@ -27,6 +27,7 @@ export class OpenAiCompatibleProvider implements LLMProvider {
   #apiKey: string | null
   #model: string
   #embedModel: string | null
+  #sessionId: string | null
 
   constructor(resolved: ResolvedProvider) {
     this.name = resolved.preset.id
@@ -34,6 +35,7 @@ export class OpenAiCompatibleProvider implements LLMProvider {
     this.#apiKey = resolved.apiKey
     this.#model = resolved.model
     this.#embedModel = resolved.embedModel
+    this.#sessionId = resolved.sessionId
   }
 
   async available(): Promise<boolean> {
@@ -41,8 +43,14 @@ export class OpenAiCompatibleProvider implements LLMProvider {
   }
 
   async #post(path: string, body: unknown): Promise<Response> {
-    const headers: Record<string, string> = { 'content-type': 'application/json' }
+    const headers: Record<string, string> = {
+      'content-type': 'application/json',
+      // Identify ourselves rather than arriving as a generic HTTP library.
+      'user-agent': 'Inkling/0.1 (personal blip tool)',
+    }
     if (this.#apiKey) headers.authorization = `Bearer ${this.#apiKey}`
+    // Gateways such as OpenCode Go refuse requests without a session id.
+    if (this.#sessionId) headers['x-opencode-session'] = this.#sessionId
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -103,11 +111,13 @@ export class AnthropicProvider implements LLMProvider {
   #baseUrl: string
   #apiKey: string | null
   #model: string
+  #sessionId: string | null
 
   constructor(resolved: ResolvedProvider) {
     this.#baseUrl = resolved.baseUrl
     this.#apiKey = resolved.apiKey
     this.#model = resolved.model
+    this.#sessionId = resolved.sessionId
   }
 
   async available(): Promise<boolean> {
@@ -125,6 +135,8 @@ export class AnthropicProvider implements LLMProvider {
           'x-api-key': this.#apiKey ?? '',
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
+          'user-agent': 'Inkling/0.1 (personal blip tool)',
+          ...(this.#sessionId ? { 'x-opencode-session': this.#sessionId } : {}),
         },
         body: JSON.stringify({
           model: this.#model,

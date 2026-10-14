@@ -3,6 +3,7 @@ import { fetchPage, isFetchableUrl } from './fetchPage'
 import type { ModelStatus } from './provider'
 import { PRESETS } from './providerConfig'
 import { type Store, isSafeDeviceId, isSafeHash } from './store'
+import { type VaultConfig, resolveNotePath, vaultStatus, writeNote } from './vault'
 
 const encoder = new TextEncoder()
 
@@ -48,11 +49,17 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
  *   GET  /api/blobs/:hash
  *   PUT  /api/blobs/:hash                 -> content-addressed, hash verified
  */
+export interface HandlerOptions {
+  llm?: LLMProvider
+  model?: ModelStatus
+  vault?: VaultConfig
+}
+
 export function createHandler(
   store: Store,
-  llm?: LLMProvider,
-  status?: ModelStatus,
+  options: HandlerOptions = {},
 ): (request: Request) => Promise<Response> {
+  const { llm, model: status, vault } = options
   return async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname
@@ -113,6 +120,48 @@ export function createHandler(
         return json({ ok: true })
       }
       return json({ error: 'method not allowed' }, 405)
+    }
+
+    if (parts.length === 2 && parts[0] === 'obsidian' && parts[1] === 'status') {
+      if (!vault) return json({ error: 'no vault configured' }, 503)
+      return json(await vaultStatus(vault))
+    }
+
+    if (parts.length === 2 && parts[0] === 'obsidian' && parts[1] === 'note') {
+      if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405)
+      if (!vault) return json({ error: 'no vault configured' }, 503)
+
+      const body = await readJson(request)
+      if (!body) return json({ error: 'invalid json body' }, 400)
+      const filename = typeof body.filename === 'string' ? body.filename.trim() : ''
+      const explicitPath = typeof body.path === 'string' ? body.path.trim() : ''
+      const markdown = typeof body.markdown === 'string' ? body.markdown : ''
+
+      // A bare filename is prefixed with the configured folder here, so the client
+      // never has to know where notes live.
+      if (filename && filename.includes('/')) {
+        return json({ error: 'filename must not contain a path separator' }, 400)
+      }
+      const relativePath = filename
+        ? vault.folder
+          ? `${vault.folder}/${filename}`
+          : filename
+        : explicitPath
+
+      if (!relativePath || !markdown) {
+        return json({ error: 'filename and markdown are required' }, 400)
+      }
+      if (!resolveNotePath(vault.vault, relativePath)) {
+        return json({ error: 'note path escapes the vault, or is not a .md file' }, 400)
+      }
+
+      try {
+        const result = await writeNote(vault.vault, relativePath, markdown)
+        return json({ ok: true, path: result.path, created: result.created })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'write failed'
+        return json({ error: message }, 502)
+      }
     }
 
     if (parts.length === 2 && parts[0] === 'llm' && request.method === 'POST') {

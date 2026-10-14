@@ -27,6 +27,7 @@ companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 | **Related blips** — links, topics and wording first; embeddings optional | done, tested |
 | **Contextual resurfacing** — a topic match overrides a snooze | done, tested |
 | **URL fetch** — server-side, so a saved link has something to react to | done, tested |
+| **Promotion** — a blip becomes an Obsidian note with specific next steps | done, tested |
 | Storage engine | **decided**: IndexedDB (10.3k writes/s vs OPFS 806/s on the Android phone) |
 
 ## Layout
@@ -44,6 +45,7 @@ inkling/
 │       ├── digest.ts     state digest for convergence checks
 │       ├── moves.ts      the playbook, selection, prompt and reply validation
 │       ├── related.ts    how blips relate: links, topics, wording, embeddings
+│       ├── obsidian.ts   note rendering, and drafting the next steps
 │       └── llm.ts        the provider seam (nothing model-shaped lives elsewhere)
 ├── server/            Bun + file-backed store; sync, model proxy, url fetch
 │   └── src/
@@ -52,6 +54,7 @@ inkling/
 │       ├── providerConfig.ts  presets, and where credentials come from
 │       ├── provider.ts   OpenAI-compatible + Anthropic transports
 │       ├── fetchPage.ts  url -> title + excerpt, with private-network guards
+│       ├── vault.ts      writing notes into the Obsidian vault, path-guarded
 │       └── index.ts      entry point
 └── apps/pwa/          React 19 + Vite + Tailwind, installable PWA
     └── src/
@@ -59,7 +62,7 @@ inkling/
         ├── sync/         SyncTransport (HTTP) + Syncer
         ├── llm/          ProxyProvider — the client's view of the model
         ├── embeddings.ts cached vectors, by content hash
-        ├── state/        useInkling(), useSync(), useRelated()
+        ├── state/        useInkling(), useSync(), useRelated(), usePromote()
         ├── components/   Capture, Feed, Desk, AllBlips, SyncPanel, MoveCard
         └── spike/        in-app storage benchmark
 ```
@@ -184,6 +187,55 @@ Typing a topic into the Today box — or advancing a blip with that topic — of
 matching snoozed blips as "bring them in". Offered rather than injected, so the finite
 list stays finite.
 
+## Promoting to a note
+
+When a blip has accumulated enough, **Promote to note** ends the ambiguity: it drafts
+specific next steps, renders an evergreen note, and writes it into your Obsidian vault.
+
+The order matters. Steps are drafted *before* the note is rendered, because a note
+without specific next steps has only moved the problem — the source material's
+complaint about blips is that they "lack clear next steps". The `promoted` event is
+appended only once the file is on disk, so a failed write leaves the blip untouched.
+
+The note is mdbase-shaped on purpose — a `type` plus typed fields — so the same
+renderer can feed a typed Markdown collection later without the formats diverging.
+
+```yaml
+---
+type: evergreen
+blip_id: 01M4XNBE96YQQZ8R4TPA1R35ST
+blip_type: idea
+title: "Stages of change theory interventions…"
+created: 2026-10-14
+promoted: 2026-10-14
+tags:
+  - blip/idea
+  - topic/change
+---
+
+# Stages of change theory interventions, and how they fit spaced repetition
+
+## Next steps
+- [ ] Send Gena a direct message listing three specific questions about …
+- [ ] Draw a six-row table mapping each stage of change to a card objective.
+
+## Context
+Topics: change, interventions
+Related:
+- [[Ask Gena about stages of change theory]]
+```
+
+Configuration:
+
+```bash
+INKLING_VAULT=~/Documents/Notebook      # default
+INKLING_VAULT_FOLDER=Inkling            # default; notes land here
+```
+
+Without a model the steps fall back to something honest rather than clever: it names
+the obvious action if there is one (read the saved link), and otherwise says plainly
+that the step is yours to define. The note still gets written.
+
 ## Testing on the phone
 
 The app must run in a **secure context** on the device. On a plain `http://<LAN-IP>`
@@ -218,4 +270,4 @@ captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5
 
 ## Not yet
 
-Obsidian export (M5), Capacitor wrap, notifications, and voice capture (M6).
+Capacitor wrap, notifications, and voice capture (M6).

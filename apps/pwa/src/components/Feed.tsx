@@ -2,20 +2,27 @@ import type { Blip, LLMProvider, RelatedBlip } from '@inkling/domain'
 import { buildDailyFeed } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import type { InklingActions } from '../state/useInkling'
+import type { PromoteResult } from '../state/usePromote'
 import { MoveCard } from './MoveCard'
 
-type Decision = 'advanced' | 'snoozed' | 'retired' | 'pinned'
+type Decision = 'advanced' | 'snoozed' | 'retired' | 'pinned' | 'promoted'
 
 export function Feed({
   blips,
   actions,
   provider,
   related,
+  onPromote,
+  promoteResults,
+  promotingId,
 }: {
   blips: Blip[]
   actions: InklingActions
   provider: LLMProvider
   related: Map<string, RelatedBlip[]>
+  onPromote: (blip: Blip, related: Blip[]) => Promise<PromoteResult>
+  promoteResults: Record<string, PromoteResult>
+  promotingId: string | null
 }) {
   const [topicsText, setTopicsText] = useState('')
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
@@ -106,6 +113,11 @@ export function Feed({
   async function pin(blip: Blip) {
     await actions.pinToDesktop(blip.id)
     decide(blip.id, 'pinned')
+  }
+
+  async function promote(blip: Blip, relatedBlips: Blip[]) {
+    const result = await onPromote(blip, relatedBlips)
+    if (result.ok) decide(blip.id, 'promoted')
   }
 
   function nextSession() {
@@ -210,8 +222,19 @@ export function Feed({
               </ul>
             ) : null}
 
+            {promoteResults[blip.id]?.ok === false ? (
+              <p className="mt-2 text-xs text-amber-300">
+                could not write the note: {promoteResults[blip.id]?.error}
+              </p>
+            ) : null}
+
             {decision ? (
-              <p className="mt-3 text-xs text-zinc-500">→ {decision}</p>
+              <p className="mt-3 text-xs text-zinc-500">
+                → {decision}
+                {decision === 'promoted' && promoteResults[blip.id]?.path
+                  ? ` to ${promoteResults[blip.id]?.path}`
+                  : ''}
+              </p>
             ) : (
               <>
                 <MoveCard
@@ -245,6 +268,19 @@ export function Feed({
                     className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300"
                   >
                     Send to desktop
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void promote(
+                        blip,
+                        relatedBlips.map((entry) => entry.blip),
+                      )
+                    }
+                    disabled={promotingId === blip.id}
+                    className="rounded-lg border border-emerald-900 px-3 py-1.5 text-xs text-emerald-300 disabled:opacity-40"
+                  >
+                    {promotingId === blip.id ? 'Writing note…' : 'Promote to note'}
                   </button>
                   <button
                     type="button"
@@ -286,7 +322,8 @@ export function Feed({
             advanced · {Object.values(decisions).filter((value) => value === 'snoozed').length}{' '}
             snoozed · {Object.values(decisions).filter((value) => value === 'retired').length}{' '}
             retired · {Object.values(decisions).filter((value) => value === 'pinned').length} to
-            desktop · nothing lost.
+            desktop · {Object.values(decisions).filter((value) => value === 'promoted').length} to
+            notes · nothing lost.
           </p>
           <button
             type="button"

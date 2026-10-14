@@ -214,6 +214,36 @@ describe('OpenAiCompatibleProvider', () => {
     )
   }
 
+  test('opencode-go requires a session id, so the provider sends one', async () => {
+    const resolved = resolveProvider(
+      { INKLING_PROVIDER: 'opencode-go', OPENCODE_API_KEY: 'k' },
+      { authPath: NO_AUTH },
+    )
+    expect(resolved.sessionId).toBeTruthy()
+
+    const stub = stubFetch(async () => Response.json({ choices: [{ message: { content: 'x' } }] }))
+    await new OpenAiCompatibleProvider(resolved).completeStructured({ system: 's', prompt: 'p' })
+    expect(stub.calls[0]?.headers['x-opencode-session']).toBe(String(resolved.sessionId))
+    expect(stub.calls[0]?.headers['user-agent']).toContain('Inkling')
+  })
+
+  test('the session id is stable, and overridable', () => {
+    const first = resolveProvider({ INKLING_PROVIDER: 'opencode-go' }, { authPath: NO_AUTH })
+    expect(first.sessionId).toBeTruthy()
+
+    const pinned = resolveProvider(
+      { INKLING_PROVIDER: 'opencode-go', INKLING_SESSION: 'session-123' },
+      { authPath: NO_AUTH },
+    )
+    expect(pinned.sessionId).toBe('session-123')
+  })
+
+  test('a provider that does not need a session does not get one', () => {
+    expect(
+      resolveProvider({ INKLING_PROVIDER: 'ollama' }, { authPath: NO_AUTH }).sessionId,
+    ).toBeNull()
+  })
+
   test('posts a chat completion and returns the text', async () => {
     const stub = stubFetch(async () =>
       Response.json({ choices: [{ message: { content: 'hello' } }] }),

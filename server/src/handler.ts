@@ -1,4 +1,6 @@
 import { type LLMProvider, parseLog, sha256Hex } from '@inkling/domain'
+import type { ConfigProblem, Runtime, ServerConfig } from './config'
+import { publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
 import type { ModelStatus } from './provider'
 import { PRESETS } from './providerConfig'
@@ -29,6 +31,48 @@ function toBody(bytes: Uint8Array): ArrayBuffer {
   return copy
 }
 
+function providerList() {
+  return PRESETS.map((preset) => ({
+    id: preset.id,
+    name: preset.name,
+    kind: preset.kind,
+    keyEnv: preset.keyEnv,
+    defaultModel: preset.defaultModel,
+    keyOptional: Boolean(preset.keyOptional),
+    noEmbeddings: Boolean(preset.noEmbeddings),
+    note: preset.note ?? null,
+  }))
+}
+
+/** Read the known settings fields out of a request body. */
+function configPatch(body: Record<string, unknown>): ServerConfig {
+  const patch: ServerConfig = {}
+  const target = patch as Record<string, unknown>
+  for (const key of [
+    'provider',
+    'model',
+    'embedProvider',
+    'embedModel',
+    'vault',
+    'folder',
+    'apiKey',
+    'embedApiKey',
+  ] as const) {
+    const value = body[key]
+    if (typeof value === 'string') target[key] = value.trim()
+  }
+  const similarity = body.embedSimilarity
+  if (similarity === null) {
+    target.embedSimilarity = null
+  } else if (typeof similarity === 'number') {
+    target.embedSimilarity = similarity
+  } else if (typeof similarity === 'string' && similarity.trim() !== '') {
+    const parsed = Number(similarity)
+    if (Number.isFinite(parsed)) target.embedSimilarity = parsed
+  }
+  return patch
+}
+
 async function readJson(request: Request): Promise<Record<string, unknown> | null> {
   try {
     const body = (await request.json()) as unknown
@@ -49,12 +93,27 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
  *   GET  /api/blobs/:hash
  *   PUT  /api/blobs/:hash                 -> content-addressed, hash verified
  */
+/** Reads and writes the saved settings, rebuilding the runtime on change. */
+export interface SettingsBridge {
+  read: () => Promise<{ config: ServerConfig; runtime: Runtime }>
+  update: (
+    patch: ServerConfig,
+  ) => Promise<{ config: ServerConfig; runtime: Runtime; problems: ConfigProblem[] }>
+}
+
 export interface HandlerOptions {
   llm?: LLMProvider
   /** Serves embeddings when set; otherwise the main provider is asked. */
   embed?: LLMProvider
   model?: ModelStatus
   vault?: VaultConfig
+  /**
+   * Read on every request, so the settings screen can change the model and vault
+   * without restarting the server. A getter rather than an object, because
+   * replacing the object would leave the handler holding the stale one.
+   */
+  runtime?: () => Runtime
+  settings?: SettingsBridge
 }
 
 export function createHandler(
@@ -63,6 +122,9 @@ export function createHandler(
 ): (request: Request) => Promise<Response> {
   const { llm, embed, model: status, vault } = options
   return async function handle(request: Request): Promise<Response> {
+    // Re-read on every request when a runtime was supplied, so settings changes
+    // take effect immediately.
+    const live = options.runtime?.() ?? { llm, embed, status, vault }
     const url = new URL(request.url)
     const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname
     const parts = path.split('/').filter((part) => part.length > 0)
@@ -84,35 +146,24 @@ export function createHandler(
     }
 
     if (parts.length === 2 && parts[0] === 'llm' && parts[1] === 'health') {
-      const configured = status?.configured ?? (llm ? await llm.available() : false)
+      const configured = live.status?.configured ?? (live.llm ? await live.llm.available() : false)
       return json({
         configured,
-        provider: status?.provider ?? (configured ? llm?.name : null) ?? null,
-        providerName: status?.providerName ?? null,
-        model: status?.model ?? null,
-        embedModel: status?.embedModel ?? null,
-        embedProvider: status?.embedProvider ?? null,
-        embedProviderName: status?.embedProviderName ?? null,
-        embedSimilarity: status?.embedSimilarity ?? null,
-        embeddings: status?.embeddings ?? false,
-        keySource: status?.keySource ?? null,
-        note: status?.note ?? null,
+        provider: live.status?.provider ?? (configured ? live.llm?.name : null) ?? null,
+        providerName: live.status?.providerName ?? null,
+        model: live.status?.model ?? null,
+        embedModel: live.status?.embedModel ?? null,
+        embedProvider: live.status?.embedProvider ?? null,
+        embedProviderName: live.status?.embedProviderName ?? null,
+        embedSimilarity: live.status?.embedSimilarity ?? null,
+        embeddings: live.status?.embeddings ?? false,
+        keySource: live.status?.keySource ?? null,
+        note: live.status?.note ?? null,
       })
     }
 
     if (parts.length === 2 && parts[0] === 'llm' && parts[1] === 'providers') {
-      return json({
-        providers: PRESETS.map((preset) => ({
-          id: preset.id,
-          name: preset.name,
-          kind: preset.kind,
-          keyEnv: preset.keyEnv,
-          defaultModel: preset.defaultModel,
-          keyOptional: Boolean(preset.keyOptional),
-          noEmbeddings: Boolean(preset.noEmbeddings),
-          note: preset.note ?? null,
-        })),
-      })
+      return json({ providers: providerList() })
     }
 
     if (parts.length === 2 && parts[0] === 'digests') {
@@ -128,13 +179,13 @@ export function createHandler(
     }
 
     if (parts.length === 2 && parts[0] === 'obsidian' && parts[1] === 'status') {
-      if (!vault) return json({ error: 'no vault configured' }, 503)
-      return json(await vaultStatus(vault))
+      if (!live.vault) return json({ error: 'no vault configured' }, 503)
+      return json(await vaultStatus(live.vault))
     }
 
     if (parts.length === 2 && parts[0] === 'obsidian' && parts[1] === 'note') {
       if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405)
-      if (!vault) return json({ error: 'no vault configured' }, 503)
+      if (!live.vault) return json({ error: 'no vault configured' }, 503)
 
       const body = await readJson(request)
       if (!body) return json({ error: 'invalid json body' }, 400)
@@ -148,25 +199,51 @@ export function createHandler(
         return json({ error: 'filename must not contain a path separator' }, 400)
       }
       const relativePath = filename
-        ? vault.folder
-          ? `${vault.folder}/${filename}`
+        ? live.vault.folder
+          ? `${live.vault.folder}/${filename}`
           : filename
         : explicitPath
 
       if (!relativePath || !markdown) {
         return json({ error: 'filename and markdown are required' }, 400)
       }
-      if (!resolveNotePath(vault.vault, relativePath)) {
+      if (!resolveNotePath(live.vault.vault, relativePath)) {
         return json({ error: 'note path escapes the vault, or is not a .md file' }, 400)
       }
 
       try {
-        const result = await writeNote(vault.vault, relativePath, markdown)
+        const result = await writeNote(live.vault.vault, relativePath, markdown)
         return json({ ok: true, path: result.path, created: result.created })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'write failed'
         return json({ error: message }, 502)
       }
+    }
+
+    if (parts.length === 1 && parts[0] === 'config') {
+      const bridge = options.settings
+      if (!bridge) return json({ error: 'settings are not available on this server' }, 503)
+
+      if (request.method === 'GET') {
+        const { config, runtime } = await bridge.read()
+        return json({ config: publicConfig(config, runtime), providers: providerList() })
+      }
+
+      if (request.method === 'PUT') {
+        const body = await readJson(request)
+        if (!body) return json({ error: 'invalid json body' }, 400)
+
+        const patch = configPatch(body)
+        const problems = validateConfig(patch)
+        if (problems.length > 0) {
+          return json({ error: 'invalid settings', problems }, 400)
+        }
+
+        const { config, runtime } = await bridge.update(patch)
+        return json({ config: publicConfig(config, runtime), providers: providerList() })
+      }
+
+      return json({ error: 'method not allowed' }, 405)
     }
 
     if (parts.length === 2 && parts[0] === 'llm' && request.method === 'POST') {
@@ -177,11 +254,11 @@ export function createHandler(
         const system = typeof body.system === 'string' ? body.system : ''
         const prompt = typeof body.prompt === 'string' ? body.prompt : ''
         if (!prompt.trim()) return json({ error: 'prompt is required' }, 400)
-        if (!llm || !(await llm.available())) {
+        if (!live.llm || !(await live.llm.available())) {
           return json({ error: 'no language model configured' }, 503)
         }
         try {
-          return json({ text: await llm.completeStructured({ system, prompt }) })
+          return json({ text: await live.llm.completeStructured({ system, prompt }) })
         } catch (error) {
           return json({ error: error instanceof Error ? error.message : 'completion failed' }, 502)
         }
@@ -192,7 +269,7 @@ export function createHandler(
           ? body.texts.filter((entry): entry is string => typeof entry === 'string').slice(0, 64)
           : []
         if (texts.length === 0) return json({ error: 'texts is required' }, 400)
-        const embedder = embed ?? llm
+        const embedder = live.embed ?? live.llm
         if (!embedder || !(await embedder.available())) {
           return json({ error: 'no embedding model configured' }, 503)
         }

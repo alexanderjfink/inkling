@@ -6,7 +6,7 @@ import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
 import { useSuggestedMove } from '../state/useSuggestedMove'
 
-type Decision = 'advanced' | 'deferred' | 'retired' | 'promoted' | 'pinned'
+type Decision = 'advanced' | 'deferred' | 'retired' | 'promoted'
 
 const DEFAULT_DEFERRAL: DeferralChoice = 'few-days'
 const DEFERRAL_LABEL: Record<DeferralChoice, string> = {
@@ -30,7 +30,7 @@ function ActionButton({
   disabled?: boolean
 }) {
   return (
-    <div className="flex w-24 flex-col items-center gap-2">
+    <div className="flex w-28 flex-col items-center gap-2">
       <button
         type="button"
         onClick={onClick}
@@ -128,12 +128,6 @@ export function Review({
     settle('deferred')
   }
 
-  async function sendToMac() {
-    if (!current) return
-    await actions.pinToDesktop(current.id)
-    settle('pinned')
-  }
-
   async function retire() {
     if (!current) return
     await actions.retire(current.id)
@@ -154,7 +148,6 @@ export function Review({
     const advanced = counts.filter((value) => value === 'advanced').length
     const deferred = counts.filter((value) => value === 'deferred').length
     const retired = counts.filter((value) => value === 'retired').length
-    const pinned = counts.filter((value) => value === 'pinned').length
     const promoted = counts.filter((value) => value === 'promoted').length
 
     return (
@@ -162,8 +155,8 @@ export function Review({
         <p className="text-2xl font-semibold">{done === 0 ? 'Nothing waiting' : 'Done for now'}</p>
         {done > 0 ? (
           <p className="text-sm text-ink-soft">
-            {advanced} advanced · {deferred} put down · {pinned} sent to the Mac · {retired} retired
-            {promoted > 0 ? ` · ${promoted} to notes` : ''} · nothing lost.
+            {advanced} advanced · {deferred} put down · {promoted} to notes · {retired} retired ·
+            nothing lost.
           </p>
         ) : (
           <p className="text-sm text-ink-soft">Capture something, or look in the attic.</p>
@@ -197,7 +190,7 @@ export function Review({
   return (
     <div className="flex flex-1 flex-col">
       <div className="mb-3 flex items-baseline justify-between text-xs text-ink-faint">
-        <span>{current.desktopPinned ? 'sent to the Mac' : 'reviewing'}</span>
+        <span>reviewing</span>
         <span>
           {done + 1} of {total}
         </span>
@@ -300,7 +293,12 @@ export function Review({
       </div>
 
       <div className="mt-6 flex items-start justify-center gap-6">
-        <ActionButton icon="↑" label="Send to Mac" onClick={() => void sendToMac()} />
+        <ActionButton
+          icon="↑"
+          label="Promote to note"
+          onClick={() => void promote()}
+          disabled={promotingId === current.id}
+        />
         <ActionButton
           icon="+"
           label="Add entry"
@@ -327,19 +325,16 @@ export function Review({
         <button type="button" onClick={() => void retire()} className="quiet underline">
           retire
         </button>
-        <button
-          type="button"
-          onClick={() => void promote()}
-          disabled={promotingId === current.id}
-          className="quiet underline disabled:opacity-40"
-        >
-          {promotingId === current.id ? 'writing note…' : 'promote to note'}
-        </button>
       </div>
 
       {promoteResults[current.id]?.ok === false ? (
         <p className="mt-2 text-center text-xs text-warn">
           could not write the note: {promoteResults[current.id]?.error}
+        </p>
+      ) : null}
+      {promoteResults[current.id]?.ok ? (
+        <p className="mt-2 text-center text-xs text-good">
+          written to {promoteResults[current.id]?.path}
         </p>
       ) : null}
     </div>

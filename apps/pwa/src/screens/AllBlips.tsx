@@ -10,7 +10,6 @@ function Row({ blip, actions }: { blip: Blip; actions: InklingActions }) {
         <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">{blip.type}</span>
         <span>{formatShortDate(blip.created)}</span>
         <span>{blip.entries.length} entries</span>
-        {blip.desktopPinned ? <span className="text-accent">▸ to Mac</span> : null}
       </div>
       <p className="text-sm font-medium">{blip.title}</p>
       {blip.topics.length > 0 ? (
@@ -34,15 +33,6 @@ function Row({ blip, actions }: { blip: Blip; actions: InklingActions }) {
             Retire
           </button>
         )}
-        {!blip.desktopPinned && blip.status !== 'retired' ? (
-          <button
-            type="button"
-            onClick={() => void actions.pinToDesktop(blip.id)}
-            className="quiet rounded-full border border-line px-3 py-1.5 text-xs"
-          >
-            Send to Mac
-          </button>
-        ) : null}
       </div>
     </div>
   )

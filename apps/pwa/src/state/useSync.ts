@@ -74,6 +74,12 @@ export function useSync() {
     }
   }, [provider])
 
+  /** Re-read the model after the settings screen changed something. */
+  const refreshModel = useCallback(async () => {
+    provider.forget()
+    setModel(await provider.health())
+  }, [provider])
+
   return {
     report,
     syncing,
@@ -83,6 +89,7 @@ export function useSync() {
     loaded,
     provider,
     model,
+    refreshModel,
     modelConfigured: model?.configured ?? false,
   }
 }

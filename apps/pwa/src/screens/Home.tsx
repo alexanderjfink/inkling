@@ -15,9 +15,21 @@ export function Home({
 }) {
   return (
     <div className="flex flex-1 flex-col justify-center gap-3">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">Inkling</h1>
-        <p className="mt-1 text-sm text-ink-faint">Help yourself make progress on your inklings.</p>
+      <div className="mb-8">
+        <div className="mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={onSettings}
+            aria-label="Settings"
+            className="circle h-11 w-11 text-lg"
+          >
+            ⚙
+          </button>
+        </div>
+        <h1 className="text-center text-3xl font-semibold tracking-tight">Inkling</h1>
+        <p className="mt-1 text-center text-sm text-ink-faint">
+          Help yourself make progress on your inklings.
+        </p>
       </div>
 
       <button
@@ -52,9 +64,6 @@ export function Home({
       </button>
 
       <div className="mt-8 flex items-center justify-center gap-6 text-xs">
-        <button type="button" onClick={onSettings} className="quiet">
-          Settings
-        </button>
         {attic > 0 ? (
           <button type="button" onClick={onAttic} className="quiet">
             {attic} in the attic

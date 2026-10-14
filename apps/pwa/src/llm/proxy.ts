@@ -71,6 +71,11 @@ export class ProxyProvider implements LLMProvider {
     return (await this.health()).configured
   }
 
+  /** Drop the cached health, so a settings change is picked up immediately. */
+  forget(): void {
+    this.#health = null
+  }
+
   async completeStructured(request: StructuredRequest): Promise<string> {
     const res = await fetch(join(this.#baseUrl, '/llm/complete'), {
       method: 'POST',

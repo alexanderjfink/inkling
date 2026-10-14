@@ -1,0 +1,255 @@
+import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  type Runtime,
+  type ServerConfig,
+  buildRuntime,
+  configPath,
+  loadConfig,
+  mergeConfig,
+  publicConfig,
+  saveConfig,
+  validateConfig,
+} from './config'
+import { createHandler } from './handler'
+import { FileStore } from './store'
+
+const BASE = 'http://localhost/api'
+
+let dir: string
+
+beforeEach(async () => {
+  dir = await mkdtemp(join(tmpdir(), 'inkling-config-'))
+})
+
+afterEach(async () => {
+  await rm(dir, { recursive: true, force: true })
+})
+
+describe('config storage', () => {
+  test('a missing file is simply empty, not an error', async () => {
+    expect(await loadConfig(dir)).toEqual({})
+  })
+
+  test('round-trips through the file', async () => {
+    const config: ServerConfig = { provider: 'ollama', model: 'llama3.2', folder: 'Notes' }
+    await saveConfig(dir, config)
+    expect(await loadConfig(dir)).toEqual(config)
+    expect(configPath(dir).endsWith('config.json')).toBe(true)
+  })
+
+  test('a corrupt file is treated as empty rather than crashing the server', async () => {
+    await saveConfig(dir, {})
+    const { writeFile } = await import('node:fs/promises')
+    await writeFile(configPath(dir), 'not json', 'utf8')
+    expect(await loadConfig(dir)).toEqual({})
+  })
+})
+
+describe('mergeConfig', () => {
+  const base: ServerConfig = { provider: 'opencode-go', model: 'kimi-k2.6', folder: 'Inkling' }
+
+  test('a patch overrides only what it mentions', () => {
+    expect(mergeConfig(base, { model: 'other-model' })).toEqual({
+      provider: 'opencode-go',
+      model: 'other-model',
+      folder: 'Inkling',
+    })
+  })
+
+  test('an empty string clears a field, so a setting can be unset', () => {
+    expect(mergeConfig(base, { model: '' })).toEqual({
+      provider: 'opencode-go',
+      folder: 'Inkling',
+    })
+  })
+
+  test('null clears a numeric field', () => {
+    const withSimilarity: ServerConfig = { ...base, embedSimilarity: 0.8 }
+    expect(mergeConfig(withSimilarity, { embedSimilarity: null })).toEqual(base)
+  })
+
+  test('undefined leaves a field alone', () => {
+    expect(mergeConfig(base, { model: undefined })).toEqual(base)
+  })
+})
+
+describe('validateConfig', () => {
+  test('accepts a sensible patch', () => {
+    expect(validateConfig({ provider: 'ollama', model: 'llama3.2', vault: '/tmp/v' })).toEqual([])
+  })
+
+  test('rejects an unknown provider, rather than failing later', () => {
+    expect(validateConfig({ provider: 'nope' })[0]?.field).toBe('provider')
+  })
+
+  test('rejects empty values for fields that must have one', () => {
+    expect(validateConfig({ model: '   ' })[0]?.field).toBe('model')
+    expect(validateConfig({ vault: '' })[0]?.field).toBe('vault')
+  })
+
+  test('rejects an embedding provider that cannot embed', () => {
+    expect(validateConfig({ embedProvider: 'anthropic' })[0]?.message).toContain('no embeddings')
+  })
+
+  test('rejects a similarity outside 0..1', () => {
+    expect(validateConfig({ embedSimilarity: 1.5 })[0]?.field).toBe('embedSimilarity')
+    expect(validateConfig({ embedSimilarity: 0 })[0]?.field).toBe('embedSimilarity')
+    expect(validateConfig({ embedSimilarity: 0.75 })).toEqual([])
+  })
+})
+
+describe('buildRuntime', () => {
+  test('saved settings win over the environment', () => {
+    const runtime = buildRuntime(
+      { provider: 'ollama', model: 'llama3.2', vault: '/tmp/vault', folder: 'Notes' },
+      { INKLING_PROVIDER: 'opencode-go' },
+    )
+    expect(runtime.status.provider).toBe('ollama')
+    expect(runtime.status.model).toBe('llama3.2')
+    expect(runtime.vault.vault).toBe('/tmp/vault')
+    expect(runtime.vault.folder).toBe('Notes')
+  })
+
+  test('the environment still supplies what settings do not', () => {
+    const runtime = buildRuntime({ model: 'llama3.2' }, { INKLING_PROVIDER: 'ollama' })
+    expect(runtime.status.provider).toBe('ollama')
+    expect(runtime.status.model).toBe('llama3.2')
+  })
+
+  test('an embedding provider can be set from settings alone', () => {
+    const runtime = buildRuntime({ embedProvider: 'ollama', embedModel: 'nomic-embed-text' }, {})
+    expect(runtime.status.embeddings).toBe(true)
+    expect(runtime.status.embedProvider).toBe('ollama')
+    expect(runtime.embed).toBeTruthy()
+  })
+
+  test('an unconfigured model is a valid state, not a crash', () => {
+    const runtime = buildRuntime({ provider: 'custom' }, {})
+    expect(runtime.status.configured).toBe(false)
+    expect(runtime.llm).toBeUndefined()
+  })
+
+  test('the public view never carries a key', () => {
+    const runtime = buildRuntime({ provider: 'openai', apiKey: 'sk-secret' }, {})
+    const view = publicConfig({ provider: 'openai', apiKey: 'sk-secret' }, runtime) as Record<
+      string,
+      unknown
+    >
+    expect(view.apiKeySet).toBe(true)
+    expect(JSON.stringify(view)).not.toContain('sk-secret')
+  })
+})
+
+describe('config routes', () => {
+  function withBridge(initial: ServerConfig = {}) {
+    let config = initial
+    let runtime: Runtime = buildRuntime(config)
+    const handle = createHandler(new FileStore(dir), {
+      runtime: () => runtime,
+      settings: {
+        read: async () => ({ config, runtime }),
+        update: async (patch) => {
+          config = mergeConfig(config, patch)
+          runtime = buildRuntime(config)
+          return { config, runtime, problems: [] }
+        },
+      },
+    })
+    return { handle, current: () => config }
+  }
+
+  test('answers 503 when the server has no settings bridge', async () => {
+    const handle = createHandler(new FileStore(dir))
+    expect((await handle(new Request(`${BASE}/config`))).status).toBe(503)
+  })
+
+  test('reports the effective configuration and the providers on offer', async () => {
+    const { handle } = withBridge({ provider: 'ollama', model: 'llama3.2' })
+    const body = await handle(new Request(`${BASE}/config`)).then((res) => res.json())
+    expect(body.config.provider).toBe('ollama')
+    expect(body.config.model).toBe('llama3.2')
+    expect(body.providers.map((preset: { id: string }) => preset.id)).toContain('omlx')
+  })
+
+  test('applies a patch and reflects it immediately', async () => {
+    const { handle, current } = withBridge()
+    const res = await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ provider: 'ollama', model: 'llama3.2', folder: 'Notes' }),
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect((await res.json()).config.model).toBe('llama3.2')
+    expect(current().folder).toBe('Notes')
+  })
+
+  test('rejects an invalid patch with a reason, and changes nothing', async () => {
+    const { handle, current } = withBridge({ provider: 'ollama' })
+    const res = await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ provider: 'not-a-provider' }),
+      }),
+    )
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.problems[0].field).toBe('provider')
+    expect(current().provider).toBe('ollama')
+  })
+
+  test('a settings change reaches the model routes without a restart', async () => {
+    const { handle } = withBridge()
+    const before = await handle(new Request(`${BASE}/llm/health`)).then((res) => res.json())
+    expect(before.embeddings).toBe(false)
+
+    await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ embedProvider: 'ollama', embedModel: 'nomic-embed-text' }),
+      }),
+    )
+
+    // The handler must read the runtime per request; holding the object it was
+    // built with meant a settings change never reached the model routes.
+    const after = await handle(new Request(`${BASE}/llm/health`)).then((res) => res.json())
+    expect(after.embeddings).toBe(true)
+    expect(after.embedProvider).toBe('ollama')
+    expect(after.embedModel).toBe('nomic-embed-text')
+  })
+
+  test('accepts a key without ever returning it', async () => {
+    const { handle } = withBridge()
+    await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ provider: 'openai', apiKey: 'sk-secret' }),
+      }),
+    )
+    const body = await handle(new Request(`${BASE}/config`)).then((res) => res.json())
+    expect(body.config.apiKeySet).toBe(true)
+    expect(JSON.stringify(body)).not.toContain('sk-secret')
+  })
+
+  test('coerces a similarity sent as a string, and rejects a silly one', async () => {
+    const { handle } = withBridge()
+    const ok = await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ embedSimilarity: '0.8' }),
+      }),
+    )
+    expect((await ok.json()).config.embedSimilarity).toBe(0.8)
+
+    const bad = await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ embedSimilarity: '9' }),
+      }),
+    )
+    expect(bad.status).toBe(400)
+  })
+})

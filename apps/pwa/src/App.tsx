@@ -9,6 +9,7 @@ import { Settings } from './screens/Settings'
 import { storage, useInkling } from './state/useInkling'
 import { usePromote } from './state/usePromote'
 import { useRelated } from './state/useRelated'
+import { useServerConfig } from './state/useServerConfig'
 import { useSync } from './state/useSync'
 
 type Screen = 'home' | 'add' | 'review' | 'all' | 'settings'
@@ -36,6 +37,7 @@ export default function App() {
     syncState.model?.embedSimilarity ?? null,
   )
   const promoteState = usePromote()
+  const serverConfig = useServerConfig(syncState.serverUrl)
 
   const onPromote = useCallback(
     (blip: Blip, relatedBlips: Blip[]) =>
@@ -124,7 +126,9 @@ export default function App() {
       ) : null}
 
       {screen === 'all' ? <AllBlips blips={blips} actions={actions} /> : null}
-      {screen === 'settings' ? <Settings syncState={syncState} events={events} /> : null}
+      {screen === 'settings' ? (
+        <Settings syncState={syncState} events={events} serverConfig={serverConfig} />
+      ) : null}
     </div>
   )
 }

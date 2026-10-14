@@ -10,10 +10,15 @@ import {
 import { Spike } from '../spike/Spike'
 import { formatBytes } from '../storage/hash'
 import { storage } from '../state/useInkling'
+import type { useServerConfig } from '../state/useServerConfig'
 import type { useSync } from '../state/useSync'
 
 const inputClass =
   'w-full rounded-2xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent'
+const buttonClass =
+  'self-start rounded-full border border-line px-4 py-2 text-xs font-medium disabled:opacity-40'
+const primaryButtonClass =
+  'self-start rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40'
 
 function Section({
   title,
@@ -33,18 +38,54 @@ function Section({
   )
 }
 
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1">
+      <span className="text-[11px] tracking-wide text-ink-faint uppercase">{label}</span>
+      {children}
+    </label>
+  )
+}
+
 export function Settings({
   syncState,
   events,
+  serverConfig,
 }: {
   syncState: ReturnType<typeof useSync>
   events: BlipEvent[]
+  serverConfig: ReturnType<typeof useServerConfig>
 }) {
-  const { report, syncing, sync, serverUrl, saveServerUrl, model } = syncState
+  const { report, syncing, sync, serverUrl, saveServerUrl } = syncState
+  const { config, providers, error, saving, save, loaded } = serverConfig
+
   const [draft, setDraft] = useState<string | null>(null)
   const [nudge, setNudge] = useState(false)
   const [nudgeNote, setNudgeNote] = useState<string | null>(null)
   const [swReady, setSwReady] = useState<boolean | null>(null)
+  const [saved, setSaved] = useState<string | null>(null)
+
+  // Editable copies of the server settings.
+  const [provider, setProvider] = useState('')
+  const [model, setModel] = useState('')
+  const [apiKey, setApiKey] = useState('')
+  const [embedProvider, setEmbedProvider] = useState('')
+  const [embedModel, setEmbedModel] = useState('')
+  const [embedApiKey, setEmbedApiKey] = useState('')
+  const [similarity, setSimilarity] = useState('')
+  const [vault, setVault] = useState('')
+  const [folder, setFolder] = useState('')
+
+  useEffect(() => {
+    if (!config) return
+    setProvider(config.provider ?? '')
+    setModel(config.model ?? '')
+    setEmbedProvider(config.embedProvider ?? '')
+    setEmbedModel(config.embedModel ?? '')
+    setSimilarity(config.embedSimilarity === null ? '' : String(config.embedSimilarity))
+    setVault(config.vault)
+    setFolder(config.folder)
+  }, [config])
 
   const value = draft ?? serverUrl
   const dirty = draft !== null && draft.trim() !== serverUrl
@@ -77,6 +118,30 @@ export function Settings({
     }
   }, [])
 
+  async function saveModel() {
+    const patch: Record<string, string | number | null> = {
+      provider,
+      model,
+      embedProvider,
+      embedModel,
+      embedSimilarity: similarity.trim() === '' ? null : Number(similarity),
+    }
+    // Only send a key when one was typed, so an empty box does not erase it.
+    if (apiKey.trim()) patch.apiKey = apiKey.trim()
+    if (embedApiKey.trim()) patch.embedApiKey = embedApiKey.trim()
+
+    if (await save(patch)) {
+      setApiKey('')
+      setEmbedApiKey('')
+      setSaved('model')
+      await syncState.refreshModel()
+    }
+  }
+
+  async function saveVault() {
+    if (await save({ vault, folder })) setSaved('notes')
+  }
+
   async function toggleNudge() {
     const store = storage()
     await store.init()
@@ -95,6 +160,9 @@ export function Settings({
     setNudge(true)
     setNudgeNote('on — you will hear from it when something is waiting')
   }
+
+  const chatProviders = providers
+  const embedProviders = providers.filter((option) => !option.noEmbeddings)
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -116,7 +184,7 @@ export function Settings({
             type="button"
             onClick={() => void saveServerUrl(value)}
             disabled={!dirty}
-            className="rounded-full border border-line px-4 py-2 text-xs font-medium disabled:opacity-40"
+            className={buttonClass}
           >
             Save
           </button>
@@ -124,7 +192,7 @@ export function Settings({
             type="button"
             onClick={() => void sync()}
             disabled={syncing}
-            className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
+            className={primaryButtonClass}
           >
             {syncing ? 'Syncing…' : 'Sync now'}
           </button>
@@ -151,27 +219,177 @@ export function Settings({
         ) : null}
       </Section>
 
-      <Section title="Model">
-        <p className="text-xs text-ink-soft">
-          {model === null ? (
-            'checking…'
-          ) : model.configured ? (
-            <>
-              {model.providerName ?? model.provider} · {model.model}
-              <br />
-              {model.embeddings
-                ? `embeddings: ${model.embedProviderName ?? model.embedProvider} · ${model.embedModel}`
-                : 'no embeddings — related blips use topics and links'}
-            </>
+      <Section
+        title="Model"
+        hint={
+          error ? (
+            <span className="text-warn">{error}</span>
+          ) : saved === 'model' ? (
+            <span className="text-good">saved</span>
           ) : (
-            <>
-              none configured — moves come from the playbook. Choose one on the server with{' '}
-              <code>INKLING_PROVIDER</code>.
-            </>
-          )}
-        </p>
+            'Saved settings override the server environment. Keys are written, never read back.'
+          )
+        }
+      >
+        {!loaded ? (
+          <p className="text-xs text-ink-faint">loading…</p>
+        ) : config === null ? (
+          <p className="text-xs text-ink-faint">
+            This server has no settings endpoint. Configure it with environment variables instead.
+          </p>
+        ) : (
+          <>
+            <Field label="Provider">
+              <select
+                value={provider}
+                onChange={(event) => setProvider(event.target.value)}
+                className={inputClass}
+              >
+                <option value="">— server default —</option>
+                {chatProviders.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Model">
+              <input
+                value={model}
+                onChange={(event) => setModel(event.target.value)}
+                placeholder={config.model ?? ''}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label={`API key ${config.apiKeySet ? '(set)' : '(not set)'}`}>
+              <input
+                value={apiKey}
+                onChange={(event) => setApiKey(event.target.value)}
+                type="password"
+                placeholder={config.apiKeySet ? 'type to replace' : 'paste a key'}
+                autoComplete="off"
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Embedding provider">
+              <select
+                value={embedProvider}
+                onChange={(event) => setEmbedProvider(event.target.value)}
+                className={inputClass}
+              >
+                <option value="">— none, or the chat provider —</option>
+                {embedProviders.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Embedding model">
+              <input
+                value={embedModel}
+                onChange={(event) => setEmbedModel(event.target.value)}
+                placeholder={config.embedModel ?? ''}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label={`Embedding key ${config.embedApiKeySet ? '(set)' : '(not set)'}`}>
+              <input
+                value={embedApiKey}
+                onChange={(event) => setEmbedApiKey(event.target.value)}
+                type="password"
+                placeholder={config.embedApiKeySet ? 'type to replace' : 'paste a key'}
+                autoComplete="off"
+                className={inputClass}
+              />
+            </Field>
+
+            <Field label="Similarity floor (0–1)">
+              <input
+                value={similarity}
+                onChange={(event) => setSimilarity(event.target.value)}
+                inputMode="decimal"
+                placeholder={config.embedSimilarity === null ? '0.75 default' : ''}
+                className={inputClass}
+              />
+            </Field>
+
+            <p className="text-xs text-ink-soft">
+              in use now: {config.configured ? `${config.providerName} · ${config.model}` : 'none'}
+              {config.embeddings
+                ? ` · embeddings via ${config.embedProviderName ?? '?'}`
+                : ' · no embeddings'}
+            </p>
+
+            <button
+              type="button"
+              onClick={() => void saveModel()}
+              disabled={saving}
+              className={primaryButtonClass}
+            >
+              {saving ? 'Saving…' : 'Save model settings'}
+            </button>
+          </>
+        )}
+      </Section>
+
+      <Section
+        title="Notes"
+        hint={
+          saved === 'notes' ? (
+            <span className="text-good">saved</span>
+          ) : (
+            'Promoted blips are written here, into this folder.'
+          )
+        }
+      >
+        {config ? (
+          <>
+            <Field label="Vault">
+              <input
+                value={vault}
+                onChange={(event) => setVault(event.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Folder inside the vault">
+              <input
+                value={folder}
+                onChange={(event) => setFolder(event.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className={inputClass}
+              />
+            </Field>
+            <button
+              type="button"
+              onClick={() => void saveVault()}
+              disabled={saving}
+              className={primaryButtonClass}
+            >
+              {saving ? 'Saving…' : 'Save note settings'}
+            </button>
+          </>
+        ) : null}
+      </Section>
+
+      <Section title="App">
         <p className="text-xs text-ink-faint">
-          app:{' '}
           {swReady === null
             ? 'checking…'
             : swReady
@@ -186,7 +404,7 @@ export function Settings({
           type="button"
           onClick={() => void toggleNudge()}
           disabled={!notificationsSupported()}
-          className="self-start rounded-full border border-line px-4 py-2 text-xs font-medium disabled:opacity-40"
+          className={buttonClass}
         >
           {nudge ? 'Turn reminders off' : 'Remind me when blips are waiting'}
         </button>
@@ -205,7 +423,7 @@ export function Settings({
           type="button"
           onClick={() => downloadBackup(events)}
           disabled={events.length === 0}
-          className="self-start rounded-full border border-line px-4 py-2 text-xs font-medium disabled:opacity-40"
+          className={buttonClass}
         >
           Download log
         </button>

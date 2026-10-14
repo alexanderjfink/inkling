@@ -9,7 +9,7 @@ without turning them into a guilty to-do list.
 The design follows Andy Matuschak, *Towards scalable blip cultivation* (2024), and the
 companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 
-## Status — M3 (Moves)
+## Status — the MVP, complete
 
 | Piece | State |
 |---|---|
@@ -20,14 +20,14 @@ companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 | Review loop — decision per blip, session receipt, sessions frozen | done |
 | Retire / attic / revive | done |
 | Sync — append-only log union, byte-offset watermarks, content-addressed blobs | done, tested |
-| Handoff — "Send to Mac" puts a blip first in the queue, on any device | done |
+| Handoff — a blip goes first in the queue, on any device | done |
 | State digest — convergence check across devices | done, tested |
 | **Moves** — a 22-move playbook, time-boxed, goal-bearing, no repeats | done, tested |
 | **Models** — a provider registry: OpenCode Go by default, plus hosted and local | done, tested |
 | **Related blips** — links, topics and wording first; embeddings optional | done, tested |
 | **Contextual resurfacing** — a topic match overrides a snooze | done, tested |
 | **URL fetch** — server-side, so a saved link has something to react to | done, tested |
-| **Promotion** — a blip becomes an Obsidian note with specific next steps | done, tested |
+| **Promotion** — ↑ on a blip writes an Obsidian note with specific next steps | done, tested |
 | **Embeddings** — a separate provider, so vectors can come from a local model | done, tested |
 | **Share target** — share a link or text from any app into Capture | done |
 | **Voice** — 🎙 Ramble transcribes on the device | done |
@@ -91,7 +91,7 @@ bun run build                      # production build
 ## Try it
 
 1. **Add a blip** — text, a URL, an image, or ramble into the microphone.
-2. **Review** — one blip at a time. Add an entry, send it to the Mac, or put it down
+2. **Review** — one blip at a time. Add an entry, promote it to a note, or put it down
    for a while. Clearing the queue shows what you did: *nothing lost*.
 3. **Settings** — server, model, reminders, backup, storage.
 4. **All blips** (from the bottom of Home) — everything, including the attic, where you
@@ -169,9 +169,30 @@ Overrides: `INKLING_BASE_URL`, `INKLING_MODEL`, `INKLING_EMBED_MODEL`, `INKLING_
 An explicit `INKLING_API_KEY` wins over anything else; otherwise the provider's own env
 var is used; otherwise OpenCode's stored credential.
 
-The key stays on the server; devices only ever talk to the proxy. The Sync tab shows
-which provider and model are in play, so it is never a mystery why a move says "from
-the playbook".
+The key stays on the server; devices only ever talk to the proxy. Settings shows which
+provider and model are in play, so it is never a mystery why a move says "from the
+playbook".
+
+## The interface
+
+Three screens, and two of them are the only things you do.
+
+```
+Home ─┬─ Add a blip    text, a link, a photo, or your voice
+      ├─ Review        one blip at a time, full screen
+      └─ ⚙ Settings    sync, model, notes, reminders, backup, storage
+```
+
+**Review** shows a single blip and three actions, and nothing else competes with them:
+
+| | |
+|---|---|
+| **↑ Promote to note** | drafts next steps and writes the note into your vault. The blip is done |
+| **＋ Add entry** | write something down, with the suggested move as the prompt |
+| **✓ until Saturday** | put it down; the label is the date it comes back |
+
+Retiring is a quiet link below. There is no separate desktop mode — the same three
+screens run on both devices, and sync keeps them the same.
 
 ## Related blips
 
@@ -190,6 +211,27 @@ so unchanged blips are never re-sent.
 Typing a topic into the Today box — or advancing a blip with that topic — offers the
 matching snoozed blips as "bring them in". Offered rather than injected, so the finite
 list stays finite.
+
+## Configuring it
+
+Almost everything is editable from the app — Home → **⚙** — and takes effect
+immediately, with no restart:
+
+| | |
+|---|---|
+| **Sync** | the server URL, and a sync now button |
+| **Model** | provider, model, API key, embedding provider, embedding model, embedding key, similarity floor |
+| **Notes** | the vault path, and the folder inside it |
+| **Reminders** | the nudge toggle |
+| **Backup** | download the log |
+| **Storage** | the IndexedDB-vs-OPFS benchmark |
+
+Saved settings override the server's environment, which still supplies anything the
+settings do not mention. **Keys are write-only**: the server reports whether one is set
+and never returns it, so nothing secret round-trips through the browser.
+
+The same things can still be set with environment variables, and
+`INKLING_PROVIDER=ollama bun run server` remains the quickest way to try one out.
 
 ## Promoting to a note
 

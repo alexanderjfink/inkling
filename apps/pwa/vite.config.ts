@@ -13,5 +13,10 @@ export default defineConfig({
     // The dev server now speaks HTTPS, so hot reload must use wss:// or the
     // client silently fails to connect.
     hmr: { protocol: 'wss' },
+    // The PWA is served over HTTPS, so it cannot call a plain-HTTP API directly
+    // (mixed content). Proxying /api keeps the phone working with no extra certs.
+    proxy: {
+      '/api': { target: 'http://localhost:8787', changeOrigin: true },
+    },
   },
 })

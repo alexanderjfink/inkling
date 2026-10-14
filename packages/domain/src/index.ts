@@ -14,7 +14,11 @@ export type {
   MoveSpec,
 } from './events'
 export { BLIP_TYPES, eventBlipId, totalOrder } from './events'
+export { stateDigest } from './digest'
+export { sha256Hex } from './hash'
 export { idTime, newId } from './ids'
+export type { MergeResult } from './log'
+export { devicesIn, eventKey, mergeEvents, parseLog, serializeLog, serializeLogBytes } from './log'
 export type { Blip, BlipStatus, MoveHistoryEntry, ScheduleState } from './project'
 export { liveBlips, project } from './project'
 export type { FeedContext } from './schedule'

@@ -4,10 +4,12 @@
   "type": "module",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "packages/*",
+    "server"
   ],
   "scripts": {
     "dev": "bun run --filter @inkling/pwa dev",
+    "server": "bun run --filter @inkling/server dev",
     "build": "bun run --filter @inkling/pwa build",
     "test": "bun test",
     "typecheck": "bun run --workspaces typecheck",

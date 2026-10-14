@@ -193,6 +193,9 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
     case 'promoteToDesktop':
       blip.desktopPinned = true
       break
+    case 'unpinFromDesktop':
+      blip.desktopPinned = false
+      break
     case 'classified':
       blip.type = event.type
       break

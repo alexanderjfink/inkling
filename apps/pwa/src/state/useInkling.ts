@@ -22,6 +22,7 @@ export interface InklingActions {
   retire(id: string, reason?: string): Promise<BlipEvent>
   revive(id: string): Promise<BlipEvent>
   pinToDesktop(id: string): Promise<BlipEvent>
+  unpinFromDesktop(id: string): Promise<BlipEvent>
   classify(id: string, type: BlipType): Promise<BlipEvent>
   link(id: string, otherId: string, reason?: string): Promise<BlipEvent>
 }
@@ -108,6 +109,9 @@ export function useInkling() {
       },
       pinToDesktop(id) {
         return storage().append({ t: 'promoteToDesktop', id })
+      },
+      unpinFromDesktop(id) {
+        return storage().append({ t: 'unpinFromDesktop', id })
       },
       classify(id, type) {
         return storage().append({ t: 'classified', id, type })

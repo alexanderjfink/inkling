@@ -126,6 +126,7 @@ export type BlipEventBody =
   | { t: 'deleted'; id: string }
   | { t: 'promoted'; id: string; notePath: string }
   | { t: 'promoteToDesktop'; id: string }
+  | { t: 'unpinFromDesktop'; id: string }
   | { t: 'classified'; id: string; type: BlipType }
 
 export type BlipEvent = BlipEventBody & EventMeta

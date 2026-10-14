@@ -5,11 +5,11 @@ export type Durability = 'strict' | 'relaxed' | 'default'
 export function openDatabase(
   name: string,
   version: number,
-  onUpgrade: (db: IDBDatabase) => void,
+  onUpgrade: (db: IDBDatabase, transaction: IDBTransaction | null) => void,
 ): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(name, version)
-    request.onupgradeneeded = () => onUpgrade(request.result)
+    request.onupgradeneeded = () => onUpgrade(request.result, request.transaction)
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
     request.onblocked = () => reject(new Error(`IndexedDB upgrade blocked for ${name}`))

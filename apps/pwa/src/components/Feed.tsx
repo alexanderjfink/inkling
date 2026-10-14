@@ -1,4 +1,5 @@
-import { type Blip, buildDailyFeed, type LLMProvider } from '@inkling/domain'
+import type { Blip, LLMProvider, RelatedBlip } from '@inkling/domain'
+import { buildDailyFeed } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import type { InklingActions } from '../state/useInkling'
 import { MoveCard } from './MoveCard'
@@ -9,24 +10,38 @@ export function Feed({
   blips,
   actions,
   provider,
+  related,
 }: {
   blips: Blip[]
   actions: InklingActions
   provider: LLMProvider
+  related: Map<string, RelatedBlip[]>
 }) {
   const [topicsText, setTopicsText] = useState('')
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
   const [noteOpen, setNoteOpen] = useState<string | null>(null)
   const [note, setNote] = useState('')
 
-  const todayTopics = useMemo(
-    () =>
-      topicsText
-        .split(',')
-        .map((t) => t.trim().toLowerCase())
-        .filter(Boolean),
-    [topicsText],
-  )
+  // Topics you engaged with this session join the context. This is what makes a
+  // blip you advanced earlier pull its relatives forward — the paper's contextual
+  // resurfacing, driven by your own attention rather than by a schedule.
+  const engagedTopics = useMemo(() => {
+    const topics = new Set<string>()
+    for (const [id, decision] of Object.entries(decisions)) {
+      if (decision !== 'advanced') continue
+      const blip = blips.find((candidate) => candidate.id === id)
+      for (const topic of blip?.topics ?? []) topics.add(topic)
+    }
+    return [...topics]
+  }, [decisions, blips])
+
+  const todayTopics = useMemo(() => {
+    const typed = topicsText
+      .split(',')
+      .map((topic) => topic.trim().toLowerCase())
+      .filter(Boolean)
+    return [...new Set([...typed, ...engagedTopics])]
+  }, [topicsText, engagedTopics])
 
   const candidates = useMemo(
     () => buildDailyFeed(blips, { now: new Date(), todayTopics }),
@@ -37,18 +52,33 @@ export function Feed({
   // the feed, items disappear mid-review, and the receipt can never be reached.
   const [session, setSession] = useState<string[] | null>(null)
   useEffect(() => {
-    if (session === null && candidates.length > 0) setSession(candidates.map((b) => b.id))
+    if (session === null && candidates.length > 0) setSession(candidates.map((blip) => blip.id))
   }, [candidates, session])
 
   const feed = useMemo(() => {
     if (session === null) return candidates
-    const byId = new Map(blips.map((b) => [b.id, b]))
-    return session.map((id) => byId.get(id)).filter((b): b is Blip => Boolean(b))
+    const byId = new Map(blips.map((blip) => [blip.id, blip]))
+    return session.map((id) => byId.get(id)).filter((blip): blip is Blip => Boolean(blip))
   }, [session, candidates, blips])
 
-  const cleared = feed.filter((b) => decisions[b.id]).length
+  // Blips that today's context pulls in but the session did not include. Offered
+  // rather than injected, so the finite list stays finite.
+  const inSession = useMemo(() => new Set(feed.map((blip) => blip.id)), [feed])
+  const contextMatches = useMemo(() => {
+    if (todayTopics.length === 0) return []
+    return blips.filter(
+      (blip) =>
+        !blip.deleted &&
+        (blip.status === 'active' || blip.status === 'snoozed') &&
+        !inSession.has(blip.id) &&
+        (blip.schedule.triggers.some((trigger) => todayTopics.includes(trigger)) ||
+          blip.topics.some((topic) => todayTopics.includes(topic))),
+    )
+  }, [blips, todayTopics, inSession])
+
+  const cleared = feed.filter((blip) => decisions[blip.id]).length
   const finished = feed.length > 0 && cleared === feed.length
-  const titleOf = (id: string) => blips.find((b) => b.id === id)?.title ?? id.slice(0, 6)
+  const titleOf = (id: string) => blips.find((blip) => blip.id === id)?.title ?? id.slice(0, 6)
 
   function decide(id: string, decision: Decision) {
     setDecisions((prev) => ({ ...prev, [id]: decision }))
@@ -95,10 +125,23 @@ export function Feed({
 
       <input
         value={topicsText}
-        onChange={(e) => setTopicsText(e.target.value)}
+        onChange={(event) => setTopicsText(event.target.value)}
         placeholder="on your mind right now? (comma separated, e.g. timeful texts)"
         className="w-full rounded-xl border border-zinc-800 bg-zinc-900/40 p-2 text-xs text-zinc-300 outline-none focus:border-zinc-600"
       />
+
+      {contextMatches.length > 0 ? (
+        <button
+          type="button"
+          onClick={() =>
+            setSession((current) => [...(current ?? []), ...contextMatches.map((b) => b.id)])
+          }
+          className="rounded-xl border border-sky-900/60 bg-sky-950/20 p-2 text-left text-xs text-sky-300"
+        >
+          {contextMatches.length} more blip{contextMatches.length === 1 ? '' : 's'} match this
+          context — bring {contextMatches.length === 1 ? 'it' : 'them'} in
+        </button>
+      ) : null}
 
       {feed.length === 0 ? (
         <p className="rounded-xl border border-zinc-800 p-4 text-sm text-zinc-500">
@@ -108,8 +151,9 @@ export function Feed({
 
       {feed.map((blip) => {
         const decision = decisions[blip.id]
-        const images = blip.entries.filter((e) => e.kind === 'media')
-        const notes = blip.entries.filter((e) => e.kind === 'note')
+        const images = blip.entries.filter((entry) => entry.kind === 'media')
+        const notes = blip.entries.filter((entry) => entry.kind === 'note')
+        const relatedBlips = related.get(blip.id) ?? []
         return (
           <article
             key={blip.id}
@@ -141,9 +185,9 @@ export function Feed({
             ) : null}
             {notes.length > 0 ? (
               <ul className="mt-2 flex flex-col gap-1">
-                {notes.map((e) => (
-                  <li key={e.id} className="text-xs text-zinc-400">
-                    · {e.text}
+                {notes.map((entry) => (
+                  <li key={entry.id} className="text-xs text-zinc-400">
+                    · {entry.text}
                   </li>
                 ))}
               </ul>
@@ -151,8 +195,19 @@ export function Feed({
 
             {blip.links.length > 0 ? (
               <p className="mt-2 text-xs text-zinc-500">
-                related: {blip.links.map((id) => titleOf(id)).join(', ')}
+                linked: {blip.links.map((id) => titleOf(id)).join(', ')}
               </p>
+            ) : null}
+
+            {relatedBlips.length > 0 ? (
+              <ul className="mt-2 flex flex-col gap-1 rounded-lg border border-zinc-800/70 bg-zinc-900/30 p-2">
+                {relatedBlips.map((entry) => (
+                  <li key={entry.blip.id} className="text-xs text-zinc-400">
+                    <span className="text-zinc-300">{entry.blip.title}</span>
+                    <span className="text-zinc-600"> — {entry.reasons.join('; ')}</span>
+                  </li>
+                ))}
+              </ul>
             ) : null}
 
             {decision ? (
@@ -161,7 +216,7 @@ export function Feed({
               <>
                 <MoveCard
                   blip={blip}
-                  related={blips.filter((other) => blip.links.includes(other.id))}
+                  related={relatedBlips.map((entry) => entry.blip)}
                   provider={provider}
                   actions={actions}
                   onComplete={() => decide(blip.id, 'advanced')}
@@ -206,7 +261,7 @@ export function Feed({
               <div className="mt-3 flex flex-col gap-2">
                 <textarea
                   value={note}
-                  onChange={(e) => setNote(e.target.value)}
+                  onChange={(event) => setNote(event.target.value)}
                   rows={3}
                   placeholder="What are you thinking?"
                   className="w-full resize-none rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-100 outline-none focus:border-zinc-600"
@@ -227,11 +282,11 @@ export function Feed({
       {finished ? (
         <div className="flex flex-col gap-3 rounded-2xl border border-emerald-900/60 bg-emerald-950/30 p-4 text-sm text-emerald-200">
           <p>
-            Today: {Object.values(decisions).filter((d) => d === 'advanced').length} advanced ·{' '}
-            {Object.values(decisions).filter((d) => d === 'snoozed').length} snoozed ·{' '}
-            {Object.values(decisions).filter((d) => d === 'retired').length} retired ·{' '}
-            {Object.values(decisions).filter((d) => d === 'pinned').length} to desktop · nothing
-            lost.
+            Today: {Object.values(decisions).filter((value) => value === 'advanced').length}{' '}
+            advanced · {Object.values(decisions).filter((value) => value === 'snoozed').length}{' '}
+            snoozed · {Object.values(decisions).filter((value) => value === 'retired').length}{' '}
+            retired · {Object.values(decisions).filter((value) => value === 'pinned').length} to
+            desktop · nothing lost.
           </p>
           <button
             type="button"

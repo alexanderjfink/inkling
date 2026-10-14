@@ -1,5 +1,7 @@
 import { type LLMProvider, parseLog, sha256Hex } from '@inkling/domain'
 import { fetchPage, isFetchableUrl } from './fetchPage'
+import type { ModelStatus } from './provider'
+import { PRESETS } from './providerConfig'
 import { type Store, isSafeDeviceId, isSafeHash } from './store'
 
 const encoder = new TextEncoder()
@@ -49,6 +51,7 @@ async function readJson(request: Request): Promise<Record<string, unknown> | nul
 export function createHandler(
   store: Store,
   llm?: LLMProvider,
+  status?: ModelStatus,
 ): (request: Request) => Promise<Response> {
   return async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url)
@@ -72,8 +75,32 @@ export function createHandler(
     }
 
     if (parts.length === 2 && parts[0] === 'llm' && parts[1] === 'health') {
-      const configured = llm ? await llm.available() : false
-      return json({ configured, provider: configured ? llm?.name : null })
+      const configured = status?.configured ?? (llm ? await llm.available() : false)
+      return json({
+        configured,
+        provider: status?.provider ?? (configured ? llm?.name : null) ?? null,
+        providerName: status?.providerName ?? null,
+        model: status?.model ?? null,
+        embedModel: status?.embedModel ?? null,
+        embeddings: status?.embeddings ?? false,
+        keySource: status?.keySource ?? null,
+        note: status?.note ?? null,
+      })
+    }
+
+    if (parts.length === 2 && parts[0] === 'llm' && parts[1] === 'providers') {
+      return json({
+        providers: PRESETS.map((preset) => ({
+          id: preset.id,
+          name: preset.name,
+          kind: preset.kind,
+          keyEnv: preset.keyEnv,
+          defaultModel: preset.defaultModel,
+          keyOptional: Boolean(preset.keyOptional),
+          noEmbeddings: Boolean(preset.noEmbeddings),
+          note: preset.note ?? null,
+        })),
+      })
     }
 
     if (parts.length === 2 && parts[0] === 'digests') {

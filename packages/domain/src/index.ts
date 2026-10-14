@@ -29,6 +29,16 @@ export {
   selectMove,
   toMoveSpec,
 } from './moves'
+export type { RelatedBlip, RelatednessOptions } from './related'
+export {
+  blipText,
+  cosine,
+  jaccard,
+  relatedness,
+  sharedTopics,
+  tokens,
+  topRelated,
+} from './related'
 export type { Blip, BlipStatus, MoveHistoryEntry, ScheduleState } from './project'
 export { liveBlips, project } from './project'
 export type { FeedContext } from './schedule'

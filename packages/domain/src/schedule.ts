@@ -29,10 +29,13 @@ function daysSince(iso: string, now: Date): number {
 export function isDue(blip: Blip, now: Date, activeTopics: string[] = []): boolean {
   if (blip.deleted) return false
   if (blip.status === 'retired' || blip.status === 'promoted') return false
-  // A matching topic trigger overrides a snooze: "show me this when I'm thinking
-  // about X again" is exactly the safety the design depends on.
+  // A matching topic overrides a snooze: "show me this when I'm thinking about X
+  // again" is exactly the safety the design depends on. Explicit triggers are
+  // honoured, and so are auto-extracted topics — otherwise you would have to curate
+  // triggers by hand for the feature to do anything.
   const triggers = blip.schedule.triggers ?? []
   if (triggers.length && triggers.some((t) => activeTopics.includes(t))) return true
+  if (activeTopics.length && blip.topics.some((t) => activeTopics.includes(t))) return true
   if (blip.status !== 'active') return false
   if (!blip.schedule.nextEarliest) return true
   const due = Date.parse(blip.schedule.nextEarliest)

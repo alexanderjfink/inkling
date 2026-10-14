@@ -4,7 +4,7 @@ import { formatBytes } from '../storage/hash'
 import type { useSync } from '../state/useSync'
 
 export function SyncPanel({ syncState }: { syncState: ReturnType<typeof useSync> }) {
-  const { report, syncing, sync, serverUrl, saveServerUrl, modelConfigured } = syncState
+  const { report, syncing, sync, serverUrl, saveServerUrl, model } = syncState
   const [draft, setDraft] = useState<string | null>(null)
 
   const value = draft ?? serverUrl
@@ -55,14 +55,19 @@ export function SyncPanel({ syncState }: { syncState: ReturnType<typeof useSync>
         </p>
         <p className="text-[11px] text-zinc-500">
           model:{' '}
-          {modelConfigured === null ? (
+          {model === null ? (
             'checking…'
-          ) : modelConfigured ? (
-            <span className="text-emerald-300">configured — moves are adapted by the model</span>
+          ) : model.configured ? (
+            <span className="text-emerald-300">
+              {model.providerName ?? model.provider} · {model.model}
+              {model.embeddings
+                ? ' · embeddings on'
+                : ' · no embeddings, so related blips use topics and links'}
+            </span>
           ) : (
             <span className="text-zinc-400">
-              not configured — moves come from the playbook. Set <code>OPENROUTER_API_KEY</code> on
-              the server to enable it.
+              none configured — moves come from the playbook. Choose a provider on the server with{' '}
+              <code>INKLING_PROVIDER</code> (opencode-go, openai, ollama, vllm, …).
             </span>
           )}
         </p>

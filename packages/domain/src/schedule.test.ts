@@ -44,6 +44,27 @@ describe('scheduler', () => {
     expect(isDue(blip, NOW, ['timeful texts'])).toBe(true)
   })
 
+  test('a matching auto-extracted topic also overrides a snooze', () => {
+    const { id, events } = blipFrom('about change theory', '2026-02-01T12:00:00Z', 'idea', [
+      'change',
+    ])
+    const blip = only([
+      ...events,
+      ev({ t: 'snoozed', id, until: '2026-06-01T00:00:00Z' }, 1, '2026-02-02T00:00:00Z'),
+    ])
+    expect(isDue(blip, NOW)).toBe(false)
+    expect(isDue(blip, NOW, ['change'])).toBe(true)
+    expect(isDue(blip, NOW, ['something-else'])).toBe(false)
+  })
+
+  test('a topic match does not resurrect a retired blip', () => {
+    const { id, events } = blipFrom('about change theory', '2026-02-01T12:00:00Z', 'idea', [
+      'change',
+    ])
+    const blip = only([...events, ev({ t: 'retired', id }, 1, '2026-02-02T00:00:00Z')])
+    expect(isDue(blip, NOW, ['change'])).toBe(false)
+  })
+
   test('retired blips never surface', () => {
     const { id, events } = blipFrom('done', '2026-01-01T00:00:00Z')
     const blip = only([...events, ev({ t: 'retired', id }, 1, '2026-01-02T00:00:00Z')])

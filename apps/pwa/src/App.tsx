@@ -5,6 +5,7 @@ import { Desk } from './components/Desk'
 import { Feed } from './components/Feed'
 import { SyncPanel } from './components/SyncPanel'
 import { useInkling } from './state/useInkling'
+import { useRelated } from './state/useRelated'
 import { useSync } from './state/useSync'
 
 type Tab = 'today' | 'capture' | 'desk' | 'all' | 'sync'
@@ -21,6 +22,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('today')
   const { ready, blips, actions } = useInkling()
   const syncState = useSync()
+  const related = useRelated(blips, syncState.provider, syncState.model?.embeddings ?? false)
 
   const active = blips.filter((blip) => !blip.deleted && blip.status === 'active').length
   const pinned = blips.filter((blip) => !blip.deleted && blip.desktopPinned).length
@@ -50,7 +52,7 @@ export default function App() {
       </header>
 
       {tab === 'today' ? (
-        <Feed blips={blips} actions={actions} provider={syncState.provider} />
+        <Feed blips={blips} actions={actions} provider={syncState.provider} related={related} />
       ) : null}
       {tab === 'capture' ? <Capture onCapture={actions.capture} /> : null}
       {tab === 'desk' ? <Desk blips={blips} actions={actions} /> : null}

@@ -5,7 +5,6 @@ import { join } from 'node:path'
 import type { LLMProvider } from '@inkling/domain'
 import { fetchPage, isFetchableUrl } from './fetchPage'
 import { createHandler } from './handler'
-import { llmConfigFromEnv } from './llm'
 import { FileStore } from './store'
 
 const BASE = 'http://localhost/api'
@@ -73,29 +72,6 @@ describe('fetchPage', () => {
     await expect(fetchPage('https://example.com/a', { fetcher })).rejects.toThrow(
       'fetch failed: 500',
     )
-  })
-})
-
-describe('llmConfigFromEnv', () => {
-  test('is unconfigured without a key, which is a valid state', () => {
-    const config = llmConfigFromEnv({})
-    expect(config.apiKey).toBeNull()
-    expect(config.baseUrl).toBe('https://openrouter.ai/api/v1')
-  })
-
-  test('reads a key and overrides', () => {
-    const config = llmConfigFromEnv({
-      OPENROUTER_API_KEY: 'sk-test',
-      INKLING_MODEL: 'some/model',
-      OPENROUTER_BASE_URL: 'https://proxy.local/v1/',
-    })
-    expect(config.apiKey).toBe('sk-test')
-    expect(config.model).toBe('some/model')
-    expect(config.baseUrl).toBe('https://proxy.local/v1')
-  })
-
-  test('treats a blank key as unconfigured', () => {
-    expect(llmConfigFromEnv({ OPENROUTER_API_KEY: '   ' }).apiKey).toBeNull()
   })
 })
 
@@ -200,8 +176,40 @@ describe('llm and fetch routes', () => {
     expect((await a.json()).configured).toBe(false)
 
     const withModel = createHandler(new FileStore(dir), fakeLlm())
-    const b = await withModel(new Request(`${BASE}/llm/health`))
-    expect(await b.json()).toEqual({ configured: true, provider: 'fake' })
+    const body = await withModel(new Request(`${BASE}/llm/health`)).then((res) => res.json())
+    expect(body.configured).toBe(true)
+    expect(body.provider).toBe('fake')
+  })
+
+  test('llm health reports the resolved provider when there is one', async () => {
+    const status = {
+      provider: 'opencode-go',
+      providerName: 'OpenCode Go',
+      model: 'kimi-k2.6',
+      embedModel: null,
+      configured: true,
+      keySource: 'opencode-auth' as const,
+      embeddings: false,
+    }
+    const handle = createHandler(new FileStore(dir), fakeLlm(), status)
+    const body = await handle(new Request(`${BASE}/llm/health`)).then((res) => res.json())
+    expect(body).toMatchObject({
+      configured: true,
+      provider: 'opencode-go',
+      providerName: 'OpenCode Go',
+      model: 'kimi-k2.6',
+      keySource: 'opencode-auth',
+      embeddings: false,
+    })
+  })
+
+  test('llm providers lists the presets a client can choose from', async () => {
+    const handle = createHandler(new FileStore(dir))
+    const body = await handle(new Request(`${BASE}/llm/providers`)).then((res) => res.json())
+    const ids = body.providers.map((preset: { id: string }) => preset.id)
+    expect(ids).toContain('opencode-go')
+    expect(ids).toContain('ollama')
+    expect(ids).toContain('anthropic')
   })
 
   test('fetch validates its url before doing anything', async () => {

@@ -226,9 +226,11 @@ Home ─┬─ Add a blip    text, a link, a photo, or your voice
 | **✓ until Saturday** | put it down; the label is the date it comes back |
 
 A **Today / All** toggle at the top switches between the finite daily feed and
-everything you have — same ordering, same three actions, no cap. Retiring is a quiet
-link below. There is no separate desktop mode: the same three screens run on both
-devices, and sync keeps them the same.
+everything you have — same ordering, same three actions, no cap. **browse** opens the
+full list, where tapping a blip opens it here, focused, whether or not it was due.
+Retiring is a quiet link below — or *revive*, if you opened something out of the
+attic. There is no separate desktop mode: the same three screens run on both devices,
+and sync keeps them the same.
 
 ## Related blips
 

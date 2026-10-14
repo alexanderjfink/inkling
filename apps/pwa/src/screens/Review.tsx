@@ -6,7 +6,7 @@ import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
 import { useSuggestedMove } from '../state/useSuggestedMove'
 
-type Decision = 'advanced' | 'deferred' | 'retired' | 'promoted'
+type Decision = 'advanced' | 'deferred' | 'retired' | 'promoted' | 'revived'
 /** Today's finite feed, or everything you have. */
 type Scope = 'today' | 'all'
 
@@ -62,6 +62,8 @@ export function Review({
   promoteResults,
   promotingId,
   onExit,
+  onBrowse,
+  focusId,
 }: {
   blips: Blip[]
   actions: InklingActions
@@ -71,17 +73,24 @@ export function Review({
   promoteResults: Record<string, PromoteResult>
   promotingId: string | null
   onExit: () => void
+  onBrowse: () => void
+  /** A blip picked from the list, to open first. */
+  focusId?: string | null
 }) {
   const [session, setSession] = useState<string[] | null>(null)
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
   const [entryOpen, setEntryOpen] = useState(false)
   const [entry, setEntry] = useState('')
   const [busy, setBusy] = useState(false)
-  const [scope, setScope] = useState<Scope>('today')
+  // A blip picked from the list may not be due today, so focus starts in "all".
+  const [scope, setScope] = useState<Scope>(focusId ? 'all' : 'today')
 
   const today = useMemo(() => buildDailyFeed(blips, { now: new Date() }), [blips])
   const everything = useMemo(() => rankBlips(blips, { now: new Date() }), [blips])
   const candidates = scope === 'today' ? today : everything
+
+  const focus = focusId ? blips.find((blip) => blip.id === focusId) : undefined
+  const focusKey = focus?.id ?? ''
 
   // Changing scope starts a new round, rather than mixing two queues.
   const lastScope = useRef(scope)
@@ -95,8 +104,13 @@ export function Review({
 
   // Freeze the round when it starts, so acting on a blip cannot reshuffle the queue.
   useEffect(() => {
-    if (session === null && candidates.length > 0) setSession(candidates.map((blip) => blip.id))
-  }, [candidates, session])
+    if (session !== null) return
+    const ids = candidates.map((blip) => blip.id)
+    // A focused blip opens first, whether or not it is in the queue — and it opens
+    // even if it is retired, which is how you get one back.
+    const ordered = focusKey ? [focusKey, ...ids.filter((id) => id !== focusKey)] : ids
+    if (ordered.length > 0) setSession(ordered)
+  }, [candidates, session, focusKey])
 
   const byId = useMemo(() => new Map(blips.map((blip) => [blip.id, blip])), [blips])
   const queue = useMemo(() => {
@@ -149,6 +163,12 @@ export function Review({
     settle('retired')
   }
 
+  async function revive() {
+    if (!current) return
+    await actions.revive(current.id)
+    settle('revived')
+  }
+
   async function promote() {
     if (!current) return
     const result = await onPromote(
@@ -164,14 +184,15 @@ export function Review({
     const deferred = counts.filter((value) => value === 'deferred').length
     const retired = counts.filter((value) => value === 'retired').length
     const promoted = counts.filter((value) => value === 'promoted').length
+    const revived = counts.filter((value) => value === 'revived').length
 
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
         <p className="text-2xl font-semibold">{done === 0 ? 'Nothing waiting' : 'Done for now'}</p>
         {done > 0 ? (
           <p className="text-sm text-ink-soft">
-            {advanced} advanced · {deferred} put down · {promoted} to notes · {retired} retired ·
-            nothing lost.
+            {advanced} advanced · {deferred} put down · {promoted} to notes · {retired} retired
+            {revived > 0 ? ` · ${revived} revived` : ''} · nothing lost.
           </p>
         ) : (
           <p className="text-sm text-ink-soft">Capture something, or look in the attic.</p>
@@ -228,6 +249,9 @@ export function Review({
             {option === 'today' ? `Today · ${today.length}` : `All · ${everything.length}`}
           </button>
         ))}
+        <button type="button" onClick={onBrowse} className="quiet text-xs underline">
+          browse
+        </button>
         <span className="ml-auto text-xs text-ink-faint">
           {done + 1} of {total}
         </span>
@@ -359,9 +383,15 @@ export function Review({
       </div>
 
       <div className="mt-4 flex justify-center gap-5 text-xs">
-        <button type="button" onClick={() => void retire()} className="quiet underline">
-          retire
-        </button>
+        {current.status === 'retired' ? (
+          <button type="button" onClick={() => void revive()} className="quiet underline">
+            revive — put it back in play
+          </button>
+        ) : (
+          <button type="button" onClick={() => void retire()} className="quiet underline">
+            retire
+          </button>
+        )}
       </div>
 
       {promoteResults[current.id]?.ok === false ? (

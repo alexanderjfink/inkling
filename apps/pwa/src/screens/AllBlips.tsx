@@ -3,19 +3,35 @@ import { isDue } from '@inkling/domain'
 import { formatShortDate } from '../format'
 import type { InklingActions } from '../state/useInkling'
 
-function Row({ blip, actions }: { blip: Blip; actions: InklingActions }) {
+function Row({
+  blip,
+  actions,
+  onOpen,
+}: {
+  blip: Blip
+  actions: InklingActions
+  onOpen: (id: string) => void
+}) {
   return (
     <div className="card flex flex-col gap-2 p-4">
-      <div className="flex flex-wrap items-center gap-2 text-[11px] tracking-wide text-ink-faint uppercase">
-        <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">{blip.type}</span>
-        <span>{formatShortDate(blip.created)}</span>
-        <span>{blip.entries.length} entries</span>
-      </div>
-      <p className="text-sm font-medium">{blip.title}</p>
-      {blip.topics.length > 0 ? (
-        <p className="text-xs text-ink-faint">#{blip.topics.join(' #')}</p>
-      ) : null}
-      <div className="flex gap-2 pt-1">
+      <button
+        type="button"
+        onClick={() => onOpen(blip.id)}
+        className="flex flex-col gap-2 text-left"
+      >
+        <span className="flex flex-wrap items-center gap-2 text-[11px] tracking-wide text-ink-faint uppercase">
+          <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">{blip.type}</span>
+          <span>{formatShortDate(blip.created)}</span>
+          <span>{blip.entries.length} entries</span>
+          {blip.desktopPinned ? <span className="text-accent">▸ to Mac</span> : null}
+        </span>
+        <span className="text-sm font-medium">{blip.title}</span>
+        {blip.topics.length > 0 ? (
+          <span className="text-xs text-ink-faint">#{blip.topics.join(' #')}</span>
+        ) : null}
+      </button>
+
+      <div className="flex gap-2">
         {blip.status === 'retired' ? (
           <button
             type="button"
@@ -33,13 +49,28 @@ function Row({ blip, actions }: { blip: Blip; actions: InklingActions }) {
             Retire
           </button>
         )}
+        <button
+          type="button"
+          onClick={() => onOpen(blip.id)}
+          className="quiet rounded-full border border-line px-3 py-1.5 text-xs"
+        >
+          Open
+        </button>
       </div>
     </div>
   )
 }
 
 /** Everything, including what you put down and what you let go of. */
-export function AllBlips({ blips, actions }: { blips: Blip[]; actions: InklingActions }) {
+export function AllBlips({
+  blips,
+  actions,
+  onOpen,
+}: {
+  blips: Blip[]
+  actions: InklingActions
+  onOpen: (id: string) => void
+}) {
   const live = blips.filter((blip) => !blip.deleted)
   const now = new Date()
 
@@ -72,7 +103,7 @@ export function AllBlips({ blips, actions }: { blips: Blip[]; actions: InklingAc
               {group.label} · {group.items.length}
             </h2>
             {group.items.map((blip) => (
-              <Row key={blip.id} blip={blip} actions={actions} />
+              <Row key={blip.id} blip={blip} actions={actions} onOpen={onOpen} />
             ))}
           </section>
         ))}

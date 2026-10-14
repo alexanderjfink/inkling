@@ -27,6 +27,8 @@ export default function App() {
   const incoming = useMemo(() => readSharedContent(), [])
   const [shared, setShared] = useState(incoming)
   const [screen, setScreen] = useState<Screen>(incoming ? 'add' : 'home')
+  /** A blip chosen from the list, to open straight away in Review. */
+  const [focusId, setFocusId] = useState<string | null>(null)
 
   const { ready, events, blips, actions } = useInkling()
   const syncState = useSync()
@@ -127,11 +129,25 @@ export default function App() {
           onPromote={onPromote}
           promoteResults={promoteState.results}
           promotingId={promoteState.busyId}
-          onExit={() => setScreen('home')}
+          onExit={() => {
+            setFocusId(null)
+            setScreen('home')
+          }}
+          onBrowse={() => setScreen('all')}
+          focusId={focusId}
         />
       ) : null}
 
-      {screen === 'all' ? <AllBlips blips={blips} actions={actions} /> : null}
+      {screen === 'all' ? (
+        <AllBlips
+          blips={blips}
+          actions={actions}
+          onOpen={(id) => {
+            setFocusId(id)
+            setScreen('review')
+          }}
+        />
+      ) : null}
       {screen === 'settings' ? (
         <Settings syncState={syncState} events={events} serverConfig={serverConfig} />
       ) : null}

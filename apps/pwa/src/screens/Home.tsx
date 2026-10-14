@@ -1,5 +1,6 @@
 export function Home({
   waiting,
+  total,
   attic,
   serverWarning,
   onAdd,
@@ -8,6 +9,7 @@ export function Home({
   onSettings,
 }: {
   waiting: number
+  total: number
   attic: number
   /** Set when the server cannot be reached, so the app is not silently degraded. */
   serverWarning: string | null
@@ -76,13 +78,16 @@ export function Home({
         </button>
       ) : null}
 
-      <div className="mt-6 flex items-center justify-center gap-6 text-xs">
-        {attic > 0 ? (
-          <button type="button" onClick={onAttic} className="quiet">
-            {attic} in the attic
-          </button>
-        ) : null}
-      </div>
+      <button
+        type="button"
+        onClick={onAttic}
+        disabled={total === 0}
+        className="quiet mt-2 text-center text-xs underline disabled:no-underline disabled:opacity-50"
+      >
+        {total === 0
+          ? 'no blips yet'
+          : `all ${total} blip${total === 1 ? '' : 's'}${attic > 0 ? ` · ${attic} in the attic` : ''}`}
+      </button>
     </div>
   )
 }

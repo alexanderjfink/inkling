@@ -179,6 +179,60 @@ export function createHandler(
       return json({ providers: providerList() })
     }
 
+    // What the provider says it can serve, so the model field can offer a list.
+    if (parts.length === 2 && parts[0] === 'llm' && parts[1] === 'models') {
+      const kind = url.searchParams.get('kind') === 'embed' ? 'embed' : 'chat'
+      const provider = kind === 'embed' ? (live.embed ?? live.llm) : live.llm
+      if (!provider) return json({ error: 'no model configured' }, 503)
+      if (!provider.listModels) return json({ error: 'this provider cannot list models' }, 501)
+      try {
+        return json({ models: await provider.listModels() })
+      } catch (error) {
+        return json(
+          { error: error instanceof Error ? error.message : 'could not list models' },
+          502,
+        )
+      }
+    }
+
+    // One real round trip, so "does this actually work?" has an answer.
+    if (
+      parts.length === 2 &&
+      parts[0] === 'llm' &&
+      parts[1] === 'test' &&
+      request.method === 'POST'
+    ) {
+      const body = await readJson(request)
+      const kind = body?.kind === 'embed' ? 'embed' : 'chat'
+      const provider = kind === 'embed' ? (live.embed ?? live.llm) : live.llm
+      if (!provider || !(await provider.available())) {
+        return json({ ok: false, error: 'no model configured for this' })
+      }
+
+      const started = Date.now()
+      try {
+        if (kind === 'embed') {
+          const vectors = await provider.embed(['a short test'])
+          return json({
+            ok: true,
+            ms: Date.now() - started,
+            detail: `${vectors[0]?.length ?? 0}-dimension vector`,
+          })
+        }
+        const text = await provider.completeStructured({
+          system: 'You reply with JSON only.',
+          prompt: 'Reply with exactly {"ok":true}',
+        })
+        return json({ ok: true, ms: Date.now() - started, detail: text.slice(0, 200) })
+      } catch (error) {
+        return json({
+          ok: false,
+          ms: Date.now() - started,
+          error: error instanceof Error ? error.message : 'the model call failed',
+        })
+      }
+    }
+
     if (parts.length === 2 && parts[0] === 'digests') {
       const deviceId = parts[1]
       if (!deviceId || !isSafeDeviceId(deviceId)) return json({ error: 'invalid device id' }, 400)

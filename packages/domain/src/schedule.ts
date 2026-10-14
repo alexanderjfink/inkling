@@ -115,6 +115,26 @@ export function buildDailyFeed(blips: Blip[], ctx: FeedContext): Blip[] {
   return chosen
 }
 
+/**
+ * Every blip worth reviewing, best first.
+ *
+ * The same ordering the daily feed uses, without the cap and without the due
+ * filter — this is what "review everything" means, and it should not be a different
+ * order from the one the feed would have chosen.
+ */
+export function rankBlips(blips: Blip[], ctx: FeedContext): Blip[] {
+  return blips
+    .filter((blip) => !blip.deleted && blip.status !== 'retired' && blip.status !== 'promoted')
+    .map((blip) => ({ blip, score: scoreBlip(blip, ctx) }))
+    .sort(
+      (x, y) =>
+        Number(y.blip.desktopPinned) - Number(x.blip.desktopPinned) ||
+        y.score - x.score ||
+        (x.blip.created < y.blip.created ? -1 : 1),
+    )
+    .map((entry) => entry.blip)
+}
+
 export type SnoozeReason = 'engaged' | 'skipped' | 'shown'
 
 /** How long "not now" means, when you do not want to think about it. */

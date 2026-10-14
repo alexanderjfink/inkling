@@ -1,12 +1,14 @@
 import type { Blip, DeferralChoice, LLMProvider, RelatedBlip } from '@inkling/domain'
-import { DEFERRAL_CHOICES, buildDailyFeed, deferUntil } from '@inkling/domain'
-import { useEffect, useMemo, useState } from 'react'
+import { DEFERRAL_CHOICES, buildDailyFeed, deferUntil, rankBlips } from '@inkling/domain'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatDeferral } from '../format'
 import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
 import { useSuggestedMove } from '../state/useSuggestedMove'
 
 type Decision = 'advanced' | 'deferred' | 'retired' | 'promoted'
+/** Today's finite feed, or everything you have. */
+type Scope = 'today' | 'all'
 
 const DEFAULT_DEFERRAL: DeferralChoice = 'few-days'
 const DEFERRAL_LABEL: Record<DeferralChoice, string> = {
@@ -75,8 +77,21 @@ export function Review({
   const [entryOpen, setEntryOpen] = useState(false)
   const [entry, setEntry] = useState('')
   const [busy, setBusy] = useState(false)
+  const [scope, setScope] = useState<Scope>('today')
 
-  const candidates = useMemo(() => buildDailyFeed(blips, { now: new Date() }), [blips])
+  const today = useMemo(() => buildDailyFeed(blips, { now: new Date() }), [blips])
+  const everything = useMemo(() => rankBlips(blips, { now: new Date() }), [blips])
+  const candidates = scope === 'today' ? today : everything
+
+  // Changing scope starts a new round, rather than mixing two queues.
+  const lastScope = useRef(scope)
+  useEffect(() => {
+    if (lastScope.current === scope) return
+    lastScope.current = scope
+    setSession(null)
+    setDecisions({})
+    setEntryOpen(false)
+  }, [scope])
 
   // Freeze the round when it starts, so acting on a blip cannot reshuffle the queue.
   useEffect(() => {
@@ -180,6 +195,15 @@ export function Review({
             Home
           </button>
         </div>
+        {scope === 'today' && everything.length > today.length ? (
+          <button
+            type="button"
+            onClick={() => setScope('all')}
+            className="quiet mt-1 text-xs underline"
+          >
+            or review all {everything.length}
+          </button>
+        ) : null}
       </div>
     )
   }
@@ -189,9 +213,22 @@ export function Review({
 
   return (
     <div className="flex flex-1 flex-col">
-      <div className="mb-3 flex items-baseline justify-between text-xs text-ink-faint">
-        <span>reviewing</span>
-        <span>
+      <div className="mb-3 flex items-center gap-2">
+        {(['today', 'all'] as const).map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setScope(option)}
+            className={`rounded-full px-3 py-1 text-xs transition ${
+              scope === option
+                ? 'bg-ink font-medium text-surface'
+                : 'border border-line text-ink-soft'
+            }`}
+          >
+            {option === 'today' ? `Today · ${today.length}` : `All · ${everything.length}`}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-ink-faint">
           {done + 1} of {total}
         </span>
       </div>

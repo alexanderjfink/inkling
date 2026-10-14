@@ -101,12 +101,18 @@ export function Add({
           onClick={() => (speech.listening ? speech.stop() : speech.start())}
           disabled={!speech.supported}
           className={`circle h-[4.25rem] w-[4.25rem] ${speech.listening ? 'circle--accent' : ''}`}
-          title="Ramble, and it transcribes as you talk"
+          title={
+            speech.supported ? 'Ramble, and it transcribes as you talk' : (speech.reason ?? '')
+          }
         >
           <span className="text-xl">🎙</span>
         </button>
         <span className="text-xs text-ink-faint">
-          {speech.listening ? 'listening — ramble away' : 'or ramble'}
+          {!speech.supported
+            ? 'voice unavailable here'
+            : speech.listening
+              ? 'listening — ramble away'
+              : 'or ramble'}
         </span>
 
         <button
@@ -119,6 +125,9 @@ export function Add({
         </button>
       </div>
 
+      {!speech.supported && speech.reason ? (
+        <p className="text-xs text-ink-faint">{speech.reason}</p>
+      ) : null}
       {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
       <p className="text-center text-xs text-ink-faint">
         Written to this device instantly — never blocked on the network.

@@ -95,6 +95,7 @@ export default function App() {
       {screen === 'home' ? (
         <Home
           waiting={waiting}
+          total={blips.filter((blip) => !blip.deleted).length}
           attic={attic}
           serverWarning={
             serverConfig.status === 'ok' || serverConfig.status === 'loading'

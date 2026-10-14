@@ -180,3 +180,68 @@ export function useServerConfig(baseUrl: string) {
 
   return { config, providers, error, saving, loaded, load, save, status }
 }
+
+export interface TestResult {
+  ok: boolean
+  ms?: number
+  detail?: string
+  error?: string
+}
+
+export interface ModelsResult {
+  ok: boolean
+  models?: string[]
+  error?: string
+}
+
+/**
+ * One real round trip to the model, and the list of what it says it can serve.
+ *
+ * Both are the difference between "saved" and "actually works" — a key can be
+ * present and still wrong, and the model name can be a typo.
+ */
+export function useModelTools(baseUrl: string) {
+  const [testing, setTesting] = useState<'chat' | 'embed' | null>(null)
+  const [listing, setListing] = useState<'chat' | 'embed' | null>(null)
+
+  const testConnection = useCallback(
+    async (kind: 'chat' | 'embed' = 'chat'): Promise<TestResult> => {
+      setTesting(kind)
+      try {
+        const res = await fetch(join(baseUrl, '/llm/test'), {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ kind }),
+        })
+        return (await res.json()) as TestResult
+      } catch (caught) {
+        return { ok: false, error: message(caught) }
+      } finally {
+        setTesting(null)
+      }
+    },
+    [baseUrl],
+  )
+
+  const loadModels = useCallback(
+    async (kind: 'chat' | 'embed' = 'chat'): Promise<ModelsResult> => {
+      setListing(kind)
+      try {
+        const res = await fetch(join(baseUrl, `/llm/models?kind=${kind}`))
+        const body = (await res.json().catch(() => ({}))) as {
+          models?: string[]
+          error?: string
+        }
+        if (!res.ok) return { ok: false, error: body.error ?? `server said ${res.status}` }
+        return { ok: true, models: body.models ?? [] }
+      } catch (caught) {
+        return { ok: false, error: message(caught) }
+      } finally {
+        setListing(null)
+      }
+    },
+    [baseUrl],
+  )
+
+  return { testConnection, loadModels, testing, listing }
+}

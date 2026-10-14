@@ -11,7 +11,7 @@ import { Spike } from '../spike/Spike'
 import { formatBytes } from '../storage/hash'
 import { storage } from '../state/useInkling'
 import type { useServerConfig } from '../state/useServerConfig'
-import { diagnoseServer } from '../state/useServerConfig'
+import { diagnoseServer, useModelTools } from '../state/useServerConfig'
 import type { useSync } from '../state/useSync'
 
 const inputClass =
@@ -66,6 +66,39 @@ export function Settings({
   const [nudgeNote, setNudgeNote] = useState<string | null>(null)
   const [swReady, setSwReady] = useState<boolean | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [chatModels, setChatModels] = useState<string[]>([])
+  const [embedModels, setEmbedModels] = useState<string[]>([])
+  const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
+  const modelTools = useModelTools(syncState.serverUrl)
+
+  async function testModel(kind: 'chat' | 'embed') {
+    const result = await modelTools.testConnection(kind)
+    setNote(
+      result.ok
+        ? {
+            ok: true,
+            text: `${kind === 'chat' ? 'the model' : 'embeddings'} replied in ${result.ms} ms — ${result.detail ?? ''}`,
+          }
+        : { ok: false, text: result.error ?? 'the call failed' },
+    )
+  }
+
+  async function loadModels(kind: 'chat' | 'embed') {
+    const result = await modelTools.loadModels(kind)
+    if (result.ok && result.models) {
+      if (kind === 'chat') setChatModels(result.models)
+      else setEmbedModels(result.models)
+      setNote({
+        ok: true,
+        text:
+          result.models.length === 0
+            ? 'the provider listed no models'
+            : `${result.models.length} models — pick one from the dropdown`,
+      })
+    } else {
+      setNote({ ok: false, text: result.error ?? 'could not list models' })
+    }
+  }
 
   // Editable copies of the server settings.
   const [provider, setProvider] = useState('')
@@ -289,12 +322,18 @@ export function Settings({
               <input
                 value={model}
                 onChange={(event) => setModel(event.target.value)}
+                list="inkling-chat-models"
                 placeholder={config.model ?? ''}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
                 className={inputClass}
               />
+              <datalist id="inkling-chat-models">
+                {chatModels.map((id) => (
+                  <option key={id} value={id} />
+                ))}
+              </datalist>
             </Field>
 
             <Field label={`API key ${config.apiKeySet ? '(set)' : '(not set)'}`}>
@@ -327,12 +366,18 @@ export function Settings({
               <input
                 value={embedModel}
                 onChange={(event) => setEmbedModel(event.target.value)}
+                list="inkling-embed-models"
                 placeholder={config.embedModel ?? ''}
                 autoCapitalize="none"
                 autoCorrect="off"
                 spellCheck={false}
                 className={inputClass}
               />
+              <datalist id="inkling-embed-models">
+                {embedModels.map((id) => (
+                  <option key={id} value={id} />
+                ))}
+              </datalist>
             </Field>
 
             <Field label={`Embedding key ${config.embedApiKeySet ? '(set)' : '(not set)'}`}>
@@ -362,6 +407,49 @@ export function Settings({
                 ? ` · embeddings via ${config.embedProviderName ?? '?'}`
                 : ' · no embeddings'}
             </p>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void loadModels('chat')}
+                disabled={modelTools.listing !== null}
+                className={buttonClass}
+              >
+                {modelTools.listing === 'chat' ? 'Loading…' : 'Load models'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void testModel('chat')}
+                disabled={modelTools.testing !== null}
+                className={buttonClass}
+              >
+                {modelTools.testing === 'chat' ? 'Testing…' : 'Test model'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void loadModels('embed')}
+                disabled={modelTools.listing !== null}
+                className={buttonClass}
+              >
+                {modelTools.listing === 'embed' ? 'Loading…' : 'Load embedding models'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void testModel('embed')}
+                disabled={modelTools.testing !== null}
+                className={buttonClass}
+              >
+                {modelTools.testing === 'embed' ? 'Testing…' : 'Test embeddings'}
+              </button>
+            </div>
+
+            {note ? (
+              <p className={`text-xs ${note.ok ? 'text-good' : 'text-warn'}`}>{note.text}</p>
+            ) : (
+              <p className="text-xs text-ink-faint">
+                Load and Test act on what is saved, so save first if you have changed something.
+              </p>
+            )}
 
             <button
               type="button"

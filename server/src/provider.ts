@@ -42,7 +42,7 @@ export class OpenAiCompatibleProvider implements LLMProvider {
     return Boolean(this.#baseUrl && this.#model)
   }
 
-  async #post(path: string, body: unknown): Promise<Response> {
+  #headers(): Record<string, string> {
     const headers: Record<string, string> = {
       'content-type': 'application/json',
       // Identify ourselves rather than arriving as a generic HTTP library.
@@ -51,6 +51,23 @@ export class OpenAiCompatibleProvider implements LLMProvider {
     if (this.#apiKey) headers.authorization = `Bearer ${this.#apiKey}`
     // Gateways such as OpenCode Go refuse requests without a session id.
     if (this.#sessionId) headers['x-opencode-session'] = this.#sessionId
+    return headers
+  }
+
+  /** What this endpoint says it can serve. */
+  async listModels(): Promise<string[]> {
+    const res = await fetch(`${this.#baseUrl}/models`, { headers: this.#headers() })
+    if (!res.ok) throw new Error(`${this.name} could not list models: ${res.status}`)
+
+    const body = (await res.json()) as { data?: Array<{ id?: string }> }
+    return (body.data ?? [])
+      .map((entry) => entry.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      .sort((a, b) => a.localeCompare(b))
+  }
+
+  async #post(path: string, body: unknown): Promise<Response> {
+    const headers = this.#headers()
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -161,6 +178,23 @@ export class AnthropicProvider implements LLMProvider {
 
   async embed(_texts: string[]): Promise<number[][]> {
     throw new Error('anthropic has no embeddings API; related blips use topics and links instead')
+  }
+
+  async listModels(): Promise<string[]> {
+    const res = await fetch(`${this.#baseUrl}/models`, {
+      headers: {
+        'x-api-key': this.#apiKey ?? '',
+        'anthropic-version': '2023-06-01',
+        'user-agent': 'Inkling/0.1 (personal blip tool)',
+      },
+    })
+    if (!res.ok) throw new Error(`anthropic could not list models: ${res.status}`)
+
+    const body = (await res.json()) as { data?: Array<{ id?: string }> }
+    return (body.data ?? [])
+      .map((entry) => entry.id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0)
+      .sort((a, b) => a.localeCompare(b))
   }
 }
 

@@ -245,6 +245,91 @@ describe('llm and fetch routes', () => {
     expect(ids).toContain('anthropic')
   })
 
+  test('models are listed when the provider can, so the field can offer a dropdown', async () => {
+    const handle = createHandler(new FileStore(dir), {
+      llm: fakeLlm({ listModels: async () => ['a-model', 'b-model'] }),
+    })
+    const body = await handle(new Request(`${BASE}/llm/models`)).then((res) => res.json())
+    expect(body.models).toEqual(['a-model', 'b-model'])
+  })
+
+  test('models answers honestly when the provider cannot list them', async () => {
+    const handle = createHandler(new FileStore(dir), { llm: fakeLlm() })
+    expect((await handle(new Request(`${BASE}/llm/models`))).status).toBe(501)
+
+    const bare = createHandler(new FileStore(dir))
+    expect((await bare(new Request(`${BASE}/llm/models`))).status).toBe(503)
+  })
+
+  test('models can be listed for the embedding provider separately', async () => {
+    const handle = createHandler(new FileStore(dir), {
+      llm: fakeLlm({ listModels: async () => ['chat-model'] }),
+      embed: fakeLlm({ name: 'embedder', listModels: async () => ['embed-model'] }),
+    })
+    const chat = await handle(new Request(`${BASE}/llm/models`)).then((res) => res.json())
+    const embed = await handle(new Request(`${BASE}/llm/models?kind=embed`)).then((res) =>
+      res.json(),
+    )
+    expect(chat.models).toEqual(['chat-model'])
+    expect(embed.models).toEqual(['embed-model'])
+  })
+
+  test('a test call reports success, timing and a sample', async () => {
+    const handle = createHandler(new FileStore(dir), {
+      llm: fakeLlm({ completeStructured: async () => '{"ok":true}' }),
+    })
+    const body = await handle(new Request(`${BASE}/llm/test`, { method: 'POST' })).then((res) =>
+      res.json(),
+    )
+    expect(body.ok).toBe(true)
+    expect(typeof body.ms).toBe('number')
+    expect(body.detail).toBe('{"ok":true}')
+  })
+
+  test('a test call reports the failure rather than throwing', async () => {
+    const handle = createHandler(new FileStore(dir), {
+      llm: fakeLlm({
+        completeStructured: async () => {
+          throw new Error('upstream said no')
+        },
+      }),
+    })
+    const res = await handle(new Request(`${BASE}/llm/test`, { method: 'POST' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(false)
+    expect(body.error).toBe('upstream said no')
+  })
+
+  test('a test call with nothing configured says so instead of failing obscurely', async () => {
+    const handle = createHandler(new FileStore(dir))
+    const body = await handle(new Request(`${BASE}/llm/test`, { method: 'POST' })).then((res) =>
+      res.json(),
+    )
+    expect(body.ok).toBe(false)
+    expect(body.error).toContain('no model configured')
+  })
+
+  test('an embedding test uses the embedding provider', async () => {
+    const asked: string[] = []
+    const handle = createHandler(new FileStore(dir), {
+      llm: fakeLlm(),
+      embed: fakeLlm({
+        name: 'embedder',
+        embed: async () => {
+          asked.push('embed')
+          return [[0.1, 0.2, 0.3]]
+        },
+      }),
+    })
+    const body = await handle(
+      new Request(`${BASE}/llm/test`, { method: 'POST', body: JSON.stringify({ kind: 'embed' }) }),
+    ).then((res) => res.json())
+    expect(body.ok).toBe(true)
+    expect(body.detail).toBe('3-dimension vector')
+    expect(asked).toEqual(['embed'])
+  })
+
   test('fetch validates its url before doing anything', async () => {
     const handle = createHandler(new FileStore(dir))
     const missing = await handle(new Request(`${BASE}/fetch`, { method: 'POST', body: '{}' }))

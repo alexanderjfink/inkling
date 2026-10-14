@@ -6,6 +6,7 @@ import {
   isDue,
   newId,
   project,
+  rankBlips,
   scoreBlip,
   snoozeUntil,
 } from '../src/index'
@@ -124,6 +125,39 @@ describe('scheduler', () => {
 
     expect(feed[0]?.id).toBe(pinned.id)
     expect(feed.map((blip) => blip.id)).toContain(older.id)
+  })
+
+  test('ranking covers everything, in the same order the feed would use', () => {
+    const old = only(blipFrom('old', '2026-01-01T00:00:00Z').events)
+    const pinnedSource = blipFrom('pinned', '2026-02-28T12:00:00Z')
+    const pinned = only([
+      ...pinnedSource.events,
+      ev({ t: 'promoteToDesktop', id: pinnedSource.id }, 1, '2026-03-01T00:00:00Z'),
+    ])
+    const snoozedSource = blipFrom('snoozed', '2026-02-01T00:00:00Z')
+    const snoozed = only([
+      ...snoozedSource.events,
+      ev(
+        { t: 'snoozed', id: snoozedSource.id, until: '2026-12-01T00:00:00Z' },
+        1,
+        '2026-02-02T00:00:00Z',
+      ),
+    ])
+
+    const ranked = rankBlips([old, pinned, snoozed], { now: NOW })
+    expect(ranked[0]?.id).toBe(pinned.id)
+    // A blip put down until December is still reviewable — that is the point.
+    expect(ranked.map((blip) => blip.id)).toContain(snoozed.id)
+  })
+
+  test('ranking leaves out retired and promoted blips', () => {
+    const retiredSource = blipFrom('retired', '2026-02-01T00:00:00Z')
+    const retired = only([
+      ...retiredSource.events,
+      ev({ t: 'retired', id: retiredSource.id }, 1, '2026-02-02T00:00:00Z'),
+    ])
+    const live = only(blipFrom('live', '2026-02-01T00:00:00Z').events)
+    expect(rankBlips([retired, live], { now: NOW }).map((blip) => blip.id)).toEqual([live.id])
   })
 
   test('deferral choices are floors, in the future, in order', () => {

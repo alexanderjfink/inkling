@@ -373,6 +373,20 @@ describe('OpenAiCompatibleProvider', () => {
     expect(stub.calls[0]?.url).toBe('http://127.0.0.1:11434/v1/embeddings')
   })
 
+  test('lists the models the endpoint offers, sorted and cleaned', async () => {
+    const stub = stubFetch(async () =>
+      Response.json({ data: [{ id: 'z-model' }, { id: 'a-model' }, { notAnId: true }] }),
+    )
+    const models = await provider().listModels()
+    expect(models).toEqual(['a-model', 'z-model'])
+    expect(stub.calls[0]?.url).toBe('http://127.0.0.1:11434/v1/models')
+  })
+
+  test('surfaces a failure to list models', async () => {
+    stubFetch(async () => new Response('nope', { status: 404 }))
+    await expect(provider().listModels()).rejects.toThrow('404')
+  })
+
   test('refuses to embed without a model rather than sending a bad request', async () => {
     const stub = stubFetch(async () => Response.json({ data: [] }))
     // vLLM's preset has no embedding model by default.

@@ -225,8 +225,10 @@ Home ─┬─ Add a blip    text, a link, a photo, or your voice
 | **＋ Add entry** | write something down, with the suggested move as the prompt |
 | **✓ until Saturday** | put it down; the label is the date it comes back |
 
-Retiring is a quiet link below. There is no separate desktop mode — the same three
-screens run on both devices, and sync keeps them the same.
+A **Today / All** toggle at the top switches between the finite daily feed and
+everything you have — same ordering, same three actions, no cap. Retiring is a quiet
+link below. There is no separate desktop mode: the same three screens run on both
+devices, and sync keeps them the same.
 
 ## Related blips
 
@@ -263,6 +265,17 @@ immediately, with no restart:
 Saved settings override the server's environment, which still supplies anything the
 settings do not mention. **Keys are write-only**: the server reports whether one is set
 and never returns it, so nothing secret round-trips through the browser.
+
+Under **Model** there are also four tools, because "saved" and "works" are different
+things:
+
+| | |
+|---|---|
+| **Load models** | asks the provider what it serves and puts the list in the model field as a dropdown. OpenCode Go returns 40 |
+| **Test model** | one real round trip, reported with its latency and the reply |
+| **Load embedding models** / **Test embeddings** | the same, for the embedding provider |
+
+They act on what is saved, so save before testing.
 
 The same things can still be set with environment variables, and
 `INKLING_PROVIDER=ollama bun run server` remains the quickest way to try one out.
@@ -346,8 +359,15 @@ the fields already filled.
 **Voice capture** uses the browser's own speech recogniser, so nothing is uploaded:
 tap **🎙 Ramble** and it transcribes as you talk. That suits the source material's
 "set a timer for two minutes and ramble into the microphone" better than shipping audio
-to a server. Chrome on Android does this well; Firefox does not, and the button
-disables itself rather than failing silently.
+to a server.
+
+It needs three things, and the button says which is missing:
+
+1. **A browser that implements it** — Chrome on Android or desktop. Firefox does not,
+   and Safari's support is partial.
+2. **A secure context** — `https://`, or `http://localhost`. Plain `http://` on a LAN
+   address is not one, so voice will not work there even in Chrome.
+3. **Microphone permission**, asked the first time you tap it.
 
 **Backups** are the log itself: **Download log** in the Sync tab writes the JSONL that
 sync already moves, so any device can re-ingest it and nothing about the format is

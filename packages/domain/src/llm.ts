@@ -18,4 +18,6 @@ export interface LLMProvider {
   /** Returns the model's raw text. Callers parse and validate it. */
   completeStructured(request: StructuredRequest): Promise<string>
   embed(texts: string[]): Promise<number[][]>
+  /** Optional: providers that can enumerate the models they offer. */
+  listModels?(): Promise<string[]>
 }

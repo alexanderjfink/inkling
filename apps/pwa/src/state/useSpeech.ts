@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 interface RecognitionAlternative {
   transcript: string
@@ -42,7 +42,15 @@ function recognitionCtor(): RecognitionCtor | null {
  * button says so rather than failing silently.
  */
 export function useSpeech(onText: (text: string) => void) {
-  const [supported] = useState(() => recognitionCtor() !== null)
+  const supported = useMemo(() => recognitionCtor() !== null, [])
+
+  // Say why, rather than leaving a dead button. The two causes are quite different.
+  const reason = supported
+    ? null
+    : window.isSecureContext === false
+      ? 'voice needs a secure connection — https, or localhost'
+      : 'this browser cannot transcribe speech. Chrome on Android or desktop can.'
+
   const [listening, setListening] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
@@ -88,5 +96,5 @@ export function useSpeech(onText: (text: string) => void) {
 
   useEffect(() => () => recognitionRef.current?.stop(), [])
 
-  return { supported, listening, error, start, stop }
+  return { supported, reason, listening, error, start, stop }
 }

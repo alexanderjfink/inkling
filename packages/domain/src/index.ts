@@ -61,6 +61,7 @@ export {
   DEFAULT_FEED_SIZE,
   deferUntil,
   isDue,
+  rankBlips,
   scoreBlip,
   snoozeUntil,
 } from './schedule'

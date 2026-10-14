@@ -54,7 +54,7 @@ bun run dev                        # PWA dev server, reachable over the LAN
 bun test                           # domain unit tests
 bun run typecheck                  # both packages
 bun run check                      # biome
-bun --cwd=apps/pwa run build       # production build
+bun run build                      # production build
 ```
 
 ## Try it

@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/*
+ * One set of tokens, re-pointed for dark.
+ *
+ * Tailwind utilities compile to var(--color-*), so overriding the variables under
+ * [data-theme='dark'] re-themes every surface without a component changing.
+ */
 @theme {
   --color-canvas: #f1f1f4;
   --color-surface: #ffffff;
@@ -11,6 +17,29 @@
   --color-accent-soft: #efeaff;
   --color-good: #157f5b;
   --color-warn: #9a5b12;
+  --shadow-card: 0 1px 2px rgb(16 16 24 / 0.04), 0 12px 32px rgb(16 16 24 / 0.08);
+  --shadow-circle: 0 1px 2px rgb(16 16 24 / 0.05), 0 10px 24px rgb(16 16 24 / 0.1);
+}
+
+[data-theme="dark"] {
+  --color-canvas: #0b0b0f;
+  --color-surface: #17171c;
+  --color-ink: #f4f4f5;
+  --color-ink-soft: #a6a6b0;
+  --color-ink-faint: #74747f;
+  --color-line: #2a2a31;
+  --color-accent: #8f74ff;
+  --color-accent-soft: #241d3d;
+  --color-good: #3ecf9a;
+  --color-warn: #e0a44a;
+  /* Shadows read as depth on light and as mud on dark, so they go deeper. */
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px rgb(0 0 0 / 0.45);
+  --shadow-circle: 0 1px 2px rgb(0 0 0 / 0.5), 0 10px 24px rgb(0 0 0 / 0.5);
+  color-scheme: dark;
+}
+
+:root {
+  color-scheme: light;
 }
 
 html,
@@ -31,9 +60,7 @@ body {
 .card {
   background: var(--color-surface);
   border-radius: 1.75rem;
-  box-shadow:
-    0 1px 2px rgb(16 16 24 / 0.04),
-    0 12px 32px rgb(16 16 24 / 0.08);
+  box-shadow: var(--shadow-card);
 }
 
 /* The three actions under a blip, as in the design. Sizing comes from the caller
@@ -45,9 +72,7 @@ body {
   border-radius: 9999px;
   background: var(--color-surface);
   color: var(--color-ink);
-  box-shadow:
-    0 1px 2px rgb(16 16 24 / 0.05),
-    0 10px 24px rgb(16 16 24 / 0.1);
+  box-shadow: var(--shadow-circle);
   transition:
     transform 120ms ease,
     opacity 120ms ease;

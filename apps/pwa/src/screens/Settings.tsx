@@ -14,6 +14,8 @@ import { storage } from '../state/useInkling'
 import type { useServerConfig } from '../state/useServerConfig'
 import { diagnoseServer, useModelTools } from '../state/useServerConfig'
 import type { useSync } from '../state/useSync'
+import type { useTheme } from '../state/useTheme'
+import { THEME_CHOICES } from '../theme'
 
 const inputClass =
   'w-full rounded-2xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent'
@@ -138,10 +140,12 @@ export function Settings({
   syncState,
   events,
   serverConfig,
+  theme,
 }: {
   syncState: ReturnType<typeof useSync>
   events: BlipEvent[]
   serverConfig: ReturnType<typeof useServerConfig>
+  theme: ReturnType<typeof useTheme>
 }) {
   const { report, syncing, sync, serverUrl, saveServerUrl } = syncState
   const { config, providers, error, saving, save, loaded, load, status } = serverConfig
@@ -321,6 +325,30 @@ export function Settings({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
+      <Section title="Theme">
+        <div className="flex flex-wrap gap-2">
+          {THEME_CHOICES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => void theme.setChoice(option.id)}
+              className={`rounded-full px-4 py-2 text-xs font-medium transition ${
+                theme.choice === option.id
+                  ? 'bg-ink text-surface'
+                  : 'border border-line text-ink-soft'
+              }`}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-ink-faint">
+          {theme.choice === 'system'
+            ? `Following the system, which is ${theme.resolved} right now.`
+            : `${theme.resolved === 'dark' ? 'Dark' : 'Light'}, on this device only.`}
+        </p>
+      </Section>
+
       <Section
         title="Server"
         hint="The app keeps your blips on this device. The server is what syncs them between devices, and where the model and the vault live."

@@ -257,7 +257,8 @@ immediately, with no restart:
 
 | | |
 |---|---|
-| **Sync** | the server URL, and a sync now button |
+| **Theme** | light, dark, or match the system |
+| **Server** | the server URL, and a sync now button |
 | **Model** | provider, model, API key, embedding provider, embedding model, embedding key, similarity floor |
 | **Notes** | the vault path, and the folder inside it |
 | **Reminders** | the nudge toggle |

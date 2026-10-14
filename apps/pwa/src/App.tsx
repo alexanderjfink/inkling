@@ -12,6 +12,7 @@ import { usePromote } from './state/usePromote'
 import { useRelated } from './state/useRelated'
 import { useServerConfig } from './state/useServerConfig'
 import { useSync } from './state/useSync'
+import { useTheme } from './state/useTheme'
 
 type Screen = 'home' | 'add' | 'review' | 'all' | 'settings'
 
@@ -41,6 +42,7 @@ export default function App() {
   )
   const promoteState = usePromote()
   const serverConfig = useServerConfig(syncState.serverUrl)
+  const theme = useTheme()
 
   const onPromote = useCallback(
     (blip: Blip, relatedBlips: Blip[]) =>
@@ -159,7 +161,7 @@ export default function App() {
         />
       ) : null}
       {ready && screen === 'settings' ? (
-        <Settings syncState={syncState} events={events} serverConfig={serverConfig} />
+        <Settings syncState={syncState} events={events} serverConfig={serverConfig} theme={theme} />
       ) : null}
     </div>
   )

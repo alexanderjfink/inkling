@@ -1,6 +1,6 @@
 import type { Blip, LLMProvider, MoveSpec, SelectMoveOptions } from '@inkling/domain'
 import { selectMove } from '@inkling/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 /**
  * In-flight requests, shared across mounts.
@@ -28,34 +28,53 @@ export function useSuggestedMove(
   blip: Blip | undefined,
   related: Blip[],
   provider: LLMProvider,
-): { move: MoveSpec | null; reroll: () => void } {
+): { move: MoveSpec | null; loading: boolean; reroll: () => void } {
   const [move, setMove] = useState<MoveSpec | null>(null)
-  const [avoid, setAvoid] = useState<string[]>([])
+  const [loading, setLoading] = useState(false)
+  // Re-rolls are remembered per blip, so moving on does not carry them over.
+  const [avoid, setAvoid] = useState<{ blipId: string; ids: string[] }>({ blipId: '', ids: [] })
 
+  const blipId = blip?.id ?? ''
+  const avoidIds = avoid.blipId === blipId ? avoid.ids : []
   const relatedIds = related.map((other) => other.id).join(',')
-  const key = blip ? `${blip.id}:${avoid.join(',')}` : ''
+  const key = blip ? `${blipId}:${avoidIds.join(',')}` : ''
+
+  // A move fetched for a different blip is wrong, not merely stale, so it goes. A
+  // re-roll keeps the current one on screen instead, because watching it sit there
+  // unchanged is what made "not this one" look broken.
+  const lastBlip = useRef('')
+  useEffect(() => {
+    if (lastBlip.current === blipId) return
+    lastBlip.current = blipId
+    setMove(null)
+  }, [blipId])
 
   useEffect(() => {
     if (!blip) {
       setMove(null)
+      setLoading(false)
       return
     }
     let cancelled = false
-    const seen = [...blip.moves.map((entry) => entry.moveId), ...avoid]
+    setLoading(true)
+    const seen = [...blip.moves.map((entry) => entry.moveId), ...avoidIds]
     void requestMove(key, { blip, related, seenMoveIds: seen }, { provider, related }).then(
       (spec) => {
-        if (!cancelled) setMove(spec)
+        if (cancelled) return
+        setMove(spec)
+        setLoading(false)
       },
     )
     return () => {
       cancelled = true
     }
-    // `related` is covered by relatedIds; `avoid` by key.
+    // `related` is covered by relatedIds; `avoidIds` by key.
   }, [key, relatedIds, provider, blip])
 
   function reroll() {
-    if (move) setAvoid((current) => [...current, move.id])
+    if (!move) return
+    setAvoid({ blipId, ids: [...avoidIds, move.id] })
   }
 
-  return { move, reroll }
+  return { move, loading, reroll }
 }

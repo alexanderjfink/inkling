@@ -136,7 +136,11 @@ export function Review({
   const done = total - queue.length
   const current = queue[0]
   const currentRelated = current ? (related.get(current.id) ?? []) : []
-  const { move, reroll } = useSuggestedMove(
+  const {
+    move,
+    loading: moveLoading,
+    reroll,
+  } = useSuggestedMove(
     current,
     currentRelated.map((entry_) => entry_.blip),
     provider,
@@ -330,7 +334,11 @@ export function Review({
             </div>
           </div>
         ) : move ? (
-          <div className="mt-5 rounded-2xl bg-accent-soft/70 p-4">
+          <div
+            className={`mt-5 rounded-2xl bg-accent-soft/70 p-4 transition-opacity ${
+              moveLoading ? 'opacity-60' : ''
+            }`}
+          >
             <p className="text-[11px] tracking-wide text-accent uppercase">
               a move, if you want one
             </p>
@@ -341,13 +349,23 @@ export function Review({
                 {Math.max(1, Math.round(move.timeLimitSec / 60))} min ·{' '}
                 {move.generatedBy === 'llm' ? 'adapted' : 'from the playbook'}
               </span>
-              <button type="button" onClick={reroll} className="quiet underline">
-                not this one
+              <button
+                type="button"
+                onClick={reroll}
+                disabled={moveLoading}
+                className="quiet underline disabled:no-underline disabled:opacity-60"
+              >
+                <ButtonLabel busy={moveLoading}>
+                  {moveLoading ? 'finding another…' : 'not this one'}
+                </ButtonLabel>
               </button>
             </div>
           </div>
         ) : (
-          <p className="mt-5 text-xs text-ink-faint">choosing a move…</p>
+          <p className="mt-5 flex items-center gap-2 text-xs text-ink-faint">
+            <Spinner className="h-3.5 w-3.5" />
+            choosing a move…
+          </p>
         )}
 
         {currentRelated.length > 0 ? (

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ButtonLabel } from '../components/Spinner'
 import { formatBytes } from '../storage/hash'
 
 interface BenchResult {
@@ -133,7 +134,7 @@ export function Spike() {
         disabled={running}
         className="self-start rounded-full border border-line px-4 py-2 text-xs font-medium disabled:opacity-40"
       >
-        {running ? 'Running…' : 'Run storage spike'}
+        <ButtonLabel busy={running}>{running ? 'Running…' : 'Run storage spike'}</ButtonLabel>
       </button>
 
       {env.length > 0 ? (

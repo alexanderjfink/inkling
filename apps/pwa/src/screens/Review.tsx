@@ -1,6 +1,7 @@
 import type { Blip, DeferralChoice, LLMProvider, RelatedBlip } from '@inkling/domain'
 import { DEFERRAL_CHOICES, buildDailyFeed, deferUntil, rankBlips } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ButtonLabel, Spinner } from '../components/Spinner'
 import { formatDeferral } from '../format'
 import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
@@ -24,24 +25,35 @@ function ActionButton({
   onClick,
   accent,
   disabled,
+  busy,
+  busyLabel,
 }: {
   icon: string
   label: string
   onClick: () => void
   accent?: boolean
   disabled?: boolean
+  busy?: boolean
+  busyLabel?: string
 }) {
   return (
     <div className="flex w-28 flex-col items-center gap-2">
       <button
         type="button"
         onClick={onClick}
-        disabled={disabled}
+        disabled={disabled || busy}
+        aria-busy={busy}
         className={`circle h-[4.25rem] w-[4.25rem] ${accent ? 'circle--accent' : ''}`}
       >
-        <span className="text-2xl leading-none">{icon}</span>
+        {busy ? (
+          <Spinner className="h-6 w-6" />
+        ) : (
+          <span className="text-2xl leading-none">{icon}</span>
+        )}
       </button>
-      <span className="text-center text-xs text-ink-soft">{label}</span>
+      <span className="text-center text-xs text-ink-soft">
+        {busy ? (busyLabel ?? label) : label}
+      </span>
     </div>
   )
 }
@@ -313,7 +325,7 @@ export function Review({
                 disabled={busy}
                 className="ml-auto rounded-full bg-ink px-6 py-3 text-sm font-semibold text-surface disabled:opacity-40"
               >
-                {busy ? 'Saving…' : 'Keep it'}
+                <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
               </button>
             </div>
           </div>
@@ -358,7 +370,8 @@ export function Review({
           icon="↑"
           label="Promote to note"
           onClick={() => void promote()}
-          disabled={promotingId === current.id}
+          busy={promotingId === current.id}
+          busyLabel="writing the note…"
         />
         <ActionButton
           icon="+"

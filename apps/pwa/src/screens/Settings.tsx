@@ -1,6 +1,7 @@
 import type { BlipEvent } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import { downloadBackup } from '../backup'
+import { ButtonLabel } from '../components/Spinner'
 import {
   NUDGE_KEY,
   notificationsSupported,
@@ -151,6 +152,8 @@ export function Settings({
   const [nudgeNote, setNudgeNote] = useState<string | null>(null)
   const [swReady, setSwReady] = useState<boolean | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [savingServer, setSavingServer] = useState(false)
+  const [savingNudge, setSavingNudge] = useState(false)
   const [chatModels, setChatModels] = useState<string[]>([])
   const [embedModels, setEmbedModels] = useState<string[]>([])
   const [customChat, setCustomChat] = useState(false)
@@ -252,6 +255,16 @@ export function Settings({
     }
   }, [])
 
+  async function applyServerUrl(url: string) {
+    setSavingServer(true)
+    try {
+      await saveServerUrl(url)
+      await load()
+    } finally {
+      setSavingServer(false)
+    }
+  }
+
   async function saveModel() {
     const patch: Record<string, string | number | null> = {
       provider,
@@ -281,21 +294,26 @@ export function Settings({
 
   async function toggleNudge() {
     const store = storage()
-    await store.init()
-    if (nudge) {
-      await store.setSetting(NUDGE_KEY, 'off')
-      setNudge(false)
-      setNudgeNote(null)
-      return
+    setSavingNudge(true)
+    try {
+      await store.init()
+      if (nudge) {
+        await store.setSetting(NUDGE_KEY, 'off')
+        setNudge(false)
+        setNudgeNote(null)
+        return
+      }
+      const permission = await requestNotificationPermission()
+      if (permission !== 'granted') {
+        setNudgeNote('this browser refused notifications')
+        return
+      }
+      await store.setSetting(NUDGE_KEY, 'on')
+      setNudge(true)
+      setNudgeNote('on — you will hear from it when something is waiting')
+    } finally {
+      setSavingNudge(false)
     }
-    const permission = await requestNotificationPermission()
-    if (permission !== 'granted') {
-      setNudgeNote('this browser refused notifications')
-      return
-    }
-    await store.setSetting(NUDGE_KEY, 'on')
-    setNudge(true)
-    setNudgeNote('on — you will hear from it when something is waiting')
   }
 
   const chatProviders = providers
@@ -319,11 +337,11 @@ export function Settings({
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => void saveServerUrl(value)}
-            disabled={!dirty}
+            onClick={() => void applyServerUrl(value)}
+            disabled={!dirty || savingServer}
             className={buttonClass}
           >
-            Save
+            <ButtonLabel busy={savingServer}>Save</ButtonLabel>
           </button>
           <button
             type="button"
@@ -331,7 +349,7 @@ export function Settings({
             disabled={syncing}
             className={primaryButtonClass}
           >
-            {syncing ? 'Syncing…' : 'Sync now'}
+            <ButtonLabel busy={syncing}>{syncing ? 'Syncing…' : 'Sync now'}</ButtonLabel>
           </button>
         </div>
 
@@ -352,7 +370,7 @@ export function Settings({
                 type="button"
                 onClick={() => {
                   setDraft(suggestion.url)
-                  void saveServerUrl(suggestion.url).then(() => load())
+                  void applyServerUrl(suggestion.url)
                 }}
                 className={buttonClass}
               >
@@ -505,7 +523,9 @@ export function Settings({
                 disabled={modelTools.listing !== null}
                 className={buttonClass}
               >
-                {modelTools.listing === 'chat' ? 'Loading…' : 'Load models'}
+                <ButtonLabel busy={modelTools.listing === 'chat'}>
+                  {modelTools.listing === 'chat' ? 'Loading…' : 'Load models'}
+                </ButtonLabel>
               </button>
               <button
                 type="button"
@@ -513,7 +533,9 @@ export function Settings({
                 disabled={modelTools.testing !== null}
                 className={buttonClass}
               >
-                {modelTools.testing === 'chat' ? 'Testing…' : 'Test model'}
+                <ButtonLabel busy={modelTools.testing === 'chat'}>
+                  {modelTools.testing === 'chat' ? 'Testing…' : 'Test model'}
+                </ButtonLabel>
               </button>
               <button
                 type="button"
@@ -521,7 +543,9 @@ export function Settings({
                 disabled={modelTools.listing !== null}
                 className={buttonClass}
               >
-                {modelTools.listing === 'embed' ? 'Loading…' : 'Load embedding models'}
+                <ButtonLabel busy={modelTools.listing === 'embed'}>
+                  {modelTools.listing === 'embed' ? 'Loading…' : 'Load embedding models'}
+                </ButtonLabel>
               </button>
               <button
                 type="button"
@@ -529,7 +553,9 @@ export function Settings({
                 disabled={modelTools.testing !== null}
                 className={buttonClass}
               >
-                {modelTools.testing === 'embed' ? 'Testing…' : 'Test embeddings'}
+                <ButtonLabel busy={modelTools.testing === 'embed'}>
+                  {modelTools.testing === 'embed' ? 'Testing…' : 'Test embeddings'}
+                </ButtonLabel>
               </button>
             </div>
 
@@ -547,7 +573,7 @@ export function Settings({
               disabled={saving}
               className={primaryButtonClass}
             >
-              {saving ? 'Saving…' : 'Save model settings'}
+              <ButtonLabel busy={saving}>{saving ? 'Saving…' : 'Save model settings'}</ButtonLabel>
             </button>
           </>
         )}
@@ -591,7 +617,7 @@ export function Settings({
               disabled={saving}
               className={primaryButtonClass}
             >
-              {saving ? 'Saving…' : 'Save note settings'}
+              <ButtonLabel busy={saving}>{saving ? 'Saving…' : 'Save note settings'}</ButtonLabel>
             </button>
           </>
         ) : null}
@@ -612,10 +638,12 @@ export function Settings({
         <button
           type="button"
           onClick={() => void toggleNudge()}
-          disabled={!notificationsSupported()}
+          disabled={!notificationsSupported() || savingNudge}
           className={buttonClass}
         >
-          {nudge ? 'Turn reminders off' : 'Remind me when blips are waiting'}
+          <ButtonLabel busy={savingNudge}>
+            {nudge ? 'Turn reminders off' : 'Remind me when blips are waiting'}
+          </ButtonLabel>
         </button>
         <p className="text-xs text-ink-faint">
           {nudgeNote ??

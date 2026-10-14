@@ -1,6 +1,7 @@
 import { BLIP_TYPES, type BlipType } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import type { CaptureDraft } from '../capture'
+import { ButtonLabel } from '../components/Spinner'
 import { useSpeech } from '../state/useSpeech'
 
 const inputClass =
@@ -121,7 +122,7 @@ export function Add({
           disabled={!canSubmit || busy}
           className="ml-auto rounded-full bg-ink px-7 py-4 text-sm font-semibold text-surface disabled:opacity-40"
         >
-          {busy ? 'Saving…' : saved > 0 ? 'Done' : 'Keep it'}
+          <ButtonLabel busy={busy}>{saved > 0 ? 'Done' : busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
         </button>
       </div>
 

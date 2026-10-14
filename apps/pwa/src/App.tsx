@@ -1,5 +1,6 @@
 import { type Blip, buildDailyFeed } from '@inkling/domain'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Spinner } from './components/Spinner'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
 import { Add } from './screens/Add'
 import { AllBlips } from './screens/AllBlips'
@@ -94,7 +95,13 @@ export default function App() {
         </header>
       ) : null}
 
-      {screen === 'home' ? (
+      {!ready ? (
+        <div className="flex flex-1 items-center justify-center">
+          <Spinner className="h-6 w-6 text-ink-faint" />
+        </div>
+      ) : null}
+
+      {ready && screen === 'home' ? (
         <Home
           waiting={waiting}
           total={blips.filter((blip) => !blip.deleted).length}
@@ -111,7 +118,7 @@ export default function App() {
         />
       ) : null}
 
-      {screen === 'add' ? (
+      {ready && screen === 'add' ? (
         <Add
           onCapture={actions.capture}
           initial={shared}
@@ -120,7 +127,7 @@ export default function App() {
         />
       ) : null}
 
-      {screen === 'review' ? (
+      {ready && screen === 'review' ? (
         <Review
           blips={blips}
           actions={actions}
@@ -138,7 +145,7 @@ export default function App() {
         />
       ) : null}
 
-      {screen === 'all' ? (
+      {ready && screen === 'all' ? (
         <AllBlips
           blips={blips}
           actions={actions}
@@ -148,7 +155,7 @@ export default function App() {
           }}
         />
       ) : null}
-      {screen === 'settings' ? (
+      {ready && screen === 'settings' ? (
         <Settings syncState={syncState} events={events} serverConfig={serverConfig} />
       ) : null}
     </div>

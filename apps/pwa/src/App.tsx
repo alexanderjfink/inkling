@@ -1,11 +1,12 @@
-import type { Blip } from '@inkling/domain'
-import { useCallback, useState } from 'react'
+import { type Blip, buildDailyFeed } from '@inkling/domain'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AllBlips } from './components/AllBlips'
 import { Capture } from './components/Capture'
 import { Desk } from './components/Desk'
 import { Feed } from './components/Feed'
 import { SyncPanel } from './components/SyncPanel'
-import { useInkling } from './state/useInkling'
+import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
+import { storage, useInkling } from './state/useInkling'
 import { usePromote } from './state/usePromote'
 import { useRelated } from './state/useRelated'
 import { useSync } from './state/useSync'
@@ -21,8 +22,12 @@ const TABS: Array<{ id: Tab; label: string }> = [
 ]
 
 export default function App() {
-  const [tab, setTab] = useState<Tab>('today')
-  const { ready, blips, actions } = useInkling()
+  // Content handed over by the OS share sheet. Read once, at mount.
+  const incoming = useMemo(() => readSharedContent(), [])
+  const [shared, setShared] = useState(incoming)
+  const [tab, setTab] = useState<Tab>(incoming ? 'capture' : 'today')
+
+  const { ready, events, blips, actions } = useInkling()
   const syncState = useSync()
   const related = useRelated(
     blips,
@@ -41,6 +46,35 @@ export default function App() {
       }),
     [promoteState, syncState.provider, syncState.serverUrl, actions],
   )
+
+  // A shared link should not linger in the URL, or a reload re-captures it.
+  useEffect(() => {
+    if (incoming) clearSharedQuery()
+  }, [incoming])
+
+  // The nudge: one notification a day, and only when something is actually
+  // waiting. The web cannot wake itself, so this fires on open rather than at a
+  // time you choose — an honest limit, not an oversight.
+  useEffect(() => {
+    if (!ready) return
+    let cancelled = false
+    void (async () => {
+      const store = storage()
+      if ((await store.getSetting(NUDGE_KEY)) !== 'on') return
+      const waiting = buildDailyFeed(blips, { now: new Date() }).length
+      if (waiting === 0) return
+      const today = new Date().toISOString().slice(0, 10)
+      if ((await store.getSetting(NUDGE_LAST_KEY)) === today) return
+      const shown = await notify(
+        `${waiting} inkling${waiting === 1 ? '' : 's'} waiting`,
+        'Low-energy moment? They are a couple of minutes each.',
+      )
+      if (shown && !cancelled) await store.setSetting(NUDGE_LAST_KEY, today)
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [ready, blips])
 
   const active = blips.filter((blip) => !blip.deleted && blip.status === 'active').length
   const pinned = blips.filter((blip) => !blip.deleted && blip.desktopPinned).length
@@ -80,10 +114,12 @@ export default function App() {
           promotingId={promoteState.busyId}
         />
       ) : null}
-      {tab === 'capture' ? <Capture onCapture={actions.capture} /> : null}
+      {tab === 'capture' ? (
+        <Capture onCapture={actions.capture} initial={shared} onConsumed={() => setShared(null)} />
+      ) : null}
       {tab === 'desk' ? <Desk blips={blips} actions={actions} /> : null}
       {tab === 'all' ? <AllBlips blips={blips} actions={actions} /> : null}
-      {tab === 'sync' ? <SyncPanel syncState={syncState} /> : null}
+      {tab === 'sync' ? <SyncPanel syncState={syncState} events={events} /> : null}
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-zinc-800 bg-zinc-950/90 backdrop-blur">
         <div className="mx-auto flex max-w-xl">

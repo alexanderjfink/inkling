@@ -28,6 +28,11 @@ companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 | **Contextual resurfacing** — a topic match overrides a snooze | done, tested |
 | **URL fetch** — server-side, so a saved link has something to react to | done, tested |
 | **Promotion** — a blip becomes an Obsidian note with specific next steps | done, tested |
+| **Embeddings** — a separate provider, so vectors can come from a local model | done, tested |
+| **Share target** — share a link or text from any app into Capture | done |
+| **Voice** — 🎙 Ramble transcribes on the device | done |
+| **Installable** — manifest, icons, service worker, offline shell | done |
+| **Backups** — the log exports as the JSONL it already is | done |
 | Storage engine | **decided**: IndexedDB (10.3k writes/s vs OPFS 806/s on the Android phone) |
 
 ## Layout
@@ -236,6 +241,47 @@ Without a model the steps fall back to something honest rather than clever: it n
 the obvious action if there is one (read the saved link), and otherwise says plainly
 that the step is yours to define. The note still gets written.
 
+## Installing it as an app
+
+There is a manifest, a service worker, real icons, and a **share target**, so Inkling
+installs as a standalone app on Android and can receive links straight from the share
+sheet. The Sync tab reports whether the service worker is live.
+
+**The catch, and it is a real one:** Chrome refuses to register a service worker on an
+origin whose certificate it does not trust. The dev server's self-signed certificate is
+exactly that, so from `https://<lan-ip>:5173` the app runs but will not install and will
+not work offline. The Sync tab says so explicitly rather than failing quietly.
+
+Three ways to get a genuinely installable app:
+
+```bash
+# 1. localhost is trusted, so this needs no certificate at all
+adb reverse tcp:5173 tcp:5173        # then open http://localhost:5173 on the phone
+
+# 2. a real certificate on the tailnet
+tailscale serve --bg 5173
+
+# 3. build it and serve it from anywhere with a proper certificate
+bun run build
+```
+
+Once installed, sharing a link or a piece of text from any app lands in Capture with
+the fields already filled.
+
+**Voice capture** uses the browser's own speech recogniser, so nothing is uploaded:
+tap **🎙 Ramble** and it transcribes as you talk. That suits the source material's
+"set a timer for two minutes and ramble into the microphone" better than shipping audio
+to a server. Chrome on Android does this well; Firefox does not, and the button
+disables itself rather than failing silently.
+
+**Backups** are the log itself: **Download log** in the Sync tab writes the JSONL that
+sync already moves, so any device can re-ingest it and nothing about the format is
+app-specific.
+
+**Reminders** are honest about the platform: the web cannot wake itself in the
+background, so the nudge arrives when you open the app with something waiting — not at
+a time you choose. A scheduled reminder needs the native wrap.
+
 ## Testing on the phone
 
 The app must run in a **secure context** on the device. On a plain `http://<LAN-IP>`
@@ -270,4 +316,8 @@ captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5
 
 ## Not yet
 
-Capacitor wrap, notifications, and voice capture (M6).
+A native shell. Everything M6 set out to fix — share-sheet capture, offline, an
+installed app, voice, backups — is now done as a PWA, because that is verifiable on
+this machine and covers the same ground on Android. A Capacitor wrap is still the way
+to get *scheduled* notifications and a real app-store presence, and it needs a native
+toolchain (no Android SDK here) plus a trusted certificate.

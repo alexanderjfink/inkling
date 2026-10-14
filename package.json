@@ -1,0 +1,21 @@
+{
+  "name": "inkling",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --cwd apps/pwa run dev",
+    "build": "bun --cwd apps/pwa run build",
+    "test": "bun test",
+    "typecheck": "bun --cwd packages/domain run typecheck && bun --cwd apps/pwa run typecheck",
+    "check": "biome check .",
+    "check:fix": "biome check --write ."
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.9",
+    "typescript": "~6.0.2"
+  }
+}

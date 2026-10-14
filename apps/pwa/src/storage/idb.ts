@@ -1,5 +1,7 @@
 /** Minimal promise helpers over IndexedDB — no dependencies. */
 
+export type Durability = 'strict' | 'relaxed' | 'default'
+
 export function openDatabase(
   name: string,
   version: number,
@@ -14,15 +16,24 @@ export function openDatabase(
   })
 }
 
-/** Run `fn` inside a single transaction and resolve when the transaction commits. */
+/**
+ * Run `fn` inside a single transaction and resolve when the transaction commits.
+ *
+ * `durability: 'strict'` asks the browser to flush before reporting success, so a
+ * committed capture survives a power loss. That matters more than throughput for
+ * an append-only log people are meant to trust; the default is relaxed.
+ */
 export function runTransaction<T>(
   db: IDBDatabase,
   stores: string | string[],
   mode: IDBTransactionMode,
   fn: (tx: IDBTransaction) => T,
+  durability?: Durability,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(stores, mode)
+    const tx = durability
+      ? db.transaction(stores, mode, { durability })
+      : db.transaction(stores, mode)
     let result: T
     try {
       result = fn(tx)

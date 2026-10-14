@@ -15,11 +15,11 @@ companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 |---|---|
 | Event schema + `project()` fold | done, tested |
 | Scheduler v1 (finite feed, no overdue term) | done, tested |
-| Append-only local storage (IndexedDB + content-addressed blobs) | done |
+| Append-only local storage (IndexedDB + content-addressed blobs, `durability: 'strict'`) | done |
 | Capture — text / URL / image | done |
 | Review loop — decision per blip, session receipt, sessions frozen | done |
 | Retire / attic / revive, send-to-desktop flag | done |
-| Storage spike harness (SQLite-OPFS vs IndexedDB) | built, **awaiting a run on the phone** |
+| Storage engine | **decided**: IndexedDB (10.3k writes/s vs OPFS 806/s on the Android phone) |
 | `server/` (sync + LLM proxy) | not started — M2 |
 
 The sync-ready layout is already in place (`deviceId`, per-event `seq`, append-only

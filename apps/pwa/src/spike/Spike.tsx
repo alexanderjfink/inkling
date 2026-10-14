@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { Durability } from '../storage/idb'
 import { formatBytes } from '../storage/hash'
 
 interface BenchResult {
@@ -25,7 +26,7 @@ interface StorageManagerExt {
 
 const COUNT = 2000
 
-async function benchIndexedDb(count: number): Promise<BenchResult> {
+async function benchIndexedDb(count: number, durability: Durability): Promise<BenchResult> {
   const name = 'inkling-spike'
   const db = await new Promise<IDBDatabase>((resolve, reject) => {
     const req = indexedDB.open(name, 1)
@@ -40,7 +41,7 @@ async function benchIndexedDb(count: number): Promise<BenchResult> {
 
   const start = performance.now()
   await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction('e', 'readwrite')
+    const tx = db.transaction('e', 'readwrite', { durability })
     const store = tx.objectStore('e')
     for (let i = 0; i < count; i++) store.add({ i, text: 'x'.repeat(200) })
     tx.oncomplete = () => resolve()
@@ -51,7 +52,7 @@ async function benchIndexedDb(count: number): Promise<BenchResult> {
   db.close()
   indexedDB.deleteDatabase(name)
   return {
-    label: 'IndexedDB append',
+    label: `IndexedDB append (${durability})`,
     ok: true,
     detail: `${count} events in ${ms.toFixed(0)} ms · ${(count / (ms / 1000)).toFixed(0)} writes/s`,
   }
@@ -72,7 +73,7 @@ async function benchOpfs(count: number): Promise<BenchResult> {
   const ms = performance.now() - start
   await root.removeEntry('inkling-spike.bin').catch(() => undefined)
   return {
-    label: 'OPFS append',
+    label: 'OPFS append (1 KB, awaited per write — worst case)',
     ok: true,
     detail: `${formatBytes(count * 1024)} in ${ms.toFixed(0)} ms · ${(count / (ms / 1000)).toFixed(0)} writes/s`,
   }
@@ -103,7 +104,11 @@ export function Spike() {
     setEnv(out)
 
     const collected: BenchResult[] = []
-    for (const bench of [() => benchIndexedDb(COUNT), () => benchOpfs(COUNT)]) {
+    for (const bench of [
+      () => benchIndexedDb(COUNT, 'default'),
+      () => benchIndexedDb(COUNT, 'strict'),
+      () => benchOpfs(COUNT),
+    ]) {
       try {
         collected.push(await bench())
       } catch (error) {
@@ -117,8 +122,9 @@ export function Spike() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-zinc-400">
-        Run this <strong className="text-zinc-200">on the Android phone</strong> before we lock the
-        storage engine. It measures the two candidate backends for the append-only log.
+        Decision (2026-10, Pixel-class Android):{' '}
+        <strong className="text-zinc-200">IndexedDB</strong> — 10.3k writes/s vs OPFS 806/s. The log
+        stays on IndexedDB; re-run this after changing the storage layer.
       </p>
       <button
         type="button"

@@ -83,9 +83,15 @@ export class AppendOnlyLog implements StorageAdapter {
       seq: this.#seq + 1,
       at: new Date().toISOString(),
     } as BlipEvent
-    await runTransaction(db, EVENTS, 'readwrite', (tx) => {
-      tx.objectStore(EVENTS).add(event)
-    })
+    await runTransaction(
+      db,
+      EVENTS,
+      'readwrite',
+      (tx) => {
+        tx.objectStore(EVENTS).add(event)
+      },
+      'strict',
+    )
     this.#seq += 1
     this.#emit()
     return event
@@ -100,9 +106,15 @@ export class AppendOnlyLog implements StorageAdapter {
       blob: file,
     }
     const db = this.#requireDb()
-    await runTransaction(db, BLOBS, 'readwrite', (tx) => {
-      tx.objectStore(BLOBS).put(record)
-    })
+    await runTransaction(
+      db,
+      BLOBS,
+      'readwrite',
+      (tx) => {
+        tx.objectStore(BLOBS).put(record)
+      },
+      'strict',
+    )
     return { hash, mime: record.mime, size: record.size }
   }
 
@@ -148,8 +160,14 @@ export class AppendOnlyLog implements StorageAdapter {
 
   async #putMeta(key: string, value: string): Promise<void> {
     const db = this.#requireDb()
-    await runTransaction(db, META, 'readwrite', (tx) => {
-      tx.objectStore(META).put(value, key)
-    })
+    await runTransaction(
+      db,
+      META,
+      'readwrite',
+      (tx) => {
+        tx.objectStore(META).put(value, key)
+      },
+      'strict',
+    )
   }
 }

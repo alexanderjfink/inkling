@@ -4,6 +4,7 @@ import { publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
 import type { ModelStatus } from './provider'
 import { PRESETS } from './providerConfig'
+import { notBuiltPage, serveStatic } from './static'
 import { type Store, isSafeDeviceId, isSafeHash } from './store'
 import { type VaultConfig, resolveNotePath, vaultStatus, writeNote } from './vault'
 
@@ -114,6 +115,8 @@ export interface HandlerOptions {
    */
   runtime?: () => Runtime
   settings?: SettingsBridge
+  /** Directory of the built PWA. When set, the server serves the app itself. */
+  staticDir?: string
 }
 
 export function createHandler(
@@ -131,6 +134,16 @@ export function createHandler(
 
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: withCors(new Headers()) })
+    }
+
+    // Anything that is not the API is the app itself, when it has been built.
+    if (!url.pathname.startsWith('/api')) {
+      if (options.staticDir) {
+        const file = await serveStatic(options.staticDir, url.pathname)
+        if (file) return file
+      } else if (url.pathname === '/' || url.pathname === '/index.html') {
+        return notBuiltPage()
+      }
     }
 
     if (parts.length === 1 && parts[0] === 'health') {

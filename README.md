@@ -76,16 +76,47 @@ Everything in `packages/domain` is pure and framework-free, so the same core run
 the server, on the desktop, and in the browser. The server imports it directly, so
 client and server can never disagree about the log format.
 
+## Getting it running
+
+One command runs everything:
+
+```bash
+bun run dev      # the server on :8787, and the app on :5173
+```
+
+Open the app at **https://localhost:5173** (accept the certificate once).
+
+**To use it for real** — on your phone, with no dev server — build the app and let the
+server serve it, so the app and the API share one origin:
+
+```bash
+bun run build && bun run server
+```
+
+Then open **http://localhost:8787** on this machine. From the phone, `tailscale serve`
+gives that a real certificate, or `adb reverse tcp:8787 tcp:8787` makes it
+`http://localhost:8787` on the phone itself.
+
+### What do I set as the "server"?
+
+The URL of the Inkling server. **`/api` is the right answer** whenever the app and the
+server share an origin — which they do in both setups above — so in practice you never
+need to change it.
+
+You would only set something else if the app is served from somewhere the server is
+not, and then Settings says so and offers the address to use. The field exists for
+that case, not as a step you are expected to complete.
+
 ## Commands
 
 ```bash
-bun install
-bun run server                     # sync server on :8787
-bun run dev                        # PWA dev server (proxies /api -> :8787)
+bun run dev                        # server + app together (the usual one)
+bun run server                     # just the sync server, on :8787
+bun run dev:pwa                    # just the app, on :5173
 bun test                           # domain + server unit tests
 bun run typecheck                  # all packages
 bun run check                      # biome
-bun run build                      # production build
+bun run build                      # build the app the server serves
 ```
 
 ## Try it
@@ -99,16 +130,19 @@ bun run build                      # production build
 
 ## Sync
 
-Run the server, then open the app on two devices and watch a blip cross.
+The server is what syncs your blips between devices, and where the model and the
+vault live. The app keeps working without it — captures go to the device either way —
+but sync, moves and promotion need it.
+
+Run it, then open the app on two devices and watch a blip cross.
 
 ```bash
-bun run server        # http://localhost:8787
+bun run server        # http://localhost:8787, and it serves the app too
 ```
 
-The PWA talks to `/api`, which the dev server proxies to `localhost:8787`. That is
-deliberate: the app is served over HTTPS, so calling a plain-HTTP API directly would
-be blocked as mixed content. Same-origin `/api` means the phone works with no extra
-certificates. To point at a server elsewhere, set the URL in the Sync tab.
+The PWA talks to `/api`. That is simply correct now: the server serves the built app
+from the same origin, so there is no proxy, no CORS and no mixed content. (In dev the
+Vite server proxies `/api` to the same place, so it is correct there too.)
 
 **On the phone**, the app reaches the server through the Vite proxy too, so nothing
 extra is needed. For a server that is *not* your laptop (and for an installed PWA),

@@ -1,6 +1,7 @@
 export function Home({
   waiting,
   attic,
+  serverWarning,
   onAdd,
   onReview,
   onAttic,
@@ -8,6 +9,8 @@ export function Home({
 }: {
   waiting: number
   attic: number
+  /** Set when the server cannot be reached, so the app is not silently degraded. */
+  serverWarning: string | null
   onAdd: () => void
   onReview: () => void
   onAttic: () => void
@@ -63,7 +66,17 @@ export function Home({
         </span>
       </button>
 
-      <div className="mt-8 flex items-center justify-center gap-6 text-xs">
+      {serverWarning ? (
+        <button
+          type="button"
+          onClick={onSettings}
+          className="mt-4 rounded-2xl border border-line bg-surface/70 p-3 text-left text-xs text-warn"
+        >
+          ⚠ {serverWarning} — tap to fix
+        </button>
+      ) : null}
+
+      <div className="mt-6 flex items-center justify-center gap-6 text-xs">
         {attic > 0 ? (
           <button type="button" onClick={onAttic} className="quiet">
             {attic} in the attic

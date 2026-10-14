@@ -11,6 +11,7 @@ import { Spike } from '../spike/Spike'
 import { formatBytes } from '../storage/hash'
 import { storage } from '../state/useInkling'
 import type { useServerConfig } from '../state/useServerConfig'
+import { diagnoseServer } from '../state/useServerConfig'
 import type { useSync } from '../state/useSync'
 
 const inputClass =
@@ -57,7 +58,8 @@ export function Settings({
   serverConfig: ReturnType<typeof useServerConfig>
 }) {
   const { report, syncing, sync, serverUrl, saveServerUrl } = syncState
-  const { config, providers, error, saving, save, loaded } = serverConfig
+  const { config, providers, error, saving, save, loaded, load, status } = serverConfig
+  const diagnosis = diagnoseServer(serverUrl, status)
 
   const [draft, setDraft] = useState<string | null>(null)
   const [nudge, setNudge] = useState(false)
@@ -167,8 +169,8 @@ export function Settings({
   return (
     <div className="flex flex-1 flex-col gap-6">
       <Section
-        title="Sync"
-        hint="Logs are append-only, so syncing is a set-union: nothing to merge, no conflicts, replaying is always safe."
+        title="Server"
+        hint="The app keeps your blips on this device. The server is what syncs them between devices, and where the model and the vault live."
       >
         <input
           value={value}
@@ -197,6 +199,34 @@ export function Settings({
             {syncing ? 'Syncing…' : 'Sync now'}
           </button>
         </div>
+
+        <p className={`text-xs ${status === 'ok' ? 'text-good' : 'text-warn'}`}>
+          {status === 'ok'
+            ? `● connected to ${serverUrl}`
+            : status === 'loading'
+              ? '● checking…'
+              : `● cannot reach ${serverUrl}`}
+        </p>
+        {diagnosis.detail ? <p className="text-xs text-ink-soft">{diagnosis.detail}</p> : null}
+
+        {status !== 'ok' ? (
+          <div className="flex flex-wrap gap-2">
+            {diagnosis.suggestions.map((suggestion) => (
+              <button
+                key={suggestion.url}
+                type="button"
+                onClick={() => {
+                  setDraft(suggestion.url)
+                  void saveServerUrl(suggestion.url).then(() => load())
+                }}
+                className={buttonClass}
+              >
+                Use {suggestion.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {report ? (
           <p className={`text-xs ${report.ok ? 'text-ink-soft' : 'text-warn'}`}>
             {report.ok ? (
@@ -234,8 +264,9 @@ export function Settings({
         {!loaded ? (
           <p className="text-xs text-ink-faint">loading…</p>
         ) : config === null ? (
-          <p className="text-xs text-ink-faint">
-            This server has no settings endpoint. Configure it with environment variables instead.
+          <p className="text-xs text-warn">
+            The model settings live on the server, and it is not reachable from here. Fix the server
+            connection at the top of this screen, then come back.
           </p>
         ) : (
           <>

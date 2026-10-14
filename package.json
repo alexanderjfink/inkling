@@ -8,7 +8,8 @@
     "server"
   ],
   "scripts": {
-    "dev": "bun run --filter @inkling/pwa dev",
+    "dev": "bun run --filter '*' dev",
+    "dev:pwa": "bun run --filter @inkling/pwa dev",
     "server": "bun run --filter @inkling/server dev",
     "build": "bun run --filter @inkling/pwa build",
     "test": "bun test",

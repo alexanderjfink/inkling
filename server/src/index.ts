@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import {
   type Runtime,
   type ServerConfig,
@@ -14,6 +15,11 @@ import { vaultStatus } from './vault'
 const port = Number(process.env.PORT ?? 8787)
 const dataDir = process.env.INKLING_DATA ?? new URL('../data/', import.meta.url).pathname
 
+// The built app, so one origin serves both the app and the API. This is what makes
+// `/api` correct away from the dev server.
+const staticDir = new URL('../../apps/pwa/dist/', import.meta.url).pathname
+const servingApp = existsSync(new URL('../../apps/pwa/dist/index.html', import.meta.url).pathname)
+
 const store = new FileStore(dataDir)
 
 // Saved settings, plus the environment underneath them. The settings screen can
@@ -25,6 +31,7 @@ const server = Bun.serve({
   port,
   hostname: '0.0.0.0',
   fetch: createHandler(store, {
+    staticDir: servingApp ? staticDir : undefined,
     runtime: () => runtime,
     settings: {
       read: async () => ({ config, runtime }),
@@ -58,6 +65,11 @@ function report() {
 
 console.log(`Inkling sync server listening on http://${server.hostname}:${server.port}`)
 report()
+console.log(
+  servingApp
+    ? `  app: serving the built app from this same origin — open http://localhost:${server.port}`
+    : '  app: not built — run `bun run build` to serve it from this origin, or use `bun run dev`',
+)
 if (!runtime.status.configured) {
   console.log(
     `  presets: ${PRESETS.map((preset) => preset.id).join(', ')} — set one in the app's Settings`,
@@ -77,4 +89,4 @@ if (!vaultState.exists) {
 }
 
 console.log('  everything above is editable in the app: Home → ⚙')
-console.log('  reach it from the phone over Tailscale, or via the PWA dev proxy at /api')
+console.log('  on the phone, use `tailscale serve` or `adb reverse` for a secure context')

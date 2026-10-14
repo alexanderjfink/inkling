@@ -96,6 +96,11 @@ export default function App() {
         <Home
           waiting={waiting}
           attic={attic}
+          serverWarning={
+            serverConfig.status === 'ok' || serverConfig.status === 'loading'
+              ? null
+              : 'the server is not reachable, so sync and the model are off'
+          }
           onAdd={() => setScreen('add')}
           onReview={() => setScreen('review')}
           onAttic={() => setScreen('all')}

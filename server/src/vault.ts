@@ -1,7 +1,7 @@
 import { access, mkdir, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { W_OK } from 'node:constants'
-import { dirname, join, resolve, sep } from 'node:path'
+import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 
 export interface VaultConfig {
   vault: string
@@ -42,18 +42,50 @@ export function resolveNotePath(vault: string, relativePath: string): string | n
 }
 
 export interface WriteResult {
-  /** Vault-relative path, as the caller asked for it. */
+  /** Vault-relative path, which may differ from the one asked for on a collision. */
   path: string
   created: boolean
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile()
+  } catch {
+    return false
+  }
+}
+
+/**
+ * A free path next to the one asked for.
+ *
+ * Note titles are human now, so two notes can genuinely want the same name. Writing
+ * over the first would destroy it, so the second becomes "Title 2" instead.
+ */
+async function freePath(base: string): Promise<string> {
+  if (!(await isFile(base))) return base
+
+  const dir = dirname(base)
+  const extension = extname(base)
+  const stem = basename(base, extension)
+  for (let n = 2; n < 100; n++) {
+    const candidate = join(dir, `${stem} ${n}${extension}`)
+    if (!(await isFile(candidate))) return candidate
+  }
+  return base
 }
 
 export async function writeNote(
   vault: string,
   relativePath: string,
   markdown: string,
+  options: { replace?: boolean } = {},
 ): Promise<WriteResult> {
-  const full = resolveNotePath(vault, relativePath)
-  if (!full) throw new Error('note path escapes the vault')
+  const requested = resolveNotePath(vault, relativePath)
+  if (!requested) throw new Error('note path escapes the vault')
+
+  // Re-promoting a blip writes back to its own note; a fresh title takes the next
+  // free name rather than clobbering whatever is already there.
+  const full = options.replace ? requested : await freePath(requested)
 
   await mkdir(dirname(full), { recursive: true })
 
@@ -66,7 +98,8 @@ export async function writeNote(
   }
 
   await writeFile(full, markdown, 'utf8')
-  return { path: relativePath, created }
+  const root = resolve(vault)
+  return { path: full.slice(root.length + 1), created }
 }
 
 export async function vaultStatus(config: VaultConfig): Promise<VaultStatus> {

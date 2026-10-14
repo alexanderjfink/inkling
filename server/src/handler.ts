@@ -1,4 +1,4 @@
-import { type LLMProvider, parseLog, sha256Hex } from '@inkling/domain'
+import { type LLMProvider, noteFilename, parseLog, sha256Hex } from '@inkling/domain'
 import type { ConfigProblem, Runtime, ServerConfig } from './config'
 import { publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
@@ -252,34 +252,35 @@ export function createHandler(
 
     if (parts.length === 2 && parts[0] === 'obsidian' && parts[1] === 'note') {
       if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405)
-      if (!live.vault) return json({ error: 'no vault configured' }, 503)
+      const vault = live.vault
+      if (!vault) return json({ error: 'no vault configured' }, 503)
 
       const body = await readJson(request)
       if (!body) return json({ error: 'invalid json body' }, 400)
+      const title = typeof body.title === 'string' ? body.title.trim() : ''
       const filename = typeof body.filename === 'string' ? body.filename.trim() : ''
       const explicitPath = typeof body.path === 'string' ? body.path.trim() : ''
       const markdown = typeof body.markdown === 'string' ? body.markdown : ''
 
-      // A bare filename is prefixed with the configured folder here, so the client
-      // never has to know where notes live.
+      if (!markdown) return json({ error: 'markdown is required' }, 400)
       if (filename && filename.includes('/')) {
         return json({ error: 'filename must not contain a path separator' }, 400)
       }
-      const relativePath = filename
-        ? live.vault.folder
-          ? `${live.vault.folder}/${filename}`
-          : filename
-        : explicitPath
 
-      if (!relativePath || !markdown) {
-        return json({ error: 'filename and markdown are required' }, 400)
-      }
-      if (!resolveNotePath(live.vault.vault, relativePath)) {
+      // An explicit path means "this blip's own note", so it is written back to.
+      // Otherwise the folder is applied here — the client never has to know where
+      // notes live — and a title becomes a filename.
+      const inFolder = (name: string) => (vault.folder ? `${vault.folder}/${name}` : name)
+      const relativePath = explicitPath || inFolder(filename || noteFilename(title || 'Untitled'))
+
+      if (!resolveNotePath(vault.vault, relativePath)) {
         return json({ error: 'note path escapes the vault, or is not a .md file' }, 400)
       }
 
       try {
-        const result = await writeNote(live.vault.vault, relativePath, markdown)
+        const result = await writeNote(vault.vault, relativePath, markdown, {
+          replace: Boolean(explicitPath),
+        })
         return json({ ok: true, path: result.path, created: result.created })
       } catch (error) {
         const message = error instanceof Error ? error.message : 'write failed'

@@ -89,19 +89,39 @@ describe('slugify', () => {
 })
 
 describe('note naming', () => {
-  test('filename is a slug plus a short id, so two blips never collide', () => {
-    const blip = richBlip()
-    const filename = noteFilename(blip)
-    expect(filename.endsWith('.md')).toBe(true)
-    expect(filename.startsWith('look-into-stages-of-change-theory')).toBe(true)
-    expect(filename).toContain(blip.id.slice(-6).toLowerCase())
+  test('the filename is the title, not a slug', () => {
+    expect(noteFilename('What are my principles?')).toBe('What are my principles.md')
+    expect(noteFilename('Stages of Change — Theory!')).toBe('Stages of Change — Theory!.md')
+    expect(noteFilename("Maybe it's safe to be more playful")).toBe(
+      "Maybe it's safe to be more playful.md",
+    )
+  })
+
+  test('strips only what would break a filename or a wikilink', () => {
+    expect(noteFilename('a/b:c*d?e"f<g>h|i#j^k[l]')).toBe('abcdefghijkl.md')
+    expect(noteFilename('spaced  repetition   for self-help books')).toBe(
+      'spaced repetition for self-help books.md',
+    )
+  })
+
+  test('never returns an empty name', () => {
+    expect(noteFilename('///')).toBe('Untitled.md')
+    expect(noteFilename('')).toBe('Untitled.md')
+    expect(noteFilename('   ')).toBe('Untitled.md')
+  })
+
+  test('does not end in a dot, which Windows dislikes', () => {
+    expect(noteFilename('a trailing dot.')).toBe('a trailing dot.md')
+  })
+
+  test('bounds the length', () => {
+    expect(noteFilename('a'.repeat(200)).length).toBeLessThanOrEqual(124)
   })
 
   test('notePath joins the folder without doubling slashes', () => {
-    const blip = richBlip()
-    expect(notePath('Inkling', blip)).toBe(`Inkling/${noteFilename(blip)}`)
-    expect(notePath('/Inkling/', blip)).toBe(`Inkling/${noteFilename(blip)}`)
-    expect(notePath('', blip)).toBe(noteFilename(blip))
+    expect(notePath('Inkling', 'A title')).toBe('Inkling/A title.md')
+    expect(notePath('/Inkling/', 'A title')).toBe('Inkling/A title.md')
+    expect(notePath('', 'A title')).toBe('A title.md')
   })
 })
 

@@ -58,9 +58,26 @@ describe('writeNote', () => {
     expect(await readFile(join(vault, 'Inkling/my-note.md'), 'utf8')).toBe('# hello\n')
   })
 
-  test('a second write replaces it and reports that it existed', async () => {
+  test('a second note with the same title takes the next free name', async () => {
     await writeNote(vault, 'Inkling/my-note.md', 'first')
     const result = await writeNote(vault, 'Inkling/my-note.md', 'second')
+    expect(result.path).toBe('Inkling/my-note 2.md')
+    expect(result.created).toBe(true)
+    // The first note is untouched: a shared title must not destroy a note.
+    expect(await readFile(join(vault, 'Inkling/my-note.md'), 'utf8')).toBe('first')
+    expect(await readFile(join(vault, 'Inkling/my-note 2.md'), 'utf8')).toBe('second')
+  })
+
+  test('a third collision keeps counting', async () => {
+    await writeNote(vault, 'Inkling/n.md', 'a')
+    await writeNote(vault, 'Inkling/n.md', 'b')
+    expect((await writeNote(vault, 'Inkling/n.md', 'c')).path).toBe('Inkling/n 3.md')
+  })
+
+  test('replace writes back to the same note, for re-promoting a blip', async () => {
+    await writeNote(vault, 'Inkling/my-note.md', 'first')
+    const result = await writeNote(vault, 'Inkling/my-note.md', 'second', { replace: true })
+    expect(result.path).toBe('Inkling/my-note.md')
     expect(result.created).toBe(false)
     expect(await readFile(join(vault, 'Inkling/my-note.md'), 'utf8')).toBe('second')
   })
@@ -105,6 +122,40 @@ describe('obsidian routes', () => {
     const res = await handle()(new Request(`${BASE}/obsidian/status`))
     expect(res.status).toBe(200)
     expect((await res.json()).folder).toBe('Inkling')
+  })
+
+  test('a title becomes a readable filename, not a slug', async () => {
+    const res = await handle()(
+      new Request(`${BASE}/obsidian/note`, {
+        method: 'POST',
+        body: JSON.stringify({ title: 'What are my principles?', markdown: '# hi\n' }),
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect((await res.json()).path).toBe('Inkling/What are my principles.md')
+    expect((await stat(join(vault, 'Inkling/What are my principles.md'))).isFile()).toBe(true)
+  })
+
+  test('two notes with the same title do not overwrite each other', async () => {
+    const send = (markdown: string) =>
+      handle()(
+        new Request(`${BASE}/obsidian/note`, {
+          method: 'POST',
+          body: JSON.stringify({ title: 'The same title', markdown }),
+        }),
+      )
+    await send('first')
+    const second = await send('second')
+    expect((await second.json()).path).toBe('Inkling/The same title 2.md')
+  })
+
+  test('an explicit path writes back to that note, for a re-promotion', async () => {
+    const send = (body: Record<string, string>) =>
+      handle()(new Request(`${BASE}/obsidian/note`, { method: 'POST', body: JSON.stringify(body) }))
+    await send({ title: 'A note', markdown: 'first' })
+    const again = await send({ path: 'Inkling/A note.md', markdown: 'second' })
+    expect((await again.json()).path).toBe('Inkling/A note.md')
+    expect(await readFile(join(vault, 'Inkling/A note.md'), 'utf8')).toBe('second')
   })
 
   test('writes a note and returns its path', async () => {

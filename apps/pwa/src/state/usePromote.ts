@@ -1,5 +1,5 @@
 import type { Blip, LLMProvider } from '@inkling/domain'
-import { draftNextSteps, noteFilename, renderObsidianNote } from '@inkling/domain'
+import { draftNextSteps, renderObsidianNote } from '@inkling/domain'
 import { useCallback, useState } from 'react'
 import type { InklingActions } from './useInkling'
 
@@ -44,7 +44,13 @@ export function usePromote() {
         const res = await fetch(join(options.baseUrl, '/obsidian/note'), {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ filename: noteFilename(blip), markdown }),
+          body: JSON.stringify({
+            title: blip.title,
+            markdown,
+            // Re-promoting writes back to the blip's own note, rather than leaving a
+            // second one beside it.
+            ...(blip.export?.notePath ? { path: blip.export.notePath } : {}),
+          }),
         })
 
         if (!res.ok) {

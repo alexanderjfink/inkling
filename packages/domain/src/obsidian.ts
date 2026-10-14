@@ -137,14 +137,29 @@ export function slugify(text: string): string {
   return slug.length > 0 ? slug : 'blip'
 }
 
-export function noteFilename(blip: Blip): string {
-  return `${slugify(blip.title)}-${blip.id.slice(-6).toLowerCase()}.md`
+/**
+ * Characters Obsidian and the filesystem will not accept in a name.
+ *
+ * Everything else stays — spaces, commas, apostrophes, capitals — because the file
+ * should be called what the note is called. A slug belongs in a URL, not in a vault.
+ */
+const ILLEGAL_IN_NAME = /[\\/:*?"<>|#^[\]]/g
+
+/** The note's filename: its title, cleaned of anything that would break it. */
+export function noteFilename(title: string): string {
+  const cleaned = title
+    .replace(ILLEGAL_IN_NAME, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 120)
+    .replace(/[.\s]+$/, '')
+  return `${cleaned.length > 0 ? cleaned : 'Untitled'}.md`
 }
 
 /** Path relative to the vault root. */
-export function notePath(folder: string, blip: Blip): string {
+export function notePath(folder: string, title: string): string {
   const clean = folder.replace(/^\/+|\/+$/g, '')
-  return clean.length > 0 ? `${clean}/${noteFilename(blip)}` : noteFilename(blip)
+  return clean.length > 0 ? `${clean}/${noteFilename(title)}` : noteFilename(title)
 }
 
 function frontmatter(blip: Blip, now: Date): string {

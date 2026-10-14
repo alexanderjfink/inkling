@@ -146,6 +146,7 @@ export default function App() {
           }}
           onBrowse={() => setScreen('all')}
           focusId={focusId}
+          serverUrl={syncState.serverUrl}
         />
       ) : null}
 

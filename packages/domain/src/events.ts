@@ -91,6 +91,13 @@ export interface MoveSpec {
   successCriteria?: string
   playbook: string
   generatedBy: 'playbook' | 'llm'
+  /**
+   * A search phrase worth looking up for this move.
+   *
+   * A phrase rather than a URL on purpose: the model cannot invent a link that does
+   * not exist, and the server resolves this against a real source.
+   */
+  materialQuery?: string
 }
 
 /** Carried by every event, and what makes the total order deterministic. */

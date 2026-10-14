@@ -24,6 +24,7 @@ export type { MoveContext, MoveTemplate, SelectMoveOptions } from './moves'
 export {
   buildMovePrompt,
   candidateTemplates,
+  deriveQuery,
   MOVE_LIBRARY,
   parseMoveResponse,
   selectMove,

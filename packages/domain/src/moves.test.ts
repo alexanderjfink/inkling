@@ -1,7 +1,10 @@
 import { describe, expect, test } from 'bun:test'
 import type { Blip, BlipEvent, BlipEventBody, BlipType, LLMProvider } from '../src/index'
 import {
+  BLIP_TYPES,
+  buildMovePrompt,
   candidateTemplates,
+  deriveQuery,
   MOVE_LIBRARY,
   parseMoveResponse,
   project,
@@ -194,6 +197,94 @@ describe('selectMove', () => {
     const move = await selectMove({ blip }, { provider: fakeProvider({ text }) })
     expect(move.generatedBy).toBe('llm')
     expect(move.title).toContain('silliest')
+  })
+})
+
+describe('moves that bring something to read', () => {
+  test('the playbook has some, and they are offered for ordinary blips', () => {
+    const material = MOVE_LIBRARY.filter((template) => template.wantsMaterial)
+    expect(material.length).toBeGreaterThanOrEqual(4)
+    expect(material.some((template) => template.blipTypes.length === BLIP_TYPES.length)).toBe(true)
+  })
+
+  test('a move that looks something up gets the model query', async () => {
+    const blip = makeBlip('question', 'What is the transtheoretical model?')
+    const candidates = candidateTemplates({ blip })
+    const wants = candidates.find((template) => template.wantsMaterial)
+    if (!wants) throw new Error('no material move available')
+
+    const text = JSON.stringify({
+      id: wants.id,
+      title: 'Look up the stages of change',
+      goal: 'one thing you did not know',
+      query: 'transtheoretical model stages of change',
+    })
+    const move = await selectMove({ blip }, { provider: fakeProvider({ text }) })
+    expect(move.materialQuery).toBe('transtheoretical model stages of change')
+  })
+
+  test('a query is ignored for a move that does not look anything up', () => {
+    const candidates = candidateTemplates({ blip: makeBlip('idea', 'an idea') })
+    const plain = candidates.find((template) => !template.wantsMaterial)
+    if (!plain) throw new Error('no plain move available')
+
+    const spec = parseMoveResponse(
+      JSON.stringify({ id: plain.id, title: 't', goal: 'g', query: 'sneaky' }),
+      candidates,
+    )
+    expect(spec?.materialQuery).toBeUndefined()
+  })
+
+  test('the query falls back to the blip when the model omits one', async () => {
+    const blip = makeBlip('question', 'What is the transtheoretical model?')
+    const candidates = candidateTemplates({ blip })
+    const wants = candidates.find((template) => template.wantsMaterial)
+    if (!wants) throw new Error('no material move available')
+
+    const text = JSON.stringify({ id: wants.id, title: 't', goal: 'g' })
+    const move = await selectMove({ blip }, { provider: fakeProvider({ text }) })
+    expect(move.materialQuery).toBeTruthy()
+    expect(move.materialQuery).toContain('transtheoretical')
+  })
+
+  test('an over-long query is trimmed', () => {
+    const candidates = candidateTemplates({ blip: makeBlip('question', 'a question?') })
+    const wants = candidates.find((template) => template.wantsMaterial)
+    if (!wants) throw new Error('no material move available')
+    const spec = parseMoveResponse(
+      JSON.stringify({ id: wants.id, title: 't', goal: 'g', query: 'x'.repeat(400) }),
+      candidates,
+    )
+    expect(spec?.materialQuery?.length).toBeLessThanOrEqual(120)
+  })
+
+  test('the prompt tells the model it may supply a query, and never a URL', () => {
+    const blip = makeBlip('question', 'a question?')
+    const { system, prompt } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
+    expect(system).toContain('search phrase')
+    expect(system).toContain('Never invent a URL')
+    expect(prompt).toContain('looks something up: yes')
+    expect(prompt).toContain('"query"')
+  })
+})
+
+describe('deriveQuery', () => {
+  test('uses the title, minus any URL', () => {
+    const blip = makeBlip('reference', 'I would love to learn to draw https://drawabox.com/')
+    const query = deriveQuery(blip)
+    expect(query).not.toContain('http')
+    expect(query).toContain('learn to draw')
+  })
+
+  test('falls back to topics when the title is only a URL', () => {
+    const blip = makeBlip('reference', 'https://example.com/thing', 'https://example.com/thing')
+    const query = deriveQuery(blip)
+    expect(query.length).toBeGreaterThan(0)
+  })
+
+  test('is never longer than a search phrase', () => {
+    const blip = makeBlip('idea', 'x'.repeat(400))
+    expect(deriveQuery(blip).length).toBeLessThanOrEqual(120)
   })
 })
 

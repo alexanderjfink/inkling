@@ -2,6 +2,7 @@ import { type LLMProvider, noteFilename, parseLog, sha256Hex } from '@inkling/do
 import type { ConfigProblem, Runtime, ServerConfig } from './config'
 import { publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
+import { lookupTopic } from './lookup'
 import type { ModelStatus } from './provider'
 import { PRESETS } from './providerConfig'
 import { notBuiltPage, serveStatic } from './static'
@@ -349,6 +350,15 @@ export function createHandler(
       }
 
       return json({ error: 'not found' }, 404)
+    }
+
+    // Resolve a search phrase to a real page. The model supplies the phrase, never
+    // the URL, so a move can bring something to read without inventing a link.
+    if (parts.length === 1 && parts[0] === 'lookup' && request.method === 'POST') {
+      const body = await readJson(request)
+      const query = body && typeof body.query === 'string' ? body.query.trim() : ''
+      if (!query) return json({ error: 'query is required' }, 400)
+      return json({ result: await lookupTopic(query) })
     }
 
     if (parts.length === 1 && parts[0] === 'fetch' && request.method === 'POST') {

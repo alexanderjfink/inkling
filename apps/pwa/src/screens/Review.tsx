@@ -1,8 +1,9 @@
 import type { Blip, DeferralChoice, LLMProvider, RelatedBlip } from '@inkling/domain'
 import { DEFERRAL_CHOICES, buildDailyFeed, deferUntil, rankBlips } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ButtonLabel, Spinner } from '../components/Spinner'
 import { formatDeferral } from '../format'
+import { type LookupResult, lookupVia } from '../llm/proxy'
+import { ButtonLabel, Spinner } from '../components/Spinner'
 import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
 import { useSuggestedMove } from '../state/useSuggestedMove'
@@ -76,6 +77,7 @@ export function Review({
   onExit,
   onBrowse,
   focusId,
+  serverUrl,
 }: {
   blips: Blip[]
   actions: InklingActions
@@ -88,6 +90,7 @@ export function Review({
   onBrowse: () => void
   /** A blip picked from the list, to open first. */
   focusId?: string | null
+  serverUrl: string
 }) {
   const [session, setSession] = useState<string[] | null>(null)
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
@@ -95,6 +98,8 @@ export function Review({
   const [entry, setEntry] = useState('')
   const [busy, setBusy] = useState(false)
   const [lastNote, setLastNote] = useState<{ title: string; path: string } | null>(null)
+  const [material, setMaterial] = useState<LookupResult | null>(null)
+  const [materialLoading, setMaterialLoading] = useState(false)
   // A blip picked from the list may not be due today, so focus starts in "all".
   const [scope, setScope] = useState<Scope>(focusId ? 'all' : 'today')
 
@@ -149,6 +154,27 @@ export function Review({
   )
 
   const deferLabel = formatDeferral(deferUntil(DEFAULT_DEFERRAL, new Date()))
+
+  // If the move brings something to read, go and get it.
+  const materialQuery = move?.materialQuery ?? ''
+  useEffect(() => {
+    if (!materialQuery) {
+      setMaterial(null)
+      setMaterialLoading(false)
+      return
+    }
+    let cancelled = false
+    setMaterial(null)
+    setMaterialLoading(true)
+    void lookupVia(serverUrl, materialQuery).then((result) => {
+      if (cancelled) return
+      setMaterial(result)
+      setMaterialLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [materialQuery, serverUrl])
 
   function settle(decision: Decision) {
     if (!current) return
@@ -367,6 +393,36 @@ export function Review({
                 </ButtonLabel>
               </button>
             </div>
+
+            {move.materialQuery ? (
+              <div className="mt-3 rounded-xl border border-line bg-surface/60 p-3">
+                {materialLoading ? (
+                  <span className="flex items-center gap-2 text-xs text-ink-faint">
+                    <Spinner className="h-3 w-3" />
+                    finding something to read…
+                  </span>
+                ) : material ? (
+                  <>
+                    <a
+                      href={material.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-medium text-accent underline"
+                    >
+                      {material.title}
+                    </a>
+                    {material.description ? (
+                      <span className="text-xs text-ink-faint"> — {material.description}</span>
+                    ) : null}
+                    <p className="mt-1 text-xs leading-relaxed text-ink-soft">{material.extract}</p>
+                  </>
+                ) : (
+                  <span className="text-xs text-ink-faint">
+                    nothing worth reading turned up — the move works without it
+                  </span>
+                )}
+              </div>
+            ) : null}
           </div>
         ) : (
           <p className="mt-5 flex items-center gap-2 text-xs text-ink-faint">

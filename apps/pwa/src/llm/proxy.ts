@@ -106,6 +106,35 @@ export interface FetchedPage {
   excerpt: string
 }
 
+export interface LookupResult {
+  title: string
+  url: string
+  description: string | null
+  extract: string
+  source: string
+}
+
+/**
+ * Resolve a search phrase to a real page.
+ *
+ * The model supplies the phrase, never the URL — a hallucinated link looks like an
+ * answer, whereas a search phrase simply finds nothing if it is wrong.
+ */
+export async function lookupVia(baseUrl: string, query: string): Promise<LookupResult | null> {
+  try {
+    const res = await fetch(join(baseUrl, '/lookup'), {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query }),
+    })
+    if (!res.ok) return null
+    const body = (await res.json()) as { result: LookupResult | null }
+    return body.result
+  } catch {
+    return null
+  }
+}
+
 /** Fetch a page's title and excerpt through the server, avoiding browser CORS. */
 export async function fetchPageVia(baseUrl: string, url: string): Promise<FetchedPage | null> {
   try {

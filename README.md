@@ -164,9 +164,30 @@ you know for certain they agree.
 ## Moves
 
 A move is a scaffolded microtask: time-boxed, low-energy, with a concrete goal, doable
-on a phone in one sitting. The playbook in `packages/domain/src/moves.ts` holds 22 of
-them across the six blip types — "set a 2-minute timer and ramble about how this came
-up", "find two counterexamples", "name the smallest version of this".
+on a phone in one sitting. The playbook in `packages/domain/src/moves.ts` holds around
+35 of them across the six blip types — "set a 2-minute timer and ramble about how this
+came up", "what would have to be true for this to be false?", "argue the opposite for
+two minutes", "do the ugliest possible first version".
+
+**Some moves bring you something to read.** The paper's complaint about naive
+resurfacing is that it shows you the same blank prompt again; new material is the fix.
+For those moves the model supplies a *search phrase*, never a URL — a hallucinated link
+looks like an answer, whereas a search phrase simply finds nothing if it is wrong. The
+server resolves it against Wikipedia, which needs no key:
+
+```
+a move, if you want one
+Find who made stages of change theory, and why
+goal: One sentence: who made it, and what they were trying to fix
+3 min · adapted                        not this one
+┌──────────────────────────────────────────────────────────┐
+│ Self-destructive behavior — Behaviours that are harmful… │
+│ one passes through on the way to recovery. The stages    │
+│ founded by Prochaska and DiClemente (1982) included…     │
+└──────────────────────────────────────────────────────────┘
+```
+
+If nothing turns up, the move still works and says so.
 
 The division of labour is deliberate. **The model selects and adapts; it does not
 invent.** A reply is only accepted if it picks a move that was actually on the menu,

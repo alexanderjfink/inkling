@@ -14,6 +14,11 @@ import type { Blip } from './project'
  * The library is data, not code. The LLM's job is to choose among these and adapt
  * the wording; it is not asked to invent tasks from nothing until the playbook has
  * been proven to work.
+ *
+ * A move marked `wantsMaterial` also brings you something to react to — the model
+ * supplies a search phrase, and the server resolves it to a real page. The paper's
+ * complaint about naive resurfacing was showing the same blank prompt again; new
+ * material is the fix.
  */
 export interface MoveTemplate {
   id: string
@@ -27,6 +32,8 @@ export interface MoveTemplate {
   successCriteria?: string
   /** Only offered when the blip has a URL to fetch. */
   needsUrl?: boolean
+  /** The move is better with something to read, so a search phrase is asked for. */
+  wantsMaterial?: boolean
 }
 
 const ALL_TYPES: BlipType[] = [...BLIP_TYPES]
@@ -60,20 +67,45 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
     goal: 'Write three smaller questions',
   },
   {
+    id: 'question.oneSentence',
+    blipTypes: ['question'],
+    title: 'Answer it in one sentence, as if you had to',
+    why: 'A forced answer is often better than the hedged one you have been carrying.',
+    timeLimitSec: 120,
+    goal: 'One sentence you would actually say out loud',
+  },
+  {
+    id: 'question.changeMyMind',
+    blipTypes: ['question'],
+    title: 'What would change your mind?',
+    why: 'Knowing what would settle a question tells you whether it is worth settling.',
+    timeLimitSec: 120,
+    goal: 'One specific thing you could find out',
+  },
+  {
+    id: 'question.opposite',
+    blipTypes: ['question'],
+    title: 'Argue the opposite for two minutes',
+    why: 'The strongest case against is the fastest way to see what you actually think.',
+    timeLimitSec: 120,
+    goal: 'The best version of the view you disagree with',
+  },
+  {
+    id: 'question.background',
+    blipTypes: ['question'],
+    title: 'Look up the background, then say what surprised you',
+    why: 'You are usually asking from further behind than you think.',
+    timeLimitSec: 240,
+    goal: 'One thing you did not know before',
+    wantsMaterial: true,
+  },
+  {
     id: 'question.who',
     blipTypes: ['question'],
     title: 'Name one person who would know',
     why: 'Deciding who to ask converts a private puzzle into a possible conversation.',
     timeLimitSec: 60,
     goal: 'One name, and why them',
-  },
-  {
-    id: 'question.partial',
-    blipTypes: ['question'],
-    title: 'Find one source that answers part of it',
-    why: 'Partial answers are usually enough to decide whether you care.',
-    timeLimitSec: 300,
-    goal: 'Keep one sentence from a source',
   },
 
   // ── references ──────────────────────────────────────────────────────────────
@@ -85,6 +117,24 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
     timeLimitSec: 180,
     goal: 'Keep one sentence that surprised you',
     needsUrl: true,
+  },
+  {
+    id: 'reference.number',
+    blipTypes: ['reference'],
+    title: 'Skim for one number or fact worth keeping',
+    why: 'One concrete fact outlives the whole article it came from.',
+    timeLimitSec: 180,
+    goal: 'One number or fact, in your own words',
+    needsUrl: true,
+  },
+  {
+    id: 'reference.who',
+    blipTypes: ['reference'],
+    title: 'Find out who made this, and why',
+    why: 'Provenance is usually the fastest way to judge whether to trust something.',
+    timeLimitSec: 180,
+    goal: 'One sentence on who and why',
+    wantsMaterial: true,
   },
   {
     id: 'reference.oneSentence',
@@ -113,6 +163,22 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
     goal: 'One sentence you would stand behind',
   },
   {
+    id: 'insight.whatIfFalse',
+    blipTypes: ['insight'],
+    title: 'What would have to be true for this to be false?',
+    why: 'Testability is what separates an insight from a mood.',
+    timeLimitSec: 150,
+    goal: 'One condition that would disprove it',
+  },
+  {
+    id: 'insight.sceptic',
+    blipTypes: ['insight'],
+    title: 'Say it out loud to an imaginary sceptic',
+    why: 'You find the soft spot the moment you have to say it to someone unimpressed.',
+    timeLimitSec: 150,
+    goal: 'The strongest objection they would raise',
+  },
+  {
     id: 'insight.counterexamples',
     blipTypes: ['insight'],
     title: 'Find two counterexamples',
@@ -128,16 +194,17 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
     timeLimitSec: 180,
     goal: 'One other domain where this holds',
   },
+  {
+    id: 'insight.background',
+    blipTypes: ['insight'],
+    title: 'Is this a thing other people have named?',
+    why: 'Someone has usually thought about it for longer than you have.',
+    timeLimitSec: 240,
+    goal: 'The nearest existing idea, and how yours differs',
+    wantsMaterial: true,
+  },
 
   // ── ideas ───────────────────────────────────────────────────────────────────
-  {
-    id: 'idea.variations',
-    blipTypes: ['idea'],
-    title: 'Sketch three variations',
-    why: 'The first version is rarely the one worth keeping.',
-    timeLimitSec: 240,
-    goal: 'Three variations, however rough',
-  },
   {
     id: 'idea.smallestTest',
     blipTypes: ['idea'],
@@ -147,12 +214,37 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
     goal: 'One test you could run this week',
   },
   {
+    id: 'idea.cheapest',
+    blipTypes: ['idea'],
+    title: 'What is the cheapest version of this?',
+    why: 'The cheap version is the one that actually gets made.',
+    timeLimitSec: 150,
+    goal: 'One version you could build in an afternoon',
+  },
+  {
+    id: 'idea.stranger',
+    blipTypes: ['idea'],
+    title: 'Describe it so a stranger would understand',
+    why: 'If it cannot survive being explained plainly, it is not yet an idea.',
+    timeLimitSec: 150,
+    goal: 'Two sentences, no jargon',
+  },
+  {
     id: 'idea.prior',
     blipTypes: ['idea'],
     title: 'Who has already done this?',
     why: 'Almost nothing is new; finding the ancestors saves months.',
-    timeLimitSec: 180,
+    timeLimitSec: 240,
     goal: 'One existing attempt, and what it missed',
+    wantsMaterial: true,
+  },
+  {
+    id: 'idea.variations',
+    blipTypes: ['idea'],
+    title: 'Sketch three variations',
+    why: 'The first version is rarely the one worth keeping.',
+    timeLimitSec: 240,
+    goal: 'Three variations, however rough',
   },
 
   // ── quests ──────────────────────────────────────────────────────────────────
@@ -163,6 +255,22 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
     why: 'Enormous things become possible the moment the first step is small.',
     timeLimitSec: 180,
     goal: 'A first step you could do today',
+  },
+  {
+    id: 'quest.uglyFirst',
+    blipTypes: ['quest'],
+    title: 'Do the ugliest possible first version',
+    why: 'The point of the first pass is to have something to be disappointed by.',
+    timeLimitSec: 240,
+    goal: 'Something exists that did not before',
+  },
+  {
+    id: 'quest.notWorthIt',
+    blipTypes: ['quest'],
+    title: 'What would make this not worth doing?',
+    why: 'Naming the exit condition is how a quest stops quietly rotting.',
+    timeLimitSec: 150,
+    goal: 'One condition under which you would stop',
   },
   {
     id: 'quest.threeSessions',
@@ -191,6 +299,14 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
     goal: 'The smallest version you would actually do',
   },
   {
+    id: 'yearning.nearby',
+    blipTypes: ['yearning'],
+    title: 'Who near you is already doing this?',
+    why: 'Most yearnings are one introduction away from being a Tuesday.',
+    timeLimitSec: 150,
+    goal: 'One person, group or place within reach',
+  },
+  {
     id: 'yearning.who',
     blipTypes: ['yearning'],
     title: 'Who else would want this?',
@@ -208,6 +324,23 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
   },
 
   // ── any blip ────────────────────────────────────────────────────────────────
+  {
+    id: 'any.read',
+    blipTypes: ALL_TYPES,
+    title: 'Read a short summary, then keep one sentence',
+    why: 'Something concrete to react to beats staring at the same prompt again.',
+    timeLimitSec: 240,
+    goal: 'One sentence, in your own words, that you did not have before',
+    wantsMaterial: true,
+  },
+  {
+    id: 'any.sentenceInAYear',
+    blipTypes: ALL_TYPES,
+    title: 'Write the sentence you would want to find in a year',
+    why: 'Notes are for the person you will be, not the one you are.',
+    timeLimitSec: 120,
+    goal: 'One sentence, written for later',
+  },
   {
     id: 'any.examples',
     blipTypes: ALL_TYPES,
@@ -262,6 +395,22 @@ function hasUrl(blip: Blip): boolean {
 }
 
 /**
+ * What to look up if the model does not suggest anything better.
+ *
+ * The title is the blip's own summary of itself, so it is the right thing to search
+ * for — minus any URL, which would only confuse a search engine.
+ */
+export function deriveQuery(blip: Blip): string {
+  const withoutUrl = blip.title
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const topics = blip.topics.filter((topic) => !/^https?$/.test(topic)).slice(0, 2)
+  const query = withoutUrl || topics.join(' ') || blip.body
+  return query.slice(0, 120).trim()
+}
+
+/**
  * Playbook moves that suit this blip, best first. Type-specific beats generic,
  * never-shown beats shown, and short beats long — the shorter a move is, the more
  * likely it is to actually happen.
@@ -293,6 +442,11 @@ export function buildMovePrompt(
     'You choose ONE move from the supplied list and adapt its wording to this blip.',
     'A move is a prompt to the person: time-boxed, low-energy, doable on a phone in one sitting,',
     'with a concrete goal. Shorter is better. Never invent a task that is not on the list.',
+    'Prefer a move that gives them something NEW to react to over one that asks them to stare',
+    'at the same question again.',
+    'If the move you choose is marked as looking something up, also supply a "query": a short,',
+    'specific search phrase of two to eight words that would find the right page.',
+    'Never invent a URL — a search phrase is what is wanted.',
     'Reply with JSON only.',
   ].join(' ')
 
@@ -309,7 +463,7 @@ export function buildMovePrompt(
     .slice(0, 8)
     .map(
       (template) =>
-        `- id: ${template.id}\n  title: ${template.title}\n  goal: ${template.goal}\n  seconds: ${template.timeLimitSec}`,
+        `- id: ${template.id}\n  title: ${template.title}\n  goal: ${template.goal}\n  seconds: ${template.timeLimitSec}${template.wantsMaterial ? '\n  looks something up: yes' : ''}`,
     )
     .join('\n')
 
@@ -320,14 +474,14 @@ export function buildMovePrompt(
     blip.topics.length > 0 ? `TOPICS: ${blip.topics.join(', ')}` : '',
     entries ? `WHAT THEY HAVE ALREADY WRITTEN:\n${entries}` : '',
     related ? `RELATED BLIPS:\n${related}` : '',
-    `TIMES THEY HAVE SKIPPED THIS: ${blip.schedule.timesSkipped}`,
+    `TIMES THEY HAVE PUT THIS DOWN: ${blip.schedule.timesSkipped}`,
     '',
     `MOVES TO CHOOSE FROM:\n${menu}`,
     '',
     'Choose one id from the list and adapt its title, why and goal to this specific blip.',
     'Keep the time limit under 5 minutes.',
     'Reply with exactly:',
-    '{"id": "<one id from the list>", "title": "...", "why": "...", "goal": "...", "timeLimitSec": 120, "steps": ["...", "..."]}',
+    '{"id": "<one id from the list>", "title": "...", "why": "...", "goal": "...", "timeLimitSec": 120, "query": "<only if the move looks something up>"}',
   ]
     .filter(Boolean)
     .join('\n')
@@ -342,6 +496,7 @@ interface RawMove {
   goal?: unknown
   timeLimitSec?: unknown
   steps?: unknown
+  query?: unknown
 }
 
 function asString(value: unknown): string | null {
@@ -389,7 +544,7 @@ export function parseMoveResponse(text: string, candidates: MoveTemplate[]): Mov
     ? raw.steps.filter((step): step is string => typeof step === 'string').slice(0, 5)
     : template.steps
 
-  return {
+  const spec: MoveSpec = {
     id: template.id,
     title,
     why: asString(raw.why) ?? template.why,
@@ -400,6 +555,14 @@ export function parseMoveResponse(text: string, candidates: MoveTemplate[]): Mov
     playbook: template.id.split('.')[0] ?? 'any',
     generatedBy: 'llm',
   }
+
+  // Only a move that looks something up gets a query, and only a short one.
+  if (template.wantsMaterial) {
+    const query = asString(raw.query)
+    if (query) spec.materialQuery = query.slice(0, 120)
+  }
+
+  return spec
 }
 
 export interface SelectMoveOptions {
@@ -417,7 +580,10 @@ export async function selectMove(
   options: SelectMoveOptions = {},
 ): Promise<MoveSpec> {
   const candidates = candidateTemplates(ctx)
-  const fallback = toMoveSpec(candidates[0] ?? FALLBACK_TEMPLATE)
+  const fallbackTemplate = candidates[0] ?? FALLBACK_TEMPLATE
+  const fallback = toMoveSpec(fallbackTemplate)
+  if (fallbackTemplate.wantsMaterial) fallback.materialQuery = deriveQuery(ctx.blip)
+
   const provider = options.provider
   if (!provider) return fallback
 
@@ -426,7 +592,16 @@ export async function selectMove(
     if (!(await provider.available())) return fallback
     const { system, prompt } = buildMovePrompt(full, candidates)
     const text = await provider.completeStructured({ system, prompt })
-    return parseMoveResponse(text, candidates) ?? fallback
+    const spec = parseMoveResponse(text, candidates)
+    if (!spec) return fallback
+
+    // A move that wants material must have a phrase to look up, even if the model
+    // forgot one — the title is a perfectly good query.
+    if (spec.materialQuery === undefined) {
+      const template = candidates.find((candidate) => candidate.id === spec.id)
+      if (template?.wantsMaterial) spec.materialQuery = deriveQuery(ctx.blip)
+    }
+    return spec
   } catch {
     return fallback
   }

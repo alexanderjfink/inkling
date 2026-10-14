@@ -1,17 +1,24 @@
 import type { Blip } from '@inkling/domain'
 import { isDue } from '@inkling/domain'
 import { formatShortDate } from '../format'
+import { obsidianUri } from '../obsidian'
 import type { InklingActions } from '../state/useInkling'
 
 function Row({
   blip,
   actions,
   onOpen,
+  vault,
 }: {
   blip: Blip
   actions: InklingActions
   onOpen: (id: string) => void
+  vault: string
 }) {
+  // "This one has a note" is worth knowing while scanning the attic.
+  const note = blip.export?.notePath
+  const gone = blip.status === 'retired' || blip.status === 'promoted'
+
   return (
     <div className="card flex flex-col gap-2 p-4">
       <button
@@ -23,7 +30,7 @@ function Row({
           <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">{blip.type}</span>
           <span>{formatShortDate(blip.created)}</span>
           <span>{blip.entries.length} entries</span>
-          {blip.desktopPinned ? <span className="text-accent">▸ to Mac</span> : null}
+          {note ? <span className="text-good">→ note</span> : null}
         </span>
         <span className="text-sm font-medium">{blip.title}</span>
         {blip.topics.length > 0 ? (
@@ -31,8 +38,8 @@ function Row({
         ) : null}
       </button>
 
-      <div className="flex gap-2">
-        {blip.status === 'retired' ? (
+      <div className="flex flex-wrap gap-2">
+        {gone ? (
           <button
             type="button"
             onClick={() => void actions.revive(blip.id)}
@@ -49,6 +56,14 @@ function Row({
             Retire
           </button>
         )}
+        {note ? (
+          <a
+            href={obsidianUri(vault, note)}
+            className="rounded-full border border-line px-3 py-1.5 text-xs text-good"
+          >
+            Open the note
+          </a>
+        ) : null}
         <button
           type="button"
           onClick={() => onOpen(blip.id)}
@@ -61,32 +76,32 @@ function Row({
   )
 }
 
-/** Everything, including what you put down and what you let go of. */
+/**
+ * Everything, including what you put down and what you let go of.
+ *
+ * Promoted blips sit here beside retired ones: both have left the feed, and both can
+ * be revived. The difference is kept visible rather than merged away — a promoted
+ * blip carries its note, and says so, with a link to open it.
+ */
 export function AllBlips({
   blips,
   actions,
   onOpen,
+  vault,
 }: {
   blips: Blip[]
   actions: InklingActions
   onOpen: (id: string) => void
+  vault: string
 }) {
   const live = blips.filter((blip) => !blip.deleted)
   const now = new Date()
+  const gone = (b: Blip) => b.status === 'retired' || b.status === 'promoted'
 
   const groups: Array<{ label: string; items: Blip[] }> = [
-    {
-      label: 'Waiting',
-      items: live.filter((b) => b.status !== 'retired' && b.status !== 'promoted' && isDue(b, now)),
-    },
-    {
-      label: 'Put down',
-      items: live.filter(
-        (b) => b.status !== 'retired' && b.status !== 'promoted' && !isDue(b, now),
-      ),
-    },
-    { label: 'Notes', items: live.filter((b) => b.status === 'promoted') },
-    { label: 'Attic', items: live.filter((b) => b.status === 'retired') },
+    { label: 'Waiting', items: live.filter((b) => !gone(b) && isDue(b, now)) },
+    { label: 'Put down', items: live.filter((b) => !gone(b) && !isDue(b, now)) },
+    { label: 'Attic', items: live.filter(gone) },
   ]
 
   if (live.length === 0) {
@@ -103,7 +118,7 @@ export function AllBlips({
               {group.label} · {group.items.length}
             </h2>
             {group.items.map((blip) => (
-              <Row key={blip.id} blip={blip} actions={actions} onOpen={onOpen} />
+              <Row key={blip.id} blip={blip} actions={actions} onOpen={onOpen} vault={vault} />
             ))}
           </section>
         ))}

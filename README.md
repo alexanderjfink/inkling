@@ -292,6 +292,10 @@ The same things can still be set with environment variables, and
 When a blip has accumulated enough, **Promote to note** ends the ambiguity: it drafts
 specific next steps, renders an evergreen note, and writes it into your Obsidian vault.
 
+The blip then moves to the **attic**, beside the retired ones — it has left the feed
+either way. It keeps a link to its note and can be revived, and re-promoting writes
+back to the same note rather than leaving a second one beside it.
+
 The order matters. Steps are drafted *before* the note is rendered, because a note
 without specific next steps has only moved the problem — the source material's
 complaint about blips is that they "lack clear next steps". The `promoted` event is

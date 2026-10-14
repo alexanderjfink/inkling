@@ -94,6 +94,7 @@ export function Review({
   const [entryOpen, setEntryOpen] = useState(false)
   const [entry, setEntry] = useState('')
   const [busy, setBusy] = useState(false)
+  const [lastNote, setLastNote] = useState<{ title: string; path: string } | null>(null)
   // A blip picked from the list may not be due today, so focus starts in "all".
   const [scope, setScope] = useState<Scope>(focusId ? 'all' : 'today')
 
@@ -112,6 +113,7 @@ export function Review({
     setSession(null)
     setDecisions({})
     setEntryOpen(false)
+    setLastNote(null)
   }, [scope])
 
   // Freeze the round when it starts, so acting on a blip cannot reshuffle the queue.
@@ -191,7 +193,12 @@ export function Review({
       current,
       currentRelated.map((entry_) => entry_.blip),
     )
-    if (result.ok) settle('promoted')
+    if (result.ok && result.path) {
+      // The blip leaves the queue on success, so remember where it went — otherwise
+      // the note's location vanishes with it.
+      setLastNote({ title: current.title, path: result.path })
+      settle('promoted')
+    }
   }
 
   if (!current) {
@@ -414,7 +421,7 @@ export function Review({
       </div>
 
       <div className="mt-4 flex justify-center gap-5 text-xs">
-        {current.status === 'retired' ? (
+        {current.status === 'retired' || current.status === 'promoted' ? (
           <button type="button" onClick={() => void revive()} className="quiet underline">
             revive — put it back in play
           </button>
@@ -425,14 +432,21 @@ export function Review({
         )}
       </div>
 
+      {current.export?.notePath ? (
+        <p className="mt-2 text-center text-xs text-good">
+          this one became a note: {current.export.notePath}
+        </p>
+      ) : null}
+
+      {lastNote ? (
+        <p className="mt-3 rounded-2xl bg-canvas p-3 text-center text-xs text-good">
+          “{lastNote.title}” became a note: {lastNote.path}
+        </p>
+      ) : null}
+
       {promoteResults[current.id]?.ok === false ? (
         <p className="mt-2 text-center text-xs text-warn">
           could not write the note: {promoteResults[current.id]?.error}
-        </p>
-      ) : null}
-      {promoteResults[current.id]?.ok ? (
-        <p className="mt-2 text-center text-xs text-good">
-          written to {promoteResults[current.id]?.path}
         </p>
       ) : null}
     </div>

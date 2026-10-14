@@ -77,7 +77,9 @@ export default function App() {
   }, [ready, blips])
 
   const waiting = useMemo(() => buildDailyFeed(blips, { now: new Date() }).length, [blips])
-  const attic = blips.filter((blip) => !blip.deleted && blip.status === 'retired').length
+  const attic = blips.filter(
+    (blip) => !blip.deleted && (blip.status === 'retired' || blip.status === 'promoted'),
+  ).length
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col p-4">
@@ -149,6 +151,7 @@ export default function App() {
         <AllBlips
           blips={blips}
           actions={actions}
+          vault={serverConfig.config?.vault ?? ''}
           onOpen={(id) => {
             setFocusId(id)
             setScreen('review')

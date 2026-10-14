@@ -68,6 +68,38 @@ Open the app, then:
 4. **Spike** measures IndexedDB vs OPFS. Run it *on the Android phone* — it decides
    the storage engine.
 
+## Testing on the phone
+
+The app must run in a **secure context** on the device. On a plain `http://<LAN-IP>`
+page the browser treats the page as insecure, so `crypto.subtle` (used to hash image
+blobs) is unavailable and OPFS cannot be probed — the Spike tab would report nothing
+useful. Two ways around it:
+
+**A. HTTPS over the LAN (the default).** The dev server serves HTTPS with a
+self-signed certificate. Open the *Network* URL Vite prints and accept the warning
+once — Chrome → **Advanced** → **Proceed**:
+
+```
+https://<your-lan-ip>:5173
+```
+
+If you reach for `http://<your-lan-ip>:5173`, Chrome will try to upgrade it to HTTPS
+and fail with *"This site can't provide a secure connection"* — that is the dev
+server speaking HTTP under a browser that insists on TLS, not a broken build.
+
+**B. `http://localhost` via `adb reverse` (no certificate, no warnings).** If you have
+USB debugging:
+
+```bash
+adb reverse tcp:5173 tcp:5173
+```
+
+then open `http://localhost:5173` on the phone. `localhost` is already a secure
+context, so everything works without a certificate.
+
+Note: each origin (scheme + host + port) gets its own local datastore, so blips
+captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5173`.
+
 ## Not yet
 
 Sync (M2), moves + LLM (M3), related blips (M4), Obsidian export (M5), Capacitor

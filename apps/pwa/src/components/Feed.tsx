@@ -1,10 +1,19 @@
-import { type Blip, buildDailyFeed } from '@inkling/domain'
+import { type Blip, buildDailyFeed, type LLMProvider } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import type { InklingActions } from '../state/useInkling'
+import { MoveCard } from './MoveCard'
 
 type Decision = 'advanced' | 'snoozed' | 'retired' | 'pinned'
 
-export function Feed({ blips, actions }: { blips: Blip[]; actions: InklingActions }) {
+export function Feed({
+  blips,
+  actions,
+  provider,
+}: {
+  blips: Blip[]
+  actions: InklingActions
+  provider: LLMProvider
+}) {
   const [topicsText, setTopicsText] = useState('')
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
   const [noteOpen, setNoteOpen] = useState<string | null>(null)
@@ -149,39 +158,48 @@ export function Feed({ blips, actions }: { blips: Blip[]; actions: InklingAction
             {decision ? (
               <p className="mt-3 text-xs text-zinc-500">→ {decision}</p>
             ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNoteOpen(noteOpen === blip.id ? null : blip.id)
-                    setNote('')
-                  }}
-                  className="rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-900"
-                >
-                  Add a note
-                </button>
-                <button
-                  type="button"
-                  onClick={() => snooze(blip)}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300"
-                >
-                  Not now
-                </button>
-                <button
-                  type="button"
-                  onClick={() => pin(blip)}
-                  className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300"
-                >
-                  Send to desktop
-                </button>
-                <button
-                  type="button"
-                  onClick={() => retire(blip)}
-                  className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-500"
-                >
-                  Retire
-                </button>
-              </div>
+              <>
+                <MoveCard
+                  blip={blip}
+                  related={blips.filter((other) => blip.links.includes(other.id))}
+                  provider={provider}
+                  actions={actions}
+                  onComplete={() => decide(blip.id, 'advanced')}
+                />
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNoteOpen(noteOpen === blip.id ? null : blip.id)
+                      setNote('')
+                    }}
+                    className="rounded-lg bg-zinc-100 px-3 py-1.5 text-xs font-semibold text-zinc-900"
+                  >
+                    Add a note
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => snooze(blip)}
+                    className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300"
+                  >
+                    Not now
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => pin(blip)}
+                    className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300"
+                  >
+                    Send to desktop
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => retire(blip)}
+                    className="rounded-lg border border-zinc-800 px-3 py-1.5 text-xs text-zinc-500"
+                  >
+                    Retire
+                  </button>
+                </div>
+              </>
             )}
 
             {noteOpen === blip.id ? (

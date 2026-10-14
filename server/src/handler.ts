@@ -1,4 +1,5 @@
-import { parseLog, sha256Hex } from '@inkling/domain'
+import { type LLMProvider, parseLog, sha256Hex } from '@inkling/domain'
+import { fetchPage, isFetchableUrl } from './fetchPage'
 import { type Store, isSafeDeviceId, isSafeHash } from './store'
 
 const encoder = new TextEncoder()
@@ -25,6 +26,15 @@ function toBody(bytes: Uint8Array): ArrayBuffer {
   return copy
 }
 
+async function readJson(request: Request): Promise<Record<string, unknown> | null> {
+  try {
+    const body = (await request.json()) as unknown
+    return typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * The sync API.
  *
@@ -36,7 +46,10 @@ function toBody(bytes: Uint8Array): ArrayBuffer {
  *   GET  /api/blobs/:hash
  *   PUT  /api/blobs/:hash                 -> content-addressed, hash verified
  */
-export function createHandler(store: Store): (request: Request) => Promise<Response> {
+export function createHandler(
+  store: Store,
+  llm?: LLMProvider,
+): (request: Request) => Promise<Response> {
   return async function handle(request: Request): Promise<Response> {
     const url = new URL(request.url)
     const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname
@@ -58,6 +71,11 @@ export function createHandler(store: Store): (request: Request) => Promise<Respo
       return json({ digests: await store.digests() })
     }
 
+    if (parts.length === 2 && parts[0] === 'llm' && parts[1] === 'health') {
+      const configured = llm ? await llm.available() : false
+      return json({ configured, provider: configured ? llm?.name : null })
+    }
+
     if (parts.length === 2 && parts[0] === 'digests') {
       const deviceId = parts[1]
       if (!deviceId || !isSafeDeviceId(deviceId)) return json({ error: 'invalid device id' }, 400)
@@ -68,6 +86,54 @@ export function createHandler(store: Store): (request: Request) => Promise<Respo
         return json({ ok: true })
       }
       return json({ error: 'method not allowed' }, 405)
+    }
+
+    if (parts.length === 2 && parts[0] === 'llm' && request.method === 'POST') {
+      const body = await readJson(request)
+      if (!body) return json({ error: 'invalid json body' }, 400)
+
+      if (parts[1] === 'complete') {
+        const system = typeof body.system === 'string' ? body.system : ''
+        const prompt = typeof body.prompt === 'string' ? body.prompt : ''
+        if (!prompt.trim()) return json({ error: 'prompt is required' }, 400)
+        if (!llm || !(await llm.available())) {
+          return json({ error: 'no language model configured' }, 503)
+        }
+        try {
+          return json({ text: await llm.completeStructured({ system, prompt }) })
+        } catch (error) {
+          return json({ error: error instanceof Error ? error.message : 'completion failed' }, 502)
+        }
+      }
+
+      if (parts[1] === 'embed') {
+        const texts = Array.isArray(body.texts)
+          ? body.texts.filter((entry): entry is string => typeof entry === 'string').slice(0, 64)
+          : []
+        if (texts.length === 0) return json({ error: 'texts is required' }, 400)
+        if (!llm || !(await llm.available())) {
+          return json({ error: 'no language model configured' }, 503)
+        }
+        try {
+          return json({ vectors: await llm.embed(texts) })
+        } catch (error) {
+          return json({ error: error instanceof Error ? error.message : 'embedding failed' }, 502)
+        }
+      }
+
+      return json({ error: 'not found' }, 404)
+    }
+
+    if (parts.length === 1 && parts[0] === 'fetch' && request.method === 'POST') {
+      const body = await readJson(request)
+      const url = body && typeof body.url === 'string' ? body.url : ''
+      if (!url) return json({ error: 'url is required' }, 400)
+      if (!isFetchableUrl(url)) return json({ error: 'url is not fetchable' }, 400)
+      try {
+        return json(await fetchPage(url))
+      } catch (error) {
+        return json({ error: error instanceof Error ? error.message : 'fetch failed' }, 502)
+      }
     }
 
     if (parts.length === 2 && parts[0] === 'logs') {

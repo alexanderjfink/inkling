@@ -1,0 +1,433 @@
+import { BLIP_TYPES, type BlipType, type MoveSpec } from './events'
+import type { LLMProvider } from './llm'
+import type { Blip } from './project'
+
+/**
+ * Moves: scaffolded microtasks that move a blip forward.
+ *
+ * Three rules, taken from the source material, are baked into the library below:
+ *
+ *   1. A move is a prompt *to you*, never something the system does for you.
+ *   2. Every move is time-boxed and low-energy — sized for a phone, on a sofa.
+ *   3. Every move has a concrete goal, so "done" is obvious and progress is visible.
+ *
+ * The library is data, not code. The LLM's job is to choose among these and adapt
+ * the wording; it is not asked to invent tasks from nothing until the playbook has
+ * been proven to work.
+ */
+export interface MoveTemplate {
+  id: string
+  /** Which blip types this suits. Generic moves list every type. */
+  blipTypes: BlipType[]
+  title: string
+  why: string
+  timeLimitSec: number
+  goal: string
+  steps?: string[]
+  successCriteria?: string
+  /** Only offered when the blip has a URL to fetch. */
+  needsUrl?: boolean
+}
+
+const ALL_TYPES: BlipType[] = [...BLIP_TYPES]
+
+/** The last-resort move: always applicable, always short. */
+const GENERIC_REACT: MoveTemplate = {
+  id: 'any.react',
+  blipTypes: ALL_TYPES,
+  title: 'React to this in one sentence',
+  why: 'A single reaction is enough to keep a blip alive.',
+  timeLimitSec: 90,
+  goal: 'One sentence',
+}
+
+export const MOVE_LIBRARY: MoveTemplate[] = [
+  // ── questions ───────────────────────────────────────────────────────────────
+  {
+    id: 'question.ramble',
+    blipTypes: ['question'],
+    title: 'Set a 2-minute timer and ramble about how this came up',
+    why: 'Saying where it came from usually reveals what you actually want to know.',
+    timeLimitSec: 120,
+    goal: 'Say one thing about this you had not put into words yet',
+  },
+  {
+    id: 'question.subquestions',
+    blipTypes: ['question'],
+    title: 'Break the question into three smaller ones',
+    why: 'A question too big to answer is usually several questions wearing a coat.',
+    timeLimitSec: 180,
+    goal: 'Write three smaller questions',
+  },
+  {
+    id: 'question.who',
+    blipTypes: ['question'],
+    title: 'Name one person who would know',
+    why: 'Deciding who to ask converts a private puzzle into a possible conversation.',
+    timeLimitSec: 60,
+    goal: 'One name, and why them',
+  },
+  {
+    id: 'question.partial',
+    blipTypes: ['question'],
+    title: 'Find one source that answers part of it',
+    why: 'Partial answers are usually enough to decide whether you care.',
+    timeLimitSec: 300,
+    goal: 'Keep one sentence from a source',
+  },
+
+  // ── references ──────────────────────────────────────────────────────────────
+  {
+    id: 'reference.firstLook',
+    blipTypes: ['reference'],
+    title: 'Look at what this page actually says',
+    why: 'You captured the link before you knew whether it was worth reading.',
+    timeLimitSec: 180,
+    goal: 'Keep one sentence that surprised you',
+    needsUrl: true,
+  },
+  {
+    id: 'reference.oneSentence',
+    blipTypes: ['reference'],
+    title: 'Read one paragraph and keep one sentence',
+    why: 'One kept sentence beats a bookmarked article you never open.',
+    timeLimitSec: 180,
+    goal: 'One sentence, in your own words',
+  },
+  {
+    id: 'reference.relevance',
+    blipTypes: ['reference'],
+    title: 'Write why this might matter to you',
+    why: 'Relevance is the thing that decays fastest about a saved link.',
+    timeLimitSec: 120,
+    goal: 'One sentence of relevance, or decide it is not relevant',
+  },
+
+  // ── insights ────────────────────────────────────────────────────────────────
+  {
+    id: 'insight.claim',
+    blipTypes: ['insight'],
+    title: 'State it as a claim you could defend',
+    why: 'A noticing becomes usable once it can be wrong.',
+    timeLimitSec: 120,
+    goal: 'One sentence you would stand behind',
+  },
+  {
+    id: 'insight.counterexamples',
+    blipTypes: ['insight'],
+    title: 'Find two counterexamples',
+    why: 'The edges of an idea are more informative than its centre.',
+    timeLimitSec: 240,
+    goal: 'Two counterexamples, or a reason there are none',
+  },
+  {
+    id: 'insight.elsewhere',
+    blipTypes: ['insight'],
+    title: 'Ask where else this applies',
+    why: 'Ideas earn their keep by travelling.',
+    timeLimitSec: 180,
+    goal: 'One other domain where this holds',
+  },
+
+  // ── ideas ───────────────────────────────────────────────────────────────────
+  {
+    id: 'idea.variations',
+    blipTypes: ['idea'],
+    title: 'Sketch three variations',
+    why: 'The first version is rarely the one worth keeping.',
+    timeLimitSec: 240,
+    goal: 'Three variations, however rough',
+  },
+  {
+    id: 'idea.smallestTest',
+    blipTypes: ['idea'],
+    title: 'What is the smallest test?',
+    why: 'Cheap tests make it safe to find out you were wrong.',
+    timeLimitSec: 120,
+    goal: 'One test you could run this week',
+  },
+  {
+    id: 'idea.prior',
+    blipTypes: ['idea'],
+    title: 'Who has already done this?',
+    why: 'Almost nothing is new; finding the ancestors saves months.',
+    timeLimitSec: 180,
+    goal: 'One existing attempt, and what it missed',
+  },
+
+  // ── quests ──────────────────────────────────────────────────────────────────
+  {
+    id: 'quest.firstSession',
+    blipTypes: ['quest'],
+    title: 'What is the first 30 minutes?',
+    why: 'Enormous things become possible the moment the first step is small.',
+    timeLimitSec: 180,
+    goal: 'A first step you could do today',
+  },
+  {
+    id: 'quest.threeSessions',
+    blipTypes: ['quest'],
+    title: 'Break it into three sessions',
+    why: 'Three sittings is usually the difference between a hobby and a bookmark.',
+    timeLimitSec: 240,
+    goal: 'Three named sessions',
+  },
+  {
+    id: 'quest.why',
+    blipTypes: ['quest'],
+    title: 'Write why you want this at all',
+    why: 'A quest without a reason is the first thing to rot.',
+    timeLimitSec: 120,
+    goal: 'One honest sentence, or decide to let it go',
+  },
+
+  // ── yearnings ───────────────────────────────────────────────────────────────
+  {
+    id: 'yearning.smallest',
+    blipTypes: ['yearning'],
+    title: 'Name the smallest version of this',
+    why: 'Yearnings are usually satisfiable in miniature long before they are in full.',
+    timeLimitSec: 120,
+    goal: 'The smallest version you would actually do',
+  },
+  {
+    id: 'yearning.who',
+    blipTypes: ['yearning'],
+    title: 'Who else would want this?',
+    why: 'Yearnings that need other people need one name to start.',
+    timeLimitSec: 120,
+    goal: 'One person to ask',
+  },
+  {
+    id: 'yearning.step',
+    blipTypes: ['yearning'],
+    title: 'One step you could take this week',
+    why: 'A week is long enough to be real and short enough to be honest.',
+    timeLimitSec: 120,
+    goal: 'One step, with a day attached',
+  },
+
+  // ── any blip ────────────────────────────────────────────────────────────────
+  {
+    id: 'any.examples',
+    blipTypes: ALL_TYPES,
+    title: 'Collect three examples',
+    why: 'Three examples usually tell you what you actually mean.',
+    timeLimitSec: 300,
+    goal: 'Three examples',
+  },
+  {
+    id: 'any.related',
+    blipTypes: ALL_TYPES,
+    title: 'How is this related to what you are already working on?',
+    why: 'Connection to live work is what keeps a blip from going stale.',
+    timeLimitSec: 120,
+    goal: 'One connection, or a reason there is none',
+  },
+  GENERIC_REACT,
+]
+
+const FALLBACK_TEMPLATE = GENERIC_REACT
+
+export function toMoveSpec(
+  template: MoveTemplate,
+  generatedBy: 'playbook' | 'llm' = 'playbook',
+): MoveSpec {
+  return {
+    id: template.id,
+    title: template.title,
+    why: template.why,
+    timeLimitSec: template.timeLimitSec,
+    goal: template.goal,
+    steps: template.steps,
+    successCriteria: template.successCriteria,
+    playbook: template.id.split('.')[0] ?? 'any',
+    generatedBy,
+  }
+}
+
+export interface MoveContext {
+  blip: Blip
+  related?: Blip[]
+  /** Move ids already shown for this blip, most recent last. */
+  seenMoveIds?: string[]
+}
+
+function isGeneric(template: MoveTemplate): boolean {
+  return template.blipTypes.length === BLIP_TYPES.length
+}
+
+function hasUrl(blip: Blip): boolean {
+  return Boolean(blip.input?.url ?? blip.context?.ref)
+}
+
+/**
+ * Playbook moves that suit this blip, best first. Type-specific beats generic,
+ * never-shown beats shown, and short beats long — the shorter a move is, the more
+ * likely it is to actually happen.
+ */
+export function candidateTemplates(ctx: MoveContext): MoveTemplate[] {
+  const seen = ctx.seenMoveIds ?? []
+  const applicable = MOVE_LIBRARY.filter(
+    (template) =>
+      template.blipTypes.includes(ctx.blip.type) && (!template.needsUrl || hasUrl(ctx.blip)),
+  )
+  const fresh = applicable.filter((template) => !seen.includes(template.id))
+  const pool = fresh.length > 0 ? fresh : applicable
+  const seenCount = (id: string) => seen.filter((entry) => entry === id).length
+
+  return [...pool].sort((a, b) => {
+    if (isGeneric(a) !== isGeneric(b)) return isGeneric(a) ? 1 : -1
+    if (seenCount(a.id) !== seenCount(b.id)) return seenCount(a.id) - seenCount(b.id)
+    return a.timeLimitSec - b.timeLimitSec || a.id.localeCompare(b.id)
+  })
+}
+
+export function buildMovePrompt(
+  ctx: MoveContext,
+  candidates: MoveTemplate[],
+): { system: string; prompt: string } {
+  const system = [
+    'You help someone make a small amount of progress on an idea they captured.',
+    'You NEVER do the task for them and never answer their question.',
+    'You choose ONE move from the supplied list and adapt its wording to this blip.',
+    'A move is a prompt to the person: time-boxed, low-energy, doable on a phone in one sitting,',
+    'with a concrete goal. Shorter is better. Never invent a task that is not on the list.',
+    'Reply with JSON only.',
+  ].join(' ')
+
+  const blip = ctx.blip
+  const entries = blip.entries
+    .slice(-5)
+    .map((entry) => `- (${entry.kind}) ${entry.text ?? entry.url ?? entry.mediaId ?? ''}`)
+    .join('\n')
+  const related = (ctx.related ?? [])
+    .slice(0, 4)
+    .map((other) => `- ${other.title}`)
+    .join('\n')
+  const menu = candidates
+    .slice(0, 8)
+    .map(
+      (template) =>
+        `- id: ${template.id}\n  title: ${template.title}\n  goal: ${template.goal}\n  seconds: ${template.timeLimitSec}`,
+    )
+    .join('\n')
+
+  const prompt = [
+    `BLIP TYPE: ${blip.type}`,
+    `TITLE: ${blip.title}`,
+    blip.body && blip.body !== blip.title ? `BODY: ${blip.body}` : '',
+    blip.topics.length > 0 ? `TOPICS: ${blip.topics.join(', ')}` : '',
+    entries ? `WHAT THEY HAVE ALREADY WRITTEN:\n${entries}` : '',
+    related ? `RELATED BLIPS:\n${related}` : '',
+    `TIMES THEY HAVE SKIPPED THIS: ${blip.schedule.timesSkipped}`,
+    '',
+    `MOVES TO CHOOSE FROM:\n${menu}`,
+    '',
+    'Choose one id from the list and adapt its title, why and goal to this specific blip.',
+    'Keep the time limit under 5 minutes.',
+    'Reply with exactly:',
+    '{"id": "<one id from the list>", "title": "...", "why": "...", "goal": "...", "timeLimitSec": 120, "steps": ["...", "..."]}',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  return { system, prompt }
+}
+
+interface RawMove {
+  id?: unknown
+  title?: unknown
+  why?: unknown
+  goal?: unknown
+  timeLimitSec?: unknown
+  steps?: unknown
+}
+
+function asString(value: unknown): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+/** Pull the first JSON object out of a model reply, tolerating prose or code fences. */
+function extractJson(text: string): unknown {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+  const candidate = fenced?.[1] ?? text
+  const start = candidate.indexOf('{')
+  const end = candidate.lastIndexOf('}')
+  if (start === -1 || end <= start) return null
+  try {
+    return JSON.parse(candidate.slice(start, end + 1))
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Validate a model reply against the candidate menu.
+ *
+ * The model may reword, but it must pick a real playbook id and produce a usable
+ * move. Anything else is discarded so the caller falls back to the library.
+ */
+export function parseMoveResponse(text: string, candidates: MoveTemplate[]): MoveSpec | null {
+  const raw = extractJson(text) as RawMove | null
+  if (!raw) return null
+
+  const title = asString(raw.title)
+  const goal = asString(raw.goal)
+  if (!title || !goal) return null
+
+  const requestedId = asString(raw.id)
+  const template =
+    candidates.find((candidate) => candidate.id === requestedId) ??
+    candidates.find((candidate) => candidate.id === requestedId?.split('.')[0])
+  if (!template) return null
+
+  const rawSeconds = typeof raw.timeLimitSec === 'number' ? raw.timeLimitSec : template.timeLimitSec
+  const timeLimitSec = Math.max(30, Math.min(900, Math.round(rawSeconds)))
+
+  const steps = Array.isArray(raw.steps)
+    ? raw.steps.filter((step): step is string => typeof step === 'string').slice(0, 5)
+    : template.steps
+
+  return {
+    id: template.id,
+    title,
+    why: asString(raw.why) ?? template.why,
+    timeLimitSec,
+    goal,
+    steps,
+    successCriteria: template.successCriteria,
+    playbook: template.id.split('.')[0] ?? 'any',
+    generatedBy: 'llm',
+  }
+}
+
+export interface SelectMoveOptions {
+  provider?: LLMProvider
+  related?: Blip[]
+}
+
+/**
+ * Choose a move. Prefers a model-adapted move, and falls back to the playbook on
+ * any failure — no provider, no network, a bad reply, or a reply that picked a move
+ * that is not on the menu.
+ */
+export async function selectMove(
+  ctx: MoveContext,
+  options: SelectMoveOptions = {},
+): Promise<MoveSpec> {
+  const candidates = candidateTemplates(ctx)
+  const fallback = toMoveSpec(candidates[0] ?? FALLBACK_TEMPLATE)
+  const provider = options.provider
+  if (!provider) return fallback
+
+  const full: MoveContext = { ...ctx, related: options.related ?? ctx.related }
+  try {
+    if (!(await provider.available())) return fallback
+    const { system, prompt } = buildMovePrompt(full, candidates)
+    const text = await provider.completeStructured({ system, prompt })
+    return parseMoveResponse(text, candidates) ?? fallback
+  } catch {
+    return fallback
+  }
+}

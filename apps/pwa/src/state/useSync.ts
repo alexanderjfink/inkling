@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ProxyProvider } from '../llm/proxy'
 import { DEFAULT_SERVER_URL, SERVER_URL_KEY, type SyncReport, Syncer } from '../sync/syncer'
 import { HttpTransport } from '../sync/transport'
 import { storage } from './useInkling'
@@ -59,5 +60,28 @@ export function useSync() {
     }
   }, [loaded, sync])
 
-  return { report, syncing, sync, serverUrl, saveServerUrl, loaded }
+  // The model lives behind the server, so the provider is just a URL.
+  const provider = useMemo(() => new ProxyProvider(serverUrl), [serverUrl])
+
+  const [modelConfigured, setModelConfigured] = useState<boolean | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void provider.available().then((ok) => {
+      if (!cancelled) setModelConfigured(ok)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [provider])
+
+  return {
+    report,
+    syncing,
+    sync,
+    serverUrl,
+    saveServerUrl,
+    loaded,
+    provider,
+    modelConfigured,
+  }
 }

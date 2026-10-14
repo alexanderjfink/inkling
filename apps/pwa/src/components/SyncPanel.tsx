@@ -4,7 +4,7 @@ import { formatBytes } from '../storage/hash'
 import type { useSync } from '../state/useSync'
 
 export function SyncPanel({ syncState }: { syncState: ReturnType<typeof useSync> }) {
-  const { report, syncing, sync, serverUrl, saveServerUrl } = syncState
+  const { report, syncing, sync, serverUrl, saveServerUrl, modelConfigured } = syncState
   const [draft, setDraft] = useState<string | null>(null)
 
   const value = draft ?? serverUrl
@@ -52,6 +52,19 @@ export function SyncPanel({ syncState }: { syncState: ReturnType<typeof useSync>
         <p className="text-[11px] text-zinc-600">
           <code>/api</code> goes through the dev proxy. For a server elsewhere, use its full URL,
           e.g. <code>https://your-box.tailnet.ts.net</code>.
+        </p>
+        <p className="text-[11px] text-zinc-500">
+          model:{' '}
+          {modelConfigured === null ? (
+            'checking…'
+          ) : modelConfigured ? (
+            <span className="text-emerald-300">configured — moves are adapted by the model</span>
+          ) : (
+            <span className="text-zinc-400">
+              not configured — moves come from the playbook. Set <code>OPENROUTER_API_KEY</code> on
+              the server to enable it.
+            </span>
+          )}
         </p>
       </section>
 

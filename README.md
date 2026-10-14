@@ -9,20 +9,22 @@ without turning them into a guilty to-do list.
 The design follows Andy Matuschak, *Towards scalable blip cultivation* (2024), and the
 companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 
-## Status — M2 (Sync + handoff)
+## Status — M3 (Moves)
 
 | Piece | State |
 |---|---|
 | Event schema + `project()` fold | done, tested |
 | Scheduler v1 (finite feed, no overdue term) | done, tested |
-| Append-only local storage (IndexedDB + content-addressed blobs, `durability: 'strict'`) | done |
+| Append-only local storage (IndexedDB, `durability: 'strict'`) | done |
 | Capture — text / URL / image | done |
 | Review loop — decision per blip, session receipt, sessions frozen | done |
 | Retire / attic / revive | done |
-| **Sync** — append-only log union, byte-offset watermarks, content-addressed blobs | done, tested |
-| **Handoff** — "send to desktop" → Desk view → action reflects back | done |
-| **State digest** — convergence check across devices | done, tested |
-| `server/` — logs, blobs, digests | done |
+| Sync — append-only log union, byte-offset watermarks, content-addressed blobs | done, tested |
+| Handoff — "send to desktop" → Desk view → action reflects back | done |
+| State digest — convergence check across devices | done, tested |
+| **Moves** — a 22-move playbook, time-boxed, goal-bearing, no repeats | done, tested |
+| **Model** — OpenRouter behind a server proxy; the model *selects and adapts* | done, tested |
+| **URL fetch** — server-side, so a saved link has something to react to | done, tested |
 | Storage engine | **decided**: IndexedDB (10.3k writes/s vs OPFS 806/s on the Android phone) |
 
 ## Layout
@@ -37,18 +39,23 @@ inkling/
 │       ├── schedule.ts   scoring + finite daily feed
 │       ├── log.ts        JSONL wire format, idempotent merge
 │       ├── hash.ts       sha256 (client and server share one implementation)
-│       └── digest.ts     state digest for convergence checks
-├── server/            Bun + file-backed store; the sync endpoint
+│       ├── digest.ts     state digest for convergence checks
+│       ├── moves.ts      the playbook, selection, prompt and reply validation
+│       └── llm.ts        the provider seam (nothing model-shaped lives elsewhere)
+├── server/            Bun + file-backed store; sync, model proxy, url fetch
 │   └── src/
 │       ├── store.ts      append-only logs, content-addressed blobs, digests
 │       ├── handler.ts    the HTTP API
+│       ├── llm.ts        OpenRouter, optional and unconfigured by default
+│       ├── fetchPage.ts  url -> title + excerpt, with private-network guards
 │       └── index.ts      entry point
 └── apps/pwa/          React 19 + Vite + Tailwind, installable PWA
     └── src/
         ├── storage/      StorageAdapter + AppendOnlyLog (IndexedDB), blobs
         ├── sync/         SyncTransport (HTTP) + Syncer
+        ├── llm/          ProxyProvider — the client's view of the model
         ├── state/        useInkling(), useSync()
-        ├── components/   Capture, Feed, Desk, AllBlips, SyncPanel
+        ├── components/   Capture, Feed, Desk, AllBlips, SyncPanel, MoveCard
         └── spike/        in-app storage benchmark
 ```
 
@@ -108,6 +115,36 @@ append-only files — there is no merge, and replaying is always safe. After eac
 the app publishes a digest of its folded state; when every device's digest matches,
 you know for certain they agree.
 
+## Moves
+
+A move is a scaffolded microtask: time-boxed, low-energy, with a concrete goal, doable
+on a phone in one sitting. The playbook in `packages/domain/src/moves.ts` holds 22 of
+them across the six blip types — "set a 2-minute timer and ramble about how this came
+up", "find two counterexamples", "name the smallest version of this".
+
+The division of labour is deliberate. **The model selects and adapts; it does not
+invent.** A reply is only accepted if it picks a move that was actually on the menu,
+produces a usable title and goal, and keeps a sane time limit — otherwise it is
+discarded and the playbook answers instead. This is the source material's advice
+taken literally: get the handcrafted version working first.
+
+That means the model is a pure enhancement:
+
+- **No key configured** → every move comes from the playbook. Nothing breaks.
+- **Server unreachable** → same. The app is offline-first.
+- **Model returns nonsense** → discarded, playbook answers.
+
+To enable it, give the server a key:
+
+```bash
+OPENROUTER_API_KEY=sk-or-... bun run server
+# optional: INKLING_MODEL, INKLING_EMBED_MODEL, OPENROUTER_BASE_URL
+```
+
+The key stays on the server; devices only ever talk to the proxy. The Sync tab shows
+whether a model is configured, so it is never a mystery why a move says "from the
+playbook".
+
 ## Testing on the phone
 
 The app must run in a **secure context** on the device. On a plain `http://<LAN-IP>`
@@ -142,5 +179,5 @@ captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5
 
 ## Not yet
 
-Moves + LLM, including the OpenRouter proxy on the server (M3), related blips (M4),
-Obsidian export (M5), Capacitor wrap, notifications, and voice capture (M6).
+Related blips and embeddings (M4), Obsidian export (M5), Capacitor wrap, notifications,
+and voice capture (M6).

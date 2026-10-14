@@ -49,7 +49,9 @@ export default function App() {
         </div>
       </header>
 
-      {tab === 'today' ? <Feed blips={blips} actions={actions} /> : null}
+      {tab === 'today' ? (
+        <Feed blips={blips} actions={actions} provider={syncState.provider} />
+      ) : null}
       {tab === 'capture' ? <Capture onCapture={actions.capture} /> : null}
       {tab === 'desk' ? <Desk blips={blips} actions={actions} /> : null}
       {tab === 'all' ? <AllBlips blips={blips} actions={actions} /> : null}

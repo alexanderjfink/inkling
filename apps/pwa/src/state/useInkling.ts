@@ -1,4 +1,4 @@
-import type { BlipEvent, BlipEventBody, BlipType, CaptureInput } from '@inkling/domain'
+import type { BlipEvent, BlipEventBody, BlipType, CaptureInput, MoveSpec } from '@inkling/domain'
 import { newId, project, snoozeUntil } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { type CaptureDraft, extractTopics, guessType, inferBody } from '../capture'
@@ -23,6 +23,10 @@ export interface InklingActions {
   revive(id: string): Promise<BlipEvent>
   pinToDesktop(id: string): Promise<BlipEvent>
   unpinFromDesktop(id: string): Promise<BlipEvent>
+  /** Record that a move was put in front of the user, so it is not repeated blindly. */
+  recordMoveShown(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
+  /** Finish a move: keep the result, mark the move done, and stretch the interval. */
+  completeMove(id: string, moveId: string, text: string): Promise<BlipEvent>
   classify(id: string, type: BlipType): Promise<BlipEvent>
   link(id: string, otherId: string, reason?: string): Promise<BlipEvent>
 }
@@ -112,6 +116,28 @@ export function useInkling() {
       },
       unpinFromDesktop(id) {
         return storage().append({ t: 'unpinFromDesktop', id })
+      },
+      recordMoveShown(id, moveSpec) {
+        return storage().append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
+      },
+      async completeMove(id, moveId, text) {
+        const store = storage()
+        const before = project(await store.allEvents()).find((blip) => blip.id === id)
+        const streak = before?.schedule.timesEngaged ?? 0
+        if (text.trim()) {
+          await store.append({
+            t: 'entry',
+            id,
+            moveId,
+            entry: { id: newId(), kind: 'note', text: text.trim(), at: new Date().toISOString() },
+          })
+        }
+        await store.append({ t: 'moveDone', id, moveId })
+        return store.append({
+          t: 'snoozed',
+          id,
+          until: snoozeUntil('engaged', new Date(), streak),
+        })
       },
       classify(id, type) {
         return storage().append({ t: 'classified', id, type })

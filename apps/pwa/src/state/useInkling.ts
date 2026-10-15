@@ -25,10 +25,15 @@ export interface InklingActions {
   unpinFromDesktop(id: string): Promise<BlipEvent>
   /** Record that a move was put in front of the user, so it is not repeated blindly. */
   recordMoveShown(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
-  /**
-   * Finish a move: keep the result, log the move with its completion time, and
-   * stretch the interval.
-   */
+  /** Keep this move for later, or let it go. */
+  saveMove(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
+  unsaveMove(id: string, moveId: string): Promise<BlipEvent>
+  /** Remove something you added. A tombstone, so nothing is really rewritten. */
+  removeEntry(id: string, entryId: string): Promise<BlipEvent>
+  /** Correct the Inkling itself. */
+  editBlip(id: string, patch: { title?: string; body?: string }): Promise<BlipEvent>
+  /** Finish a move: keep the result, log the move with its completion time, and
+   * stretch the interval. */
   completeMove(id: string, moveSpec: MoveSpec, text: string): Promise<BlipEvent>
   /** A blip has been written out as a note; the path is where it landed. */
   promote(id: string, notePath: string): Promise<BlipEvent>
@@ -127,6 +132,18 @@ export function useInkling() {
       },
       recordMoveShown(id, moveSpec) {
         return storage().append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
+      },
+      saveMove(id, moveSpec) {
+        return storage().append({ t: 'moveSaved', id, moveId: moveSpec.id, moveSpec })
+      },
+      unsaveMove(id, moveId) {
+        return storage().append({ t: 'moveUnsaved', id, moveId })
+      },
+      removeEntry(id, entryId) {
+        return storage().append({ t: 'entryRemoved', id, entryId })
+      },
+      editBlip(id, patch) {
+        return storage().append({ t: 'edited', id, ...patch })
       },
       async completeMove(id, moveSpec, text) {
         const store = storage()

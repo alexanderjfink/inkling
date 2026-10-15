@@ -125,6 +125,13 @@ export type BlipEventBody =
   | { t: 'moveShown'; id: string; moveId: string; moveSpec: MoveSpec }
   | { t: 'moveDone'; id: string; moveId: string }
   | { t: 'moveSkipped'; id: string; moveId: string }
+  /** Keep this move for later, rather than losing it when the card moves on. */
+  | { t: 'moveSaved'; id: string; moveId: string; moveSpec: MoveSpec }
+  | { t: 'moveUnsaved'; id: string; moveId: string }
+  /** Remove something you added. A tombstone, not a rewrite. */
+  | { t: 'entryRemoved'; id: string; entryId: string }
+  /** Correct the Inkling itself. Only the fields given are changed. */
+  | { t: 'edited'; id: string; title?: string; body?: string; type?: BlipType }
   | { t: 'linked'; id: string; otherId: string; reason?: string }
   | { t: 'topicAdded'; id: string; topic: string }
   | { t: 'snoozed'; id: string; until?: ISODate; triggers?: string[] }

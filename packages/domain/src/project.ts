@@ -49,6 +49,8 @@ export interface Blip {
   blocks: Block[]
   schedule: ScheduleState
   moves: MoveHistoryEntry[]
+  /** A move kept deliberately, offered again next time this surfaces. */
+  savedMove?: MoveSpec
   export?: { notePath: string; at: string }
   desktopPinned: boolean
 }
@@ -152,11 +154,27 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
         move.outcome = 'done'
         move.doneAt = event.at
       }
+      // A saved move has been used, so it is no longer waiting.
+      if (blip.savedMove?.id === event.moveId) blip.savedMove = undefined
       blip.schedule.heat = clamp01(blip.schedule.heat + 0.15)
       blip.schedule.timesEngaged += 1
       blip.schedule.lastTouched = event.at
       break
     }
+    case 'moveSaved':
+      blip.savedMove = event.moveSpec
+      break
+    case 'moveUnsaved':
+      if (blip.savedMove?.id === event.moveId) blip.savedMove = undefined
+      break
+    case 'entryRemoved':
+      blip.entries = blip.entries.filter((entry) => entry.id !== event.entryId)
+      break
+    case 'edited':
+      if (event.title !== undefined) blip.title = event.title
+      if (event.body !== undefined) blip.body = event.body
+      if (event.type !== undefined) blip.type = event.type
+      break
     case 'moveSkipped': {
       const move = blip.moves.find((m) => m.moveId === event.moveId)
       if (move) move.outcome = 'skipped'

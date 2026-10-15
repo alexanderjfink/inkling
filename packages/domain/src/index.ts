@@ -22,11 +22,14 @@ export type { MergeResult } from './log'
 export { devicesIn, eventKey, mergeEvents, parseLog, serializeLog, serializeLogBytes } from './log'
 export type { MoveContext, MoveTemplate, SelectMoveOptions } from './moves'
 export {
+  buildGuidancePrompt,
   buildMovePrompt,
   candidateTemplates,
   deriveQuery,
   MOVE_LIBRARY,
+  parseGuidance,
   parseMoveResponse,
+  requestGuidance,
   selectMove,
   toMoveSpec,
 } from './moves'

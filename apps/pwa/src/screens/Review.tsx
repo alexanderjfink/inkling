@@ -1,6 +1,13 @@
 import type { Blip, DeferralChoice, LLMProvider, MoveSpec, RelatedBlip } from '@inkling/domain'
-import { DEFERRAL_CHOICES, buildDailyFeed, deferUntil, rankBlips } from '@inkling/domain'
+import {
+  DEFERRAL_CHOICES,
+  buildDailyFeed,
+  deferUntil,
+  rankBlips,
+  requestGuidance,
+} from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Markdown } from '../components/Markdown'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 import { formatDeferral, formatWhen } from '../format'
 import { type LookupResult, lookupVia } from '../llm/proxy'
@@ -126,6 +133,12 @@ export function Review({
   /** Open when non-null. A move means "doing that move"; null means a free note. */
   const [composer, setComposer] = useState<{ move: MoveSpec | null } | null>(null)
   const [entry, setEntry] = useState('')
+  const [editing, setEditing] = useState(false)
+  const [draftTitle, setDraftTitle] = useState('')
+  const [draftBody, setDraftBody] = useState('')
+  /** null means "not asked yet"; an empty list means "nothing came back". */
+  const [guidance, setGuidance] = useState<string[] | null>(null)
+  const [guidanceLoading, setGuidanceLoading] = useState(false)
   // A picked Inkling may not be due today, so focus starts in "all".
   const [scope, setScope] = useState<Scope>(focusId ? 'all' : 'today')
 
@@ -229,6 +242,38 @@ export function Review({
     setDecisions((previous) => ({ ...previous, [current.id]: decision }))
     setComposer(null)
     setEntry('')
+    setGuidance(null)
+    setEditing(false)
+  }
+
+  async function saveForLater() {
+    if (!current || !move) return
+    // Keep the move, and put the Inkling down so it comes back with that move.
+    await actions.saveMove(current.id, move)
+    await actions.snooze(current.id, deferUntil(DEFAULT_DEFERRAL, new Date()))
+    settle('deferred')
+  }
+
+  async function askForGuidance() {
+    if (!current) return
+    setGuidanceLoading(true)
+    try {
+      const result = await requestGuidance(
+        current,
+        move,
+        material ? { title: material.title, extract: material.extract } : null,
+        provider,
+      )
+      setGuidance(result?.items ?? [])
+    } finally {
+      setGuidanceLoading(false)
+    }
+  }
+
+  async function saveEdit() {
+    if (!current) return
+    await actions.editBlip(current.id, { title: draftTitle.trim(), body: draftBody })
+    setEditing(false)
   }
 
   async function saveEntry() {
@@ -365,12 +410,54 @@ export function Review({
           {current.schedule.timesSkipped > 0 ? (
             <span className="text-ink-faint">put down {current.schedule.timesSkipped}×</span>
           ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              setDraftTitle(current.title)
+              setDraftBody(current.body)
+              setEditing(true)
+            }}
+            className="quiet ml-auto text-[11px] underline"
+          >
+            edit
+          </button>
         </div>
 
-        <h2 className="mt-3 text-xl leading-snug font-semibold">{current.title}</h2>
-        {current.body && current.body !== current.title ? (
-          <p className="mt-2 text-sm text-ink-soft">{current.body}</p>
-        ) : null}
+        {editing ? (
+          <div className="mt-3 flex flex-col gap-2">
+            <input
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+              className="w-full rounded-xl border border-line bg-surface p-3 text-base font-semibold outline-none focus:border-accent"
+            />
+            <textarea
+              value={draftBody}
+              onChange={(event) => setDraftBody(event.target.value)}
+              rows={5}
+              className="w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent"
+            />
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setEditing(false)} className="quiet text-xs">
+                cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void saveEdit()}
+                className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <Markdown text={current.title} className="mt-3 text-xl leading-snug font-semibold" />
+            {current.body && current.body !== current.title ? (
+              <Markdown text={current.body} className="mt-2 text-sm text-ink-soft" />
+            ) : null}
+          </>
+        )}
+
         {current.input?.url ? (
           <a
             href={current.input.url}
@@ -385,10 +472,18 @@ export function Review({
           <p className="mt-2 text-xs text-ink-faint">🖼 {images.length} image attachment(s)</p>
         ) : null}
         {notes.length > 0 ? (
-          <ul className="mt-3 flex flex-col gap-1">
+          <ul className="mt-3 flex flex-col gap-2">
             {notes.map((note) => (
-              <li key={note.id} className="text-sm text-ink-soft">
-                · {note.text}
+              <li key={note.id} className="flex items-start gap-2">
+                <Markdown text={note.text ?? ''} className="flex-1 text-sm text-ink-soft" />
+                <button
+                  type="button"
+                  onClick={() => void actions.removeEntry(current.id, note.id)}
+                  aria-label="Remove this entry"
+                  className="quiet px-1 text-xs leading-none"
+                >
+                  ×
+                </button>
               </li>
             ))}
           </ul>
@@ -433,6 +528,9 @@ export function Review({
             </p>
             <p className="mt-1 text-sm font-medium">{move.title}</p>
             <p className="mt-1 text-xs text-ink-soft">goal: {move.goal}</p>
+            {current.savedMove ? (
+              <p className="mt-1 text-[11px] text-good">saved — this is the move you kept</p>
+            ) : null}
 
             {move.materialQuery ? (
               <div className="mt-3 rounded-xl border border-line bg-surface/60 p-3">
@@ -488,6 +586,45 @@ export function Review({
                 </ButtonLabel>
               </button>
             </div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
+              <button type="button" onClick={() => void saveForLater()} className="quiet underline">
+                save for later
+              </button>
+              <button
+                type="button"
+                onClick={() => void askForGuidance()}
+                disabled={guidanceLoading}
+                className="quiet underline disabled:no-underline disabled:opacity-60"
+              >
+                <ButtonLabel busy={guidanceLoading}>
+                  {guidanceLoading ? 'thinking…' : 'help me with the next step'}
+                </ButtonLabel>
+              </button>
+            </div>
+
+            {guidance ? (
+              <div className="mt-3 rounded-xl border border-line bg-surface/60 p-3">
+                {guidance.length === 0 ? (
+                  <p className="text-xs text-ink-faint">
+                    nothing came back — ask again, or just start and see
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+                      what to look for
+                    </p>
+                    <ul className="mt-1 flex flex-col gap-1.5">
+                      {guidance.map((item) => (
+                        <li key={item} className="text-xs leading-relaxed text-ink-soft">
+                          · {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+              </div>
+            ) : null}
           </div>
         ) : (
           <p className="mt-5 flex items-center gap-2 text-xs text-ink-faint">

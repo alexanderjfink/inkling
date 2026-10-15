@@ -37,6 +37,7 @@ export function useSuggestedMove(
   const blipId = blip?.id ?? ''
   const avoidIds = avoid.blipId === blipId ? avoid.ids : []
   const relatedIds = related.map((other) => other.id).join(',')
+  const savedId = blip?.savedMove?.id ?? ''
   const key = blip ? `${blipId}:${avoidIds.join(',')}` : ''
 
   /**
@@ -68,6 +69,13 @@ export function useSuggestedMove(
       return
     }
 
+    // A move you saved deliberately is the one to show — no need to ask again.
+    if (target.savedMove) {
+      setMove(target.savedMove)
+      setLoading(false)
+      return
+    }
+
     let cancelled = false
     setLoading(true)
     const seen = [...target.moves.map((entry) => entry.moveId), ...avoidIds]
@@ -82,7 +90,7 @@ export function useSuggestedMove(
       cancelled = true
     }
     // `related` is covered by relatedIds; `avoidIds` by key; the blip by blipId.
-  }, [key, relatedIds, provider, blipId])
+  }, [key, relatedIds, provider, blipId, savedId])
 
   function reroll() {
     if (!move) return

@@ -98,3 +98,75 @@ body {
 .quiet:hover {
   color: var(--color-ink-soft);
 }
+
+/* Markdown, rendered into an Inkling's own text. Real CSS, because the content
+   arrives as HTML rather than as elements Tailwind can class. */
+.md > *:first-child {
+  margin-top: 0;
+}
+
+.md p {
+  margin: 0.4rem 0 0;
+}
+
+.md ul,
+.md ol {
+  margin: 0.4rem 0 0;
+  padding-left: 1.15rem;
+  list-style: disc;
+}
+
+.md li {
+  margin: 0.15rem 0;
+}
+
+.md blockquote {
+  margin: 0.4rem 0 0;
+  padding-left: 0.75rem;
+  border-left: 2px solid var(--color-line);
+  color: var(--color-ink-soft);
+}
+
+.md a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  word-break: break-word;
+}
+
+.md h1,
+.md h2,
+.md h3,
+.md h4,
+.md h5,
+.md h6 {
+  margin: 0.6rem 0 0;
+  font-weight: 600;
+  font-size: 1em;
+}
+
+.md hr {
+  margin: 0.6rem 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.md code {
+  background: var(--color-canvas);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.35rem;
+  font-size: 0.85em;
+}
+
+.md pre {
+  margin: 0.5rem 0 0;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: var(--color-canvas);
+  overflow-x: auto;
+  font-size: 0.75rem;
+}
+
+.md pre code {
+  background: none;
+  padding: 0;
+}

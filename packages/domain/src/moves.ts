@@ -576,6 +576,88 @@ export function parseMoveResponse(text: string, candidates: MoveTemplate[]): Mov
   return spec
 }
 
+/**
+ * Ask for a short list of things to look for.
+ *
+ * Deliberately not "do the work for me": the answer is what to *watch for*, so the
+ * person still has to look. The move and any material found for it are given to the
+ * model, so the list is about this specific thing rather than the topic in general.
+ */
+export function buildGuidancePrompt(
+  blip: Blip,
+  move: MoveSpec | null,
+  material?: { title: string; extract: string } | null,
+): { system: string; prompt: string } {
+  const system = [
+    'You help someone know what to look for before they go and look.',
+    'You do NOT do the work, answer their question, or write the note for them.',
+    'Give between two and four items. Each is ONE short sentence of at most 20 words —',
+    'a single thing to notice, compare or check.',
+    'Each item must be specific to this material — never generic advice like "take notes".',
+    'Reply with JSON only.',
+  ].join(' ')
+
+  const entries = blip.entries
+    .slice(-6)
+    .map((entry) => `- ${entry.text ?? entry.url ?? ''}`)
+    .join('\n')
+
+  const prompt = [
+    `TITLE: ${blip.title}`,
+    blip.body && blip.body !== blip.title ? `BODY: ${blip.body}` : '',
+    move ? `THE MOVE THEY ARE ABOUT TO DO: ${move.title} (goal: ${move.goal})` : '',
+    material ? `WHAT THEY ARE ABOUT TO READ: ${material.title}\n${material.extract}` : '',
+    entries ? `WHAT THEY HAVE WRITTEN SO FAR:\n${entries}` : '',
+    '',
+    'Reply with exactly:',
+    '{"items": ["...", "..."]}',
+  ]
+    .filter(Boolean)
+    .join('\n')
+
+  return { system, prompt }
+}
+
+/**
+ * Pull a list of short items out of a model reply.
+ *
+ * Generous about length on purpose: a useful item that happens to run to 250
+ * characters is worth keeping, and dropping it because of a limit is how this
+ * silently returned nothing at all. Only an absurd one is trimmed.
+ */
+export function parseGuidance(text: string): string[] | null {
+  const raw = extractJson(text) as { items?: unknown } | null
+  const items = raw?.items
+  if (!Array.isArray(items)) return null
+
+  const cleaned = items
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0 && item.length <= 600)
+    .map((item) => (item.length > 320 ? `${item.slice(0, 317).trimEnd()}…` : item))
+    .slice(0, 4)
+
+  return cleaned.length > 0 ? cleaned : null
+}
+
+/** Never throws: without a model, or on any failure, there is simply no guidance. */
+export async function requestGuidance(
+  blip: Blip,
+  move: MoveSpec | null,
+  material: { title: string; extract: string } | null,
+  provider?: LLMProvider,
+): Promise<{ items: string[]; generatedBy: 'llm' } | null> {
+  if (!provider) return null
+  try {
+    if (!(await provider.available())) return null
+    const { system, prompt } = buildGuidancePrompt(blip, move, material)
+    const items = parseGuidance(await provider.completeStructured({ system, prompt }))
+    return items ? { items, generatedBy: 'llm' } : null
+  } catch {
+    return null
+  }
+}
+
 export interface SelectMoveOptions {
   provider?: LLMProvider
   related?: Blip[]

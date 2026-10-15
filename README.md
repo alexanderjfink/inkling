@@ -248,8 +248,17 @@ Home ─┬─ Add an Inkling   text, a link, a photo, or your voice (⌘↵ / C
 
 A suggested **move** sits above them with a **Do this** button: it opens the same
 composer, bound to that move, and records the move as done when you keep the result.
-Under the move, **moves so far** lists what has been put in front of you and when —
-behind a tap, so the card stays clean. Related Inklings are listed and open on tap.
+Under it: **save for later** (keeps that move and puts the Inkling down, so it returns
+with the move you liked) and **help me with the next step** (a short list of what to
+look for, specific to the move and to whatever material was found).
+
+**moves so far** lists what has been put in front of you and when — behind a tap, so
+the card stays clean. Related Inklings are listed and open on tap.
+
+Text is **Markdown**: headings, lists, quotes, code, bold, links. It is rendered by a
+small renderer that escapes first and only then applies markup, so a note cannot
+inject anything. **edit** corrects the title and body, and each entry has an **×** to
+remove it — both recorded as events, so the log stays append-only.
 
 A **Today / All** toggle switches between the finite daily feed and everything you
 have. **browse** opens the full list, where tapping an Inkling opens it here, focused,

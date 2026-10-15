@@ -2,12 +2,15 @@ import { describe, expect, test } from 'bun:test'
 import type { Blip, BlipEvent, BlipEventBody, BlipType, LLMProvider } from '../src/index'
 import {
   BLIP_TYPES,
+  buildGuidancePrompt,
   buildMovePrompt,
   candidateTemplates,
   deriveQuery,
   MOVE_LIBRARY,
+  parseGuidance,
   parseMoveResponse,
   project,
+  requestGuidance,
   selectMove,
   toMoveSpec,
 } from '../src/index'
@@ -348,6 +351,46 @@ describe('deriveQuery', () => {
   test('is never longer than a search phrase', () => {
     const blip = makeBlip('idea', 'x'.repeat(400))
     expect(deriveQuery(blip).length).toBeLessThanOrEqual(120)
+  })
+})
+
+describe('guidance', () => {
+  test('keeps a useful item that runs long, rather than dropping it', () => {
+    // The first real reply had four items of ~205 characters, and a 200-character
+    // limit silently discarded every one of them.
+    const long = `Notice whether the app's suggestions spread socially because users tell each other about them, or because the algorithm itself reaches out to new people — only the first is a mechanism you could copy for Inkling.`
+    expect(long.length).toBeGreaterThan(200)
+    const items = parseGuidance(JSON.stringify({ items: [long] }))
+    expect(items).toHaveLength(1)
+    expect(items?.[0]).toContain('Notice whether')
+  })
+
+  test('trims only an absurdly long item', () => {
+    const items = parseGuidance(JSON.stringify({ items: ['x'.repeat(2000)] }))
+    expect(items?.[0]?.length ?? 0).toBeLessThanOrEqual(320)
+  })
+
+  test('rejects junk, empties, and a reply with no items', () => {
+    expect(parseGuidance('no idea')).toBeNull()
+    expect(parseGuidance('{"items":[]}')).toBeNull()
+    expect(parseGuidance('{"items":["  "]}')).toBeNull()
+    expect(parseGuidance('{"nope":true}')).toBeNull()
+  })
+
+  test('caps at four', () => {
+    expect(parseGuidance(JSON.stringify({ items: ['a', 'b', 'c', 'd', 'e'] }))).toHaveLength(4)
+  })
+
+  test('the prompt asks for one short sentence each', () => {
+    const blip = makeBlip('idea', 'an idea')
+    const { system } = buildGuidancePrompt(blip, null, null)
+    expect(system).toContain('20 words')
+    expect(system).toContain('never generic advice')
+  })
+
+  test('without a provider there is simply no guidance', async () => {
+    const blip = makeBlip('idea', 'an idea')
+    expect(await requestGuidance(blip, null, null)).toBeNull()
   })
 })
 

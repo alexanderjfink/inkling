@@ -1,6 +1,6 @@
-import type { BlipEvent } from '@inkling/domain'
+import type { Blip, BlipEvent } from '@inkling/domain'
 import { useEffect, useState } from 'react'
-import { downloadBackup } from '../backup'
+import { BACKUP_LAST_KEY, daysSince, downloadBackup, downloadMarkdownBackup } from '../backup'
 import { ButtonLabel } from '../components/Spinner'
 import {
   NUDGE_KEY,
@@ -139,11 +139,13 @@ function ModelPicker({
 export function Settings({
   syncState,
   events,
+  blips,
   serverConfig,
   theme,
 }: {
   syncState: ReturnType<typeof useSync>
   events: BlipEvent[]
+  blips: Blip[]
   serverConfig: ReturnType<typeof useServerConfig>
   theme: ReturnType<typeof useTheme>
 }) {
@@ -156,6 +158,25 @@ export function Settings({
   const [nudgeNote, setNudgeNote] = useState<string | null>(null)
   const [swReady, setSwReady] = useState<boolean | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [lastBackup, setLastBackup] = useState<Date | null>(null)
+
+  // Read when the last export was, so a stale one can be pointed out rather than
+  // silently forgotten — which is how escape hatches fail.
+  useEffect(() => {
+    void (async () => {
+      const raw = await storage().getSetting(BACKUP_LAST_KEY)
+      const parsed = raw ? new Date(raw) : null
+      setLastBackup(parsed && !Number.isNaN(parsed.getTime()) ? parsed : null)
+    })()
+  }, [])
+
+  async function takeBackup(kind: 'log' | 'notes') {
+    if (kind === 'log') downloadBackup(events)
+    else downloadMarkdownBackup(blips)
+    const at = new Date()
+    setLastBackup(at)
+    await storage().setSetting(BACKUP_LAST_KEY, at.toISOString())
+  }
   const [savingServer, setSavingServer] = useState(false)
   const [savingNudge, setSavingNudge] = useState(false)
   const [chatModels, setChatModels] = useState<string[]>([])
@@ -215,6 +236,8 @@ export function Settings({
   const [embedApiKey, setEmbedApiKey] = useState('')
   const [similarity, setSimilarity] = useState('')
   const [vault, setVault] = useState('')
+  const [twaPackage, setTwaPackage] = useState('')
+  const [twaFingerprint, setTwaFingerprint] = useState('')
   const [folder, setFolder] = useState('')
 
   useEffect(() => {
@@ -226,6 +249,8 @@ export function Settings({
     setSimilarity(config.embedSimilarity === null ? '' : String(config.embedSimilarity))
     setVault(config.vault)
     setFolder(config.folder)
+    setTwaPackage(config.twaPackage ?? '')
+    setTwaFingerprint(config.twaFingerprint ?? '')
   }, [config])
 
   const value = draft ?? serverUrl
@@ -294,6 +319,10 @@ export function Settings({
 
   async function saveVault() {
     if (await save({ vault, folder })) setSaved('notes')
+  }
+
+  async function saveTwa() {
+    if (await save({ twaPackage, twaFingerprint })) setSaved('twa')
   }
 
   async function toggleNudge() {
@@ -681,17 +710,88 @@ export function Settings({
 
       <Section title="Backup">
         <p className="text-xs text-ink-soft">
-          {events.length} event{events.length === 1 ? '' : 's'} on this device. The export is the
-          JSONL the log already is, so any device can re-ingest it.
+          {events.length} event{events.length === 1 ? '' : 's'} on this device.{' '}
+          {lastBackup === null
+            ? 'Never exported from this device.'
+            : daysSince(lastBackup) === 0
+              ? 'Last exported today.'
+              : `Last exported ${daysSince(lastBackup)} day${daysSince(lastBackup) === 1 ? '' : 's'} ago.`}
+        </p>
+        <p className="text-xs text-ink-faint">
+          The log is the JSONL that sync already moves, so any device can re-ingest it. The Markdown
+          one is the same data as something you could still read if Inkling were gone.
         </p>
         <button
           type="button"
-          onClick={() => downloadBackup(events)}
+          onClick={() => void takeBackup('log')}
           disabled={events.length === 0}
           className={buttonClass}
         >
-          Download log
+          Download log (JSONL)
         </button>
+        <button
+          type="button"
+          onClick={() => void takeBackup('notes')}
+          disabled={blips.length === 0}
+          className={buttonClass}
+        >
+          Download as Markdown
+        </button>
+      </Section>
+
+      <Section
+        title="Android app (optional)"
+        hint={
+          saved === 'twa' ? (
+            <span className="text-good">saved</span>
+          ) : (
+            'Only needed for a Trusted Web Activity APK. Without both of these, Android shows a URL bar instead of running it full screen.'
+          )
+        }
+      >
+        {config ? (
+          <>
+            <Field label="Package name">
+              <input
+                value={twaPackage}
+                onChange={(event) => setTwaPackage(event.target.value)}
+                placeholder="app.inkling.twa"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className={inputClass}
+              />
+            </Field>
+            <Field label="Signing fingerprint (SHA-256)">
+              <input
+                value={twaFingerprint}
+                onChange={(event) => setTwaFingerprint(event.target.value)}
+                placeholder="AA:BB:CC:…"
+                autoCapitalize="characters"
+                autoCorrect="off"
+                spellCheck={false}
+                className={inputClass}
+              />
+            </Field>
+            <p className="text-xs text-ink-faint">
+              Get it from your keystore:{' '}
+              <code className="text-[11px]">
+                keytool -list -v -keystore android.keystore -alias inkling
+              </code>
+              . This server then serves it at{' '}
+              <code className="text-[11px]">/.well-known/assetlinks.json</code>, so it cannot drift
+              from what you saved here.
+            </p>
+            <button
+              type="button"
+              onClick={() => void saveTwa()}
+              disabled={saving}
+              className={primaryButtonClass}
+            >
+              <ButtonLabel busy={saving}>{saving ? 'Saving…' : 'Save app settings'}</ButtonLabel>
+            </button>
+          </>
+        ) : null}
       </Section>
 
       <Section title="Storage">

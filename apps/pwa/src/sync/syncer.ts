@@ -1,10 +1,11 @@
-import type { BlipEvent } from '@inkling/domain'
+import type { BlipEvent, Block } from '@inkling/domain'
 import { parseLog, stateDigest } from '@inkling/domain'
+import { defaultServerUrl } from '../native'
 import type { StorageAdapter } from '../storage/adapter'
 import type { SyncTransport } from './transport'
 
 export const SERVER_URL_KEY = 'sync:serverUrl'
-export const DEFAULT_SERVER_URL = '/api'
+export const DEFAULT_SERVER_URL = defaultServerUrl()
 const PUSHED_KEY = 'sync:pushedOffset'
 const NEWLINE = 0x0a
 const watermarkKey = (deviceId: string) => `sync:watermark:${deviceId}`
@@ -24,7 +25,13 @@ export interface SyncReport {
   at: string
 }
 
-function referencedHashes(events: BlipEvent[]): Set<string> {
+function blockHashes(block: Block): string[] {
+  return block.items
+    .map((item) => item.mediaId)
+    .filter((hash): hash is string => typeof hash === 'string' && hash.length > 0)
+}
+
+export function referencedHashes(events: BlipEvent[]): Set<string> {
   const hashes = new Set<string>()
   for (const event of events) {
     if (event.t === 'captured') {
@@ -32,18 +39,33 @@ function referencedHashes(events: BlipEvent[]): Set<string> {
       for (const id of event.mediaIds ?? []) hashes.add(id)
     } else if (event.t === 'entry' && event.entry.mediaId) {
       hashes.add(event.entry.mediaId)
+    } else if (event.t === 'blockAdded') {
+      // A grid of images is media too. Without this its blobs would never move.
+      for (const id of blockHashes(event.block)) hashes.add(id)
+    } else if (event.t === 'blockUpdated' && event.patch.items) {
+      for (const id of blockHashes({ id: event.blockId, kind: 'grid', items: event.patch.items })) {
+        hashes.add(id)
+      }
     }
   }
   return hashes
 }
 
-function mimeFor(events: BlipEvent[], hash: string): string {
+export function mimeFor(events: BlipEvent[], hash: string): string {
   for (const event of events) {
     if (
       event.t === 'captured' &&
       (event.input.mediaId === hash || event.mediaIds?.includes(hash))
     ) {
       return event.input.mime ?? 'application/octet-stream'
+    }
+    if (event.t === 'blockAdded') {
+      const item = event.block.items.find((row) => row.mediaId === hash)
+      if (item?.mime) return item.mime
+    }
+    if (event.t === 'blockUpdated') {
+      const item = event.patch.items?.find((row) => row.mediaId === hash)
+      if (item?.mime) return item.mime
     }
   }
   return 'application/octet-stream'

@@ -32,7 +32,7 @@ companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 | **Share target** — share a link or text from any app into Capture | done |
 | **Voice** — 🎙 Ramble transcribes on the device | done |
 | **Installable** — manifest, icons, service worker, offline shell | done |
-| **Backups** — the log exports as the JSONL it already is | done |
+| **Backups** — the log exports as the JSONL it already is, plus a readable Markdown one | done |
 | Storage engine | **decided**: IndexedDB (10.3k writes/s vs OPFS 806/s on the Android phone) |
 
 ## Layout
@@ -260,10 +260,25 @@ small renderer that escapes first and only then applies markup, so a note cannot
 inject anything. **edit** corrects the title and body, and each entry has an **×** to
 remove it — both recorded as events, so the log stays append-only.
 
+**structure** is where an Inkling changes shape. A question that turns out to be a
+project gets a **checklist**; a link that turns out to be long gets a **reading
+tracker**; a decision gets a **poll**; a set of variations gets a **grid** of images.
+Each is a block, and blocks can be added, changed and removed — so the structure
+follows what the blip becomes rather than the other way round. Images in a grid go
+through the same content-addressed store as captured photos, so they sync too.
+
+**retire** and **delete** are deliberately different words. Retiring means *not now*:
+it goes to the attic, stays searchable, and can come back. Deleting means *not this*:
+it leaves the app. Neither is a hard erase from the log, which is append-only — both
+are tombstones, so nothing is ever really rewritten.
+
 A **Today / All** toggle switches between the finite daily feed and everything you
 have. **browse** opens the full list, where tapping an Inkling opens it here, focused,
-whether or not it was due. Retiring is a quiet link below — or *revive*, if you opened
-something out of the attic.
+whether or not it was due.
+
+Home carries one small trust line: **"3 captured today — all saved."** A capture that
+vanished silently is the failure this app exists to avoid, so the count is visible
+rather than assumed.
 
 ## Related blips
 
@@ -414,13 +429,68 @@ It needs three things, and the button says which is missing:
    address is not one, so voice will not work there even in Chrome.
 3. **Microphone permission**, asked the first time you tap it.
 
-**Backups** are the log itself: **Download log** in the Sync tab writes the JSONL that
-sync already moves, so any device can re-ingest it and nothing about the format is
-app-specific.
+**Backups** are the log itself: **Download log (JSONL)** writes the bytes sync already
+moves, so any device can re-ingest it and nothing about the format is app-specific.
+**Download as Markdown** is the same data as something you could still read if Inkling
+were gone — entries, structure, which checklist items were ticked, which moves you
+actually did. Settings says when you last exported, because an escape hatch nobody
+remembers to use is not one.
 
 **Reminders** are honest about the platform: the web cannot wake itself in the
 background, so the nudge arrives when you open the app with something waiting — not at
 a time you choose. A scheduled reminder needs the native wrap.
+
+## The Android app (Capacitor)
+
+The PWA installs from Chrome and does almost everything. An APK exists for the two
+things a web page cannot do: a **scheduled** notification (the browser cannot wake
+itself), and the system **share sheet** without going through Chrome.
+
+`apps/pwa/android/` is a generated Capacitor project, committed so it can be opened
+and built. The scaffolding is done; the build is not:
+
+```bash
+cd apps/pwa
+bun run cap:sync          # build the web app, copy it into the Android project
+bun run cap:open          # open in Android Studio
+bun run cap:apk           # or: gradlew assembleDebug → android/app/build/outputs/apk/debug/
+```
+
+**It has not been built here.** There is no Java runtime and no Android SDK on the
+machine this was written on, so `./gradlew` stops at *"Unable to locate a Java
+Runtime"*. Everything up to that point is done: the platform is added, the app id and
+namespace are set (`app.inkling.mobile`), the web assets are copied in, and the
+project is a normal Android project. What remains is a machine with a JDK and the SDK
+(`local.properties` with `sdk.dir`), and then the plugins worth adding —
+`@capacitor/local-notifications` and `@capacitor/share`.
+
+### Two things the native build has to get right
+
+**The server address must be absolute.** In a browser the app and the API are the same
+origin, which is why opening the server's own address needs no configuration. In the
+APK the app is served from the phone (`https://localhost`), so a relative `/api` would
+point at the phone. Set it in Settings, or bake it in at build time:
+
+```bash
+VITE_INKLING_SERVER=https://your-machine.ts.net/api bun run build
+```
+
+The app detects this and says so rather than reporting a server that is "down".
+
+**`androidScheme: 'https'`** in `capacitor.config.ts` makes the WebView origin a
+*secure context*. Without it `crypto.subtle` is unavailable, and the log hashes image
+blobs with it — capture would fail on the phone and work on the desktop.
+
+### A Trusted Web Activity instead
+
+A TWA is a thinner option: an APK that is a Chrome shell pointed at your server. No
+rebuild when the web app changes, and it shares Chrome's storage. It needs a
+`/.well-known/assetlinks.json` on the origin, which this server generates from
+settings — **Home → ⚙ → Android app** — rather than keeping as a file that can drift:
+
+```bash
+keytool -list -v -keystore android.keystore -alias inkling   # get the SHA-256
+```
 
 ## Testing on the phone
 
@@ -524,20 +594,21 @@ just not as the backbone.
 
 ## Not yet
 
-A native shell. Everything M6 set out to fix — share-sheet capture, offline, an
-installed app, voice, backups — is now done as a PWA, because that is verifiable on
-this machine and covers the same ground on Android. A Capacitor wrap is still the way
-to get *scheduled* notifications and a real app-store presence, and it needs a native
-toolchain (no Android SDK here) plus a trusted certificate.
+A native shell that *builds*. The Capacitor project is scaffolded and committed, but
+`./gradlew` needs a JDK and the Android SDK, neither of which is on the machine this
+was written on — so the APK itself is unbuilt. Everything before the Gradle step is
+done and checked: the platform is added, the app id is set, the web assets copy in, and
+the app knows how to behave natively (absolute server address, no service worker).
 
-**The container image has not been built.** There is no Docker on the machine this was
-written on, so the `Dockerfile` is written against the commands that are known to work
-(`bun install --frozen-lockfile`, `bun run build`, `bun server/src/index.ts`) but has not
-itself been run. What *has* been verified is the behaviour a container depends on: the
-server starts from an empty data directory with no keys, no `~/.local/share/opencode`
-auth file and no vault, still serves the app, still works without a model, and accepts
+**The container image has not been built** either, for the same reason — no Docker
+here. What *has* been verified is the behaviour a container depends on: the server
+starts from an empty data directory with no keys, no `~/.local/share/opencode` auth
+file and no vault, still serves the app, still works without a model, and accepts
 settings at runtime that take effect with no restart.
 
-**No auth on the API.** See above — it is the one thing standing between "self-hosted"
-and "safe on the open internet". A shared secret would be a small change; Tailscale is
-the answer until then.
+**No auth on the API.** It is the one thing standing between "self-hosted" and "safe on
+the open internet". A shared secret would be a small change; Tailscale is the answer
+until then.
+
+**Scheduled notifications** still need the native build. The nudge arrives when you open
+the app, not at a time you choose, because the web cannot wake itself.

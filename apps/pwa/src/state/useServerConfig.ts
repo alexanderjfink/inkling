@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { needsServerUrl } from '../native'
 
 export interface PublicConfig {
   provider: string | null
@@ -12,6 +13,8 @@ export interface PublicConfig {
   configured: boolean
   vault: string
   folder: string
+  twaPackage: string | null
+  twaFingerprint: string | null
   apiKeySet: boolean
   embedApiKeySet: boolean
 }
@@ -58,6 +61,17 @@ export function diagnoseServer(serverUrl: string, status: ServerStatus): ServerD
   const https = window.location.protocol === 'https:'
   const host = window.location.hostname
   const suggestions: Array<{ url: string; label: string }> = []
+
+  // In the native shell the app is served from the device, so a relative path points
+  // at the device. That fails looking exactly like "the server is down", so name it.
+  if (needsServerUrl(serverUrl)) {
+    return {
+      status,
+      detail:
+        'This is the Android app, which is served from the phone itself — so the server has to be a full address, like https://your-machine.ts.net/api. Set it above.',
+      suggestions,
+    }
+  }
 
   if (!https) {
     suggestions.push({ url: `http://${host}:8787`, label: `the server on ${host}:8787` })

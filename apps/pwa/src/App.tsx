@@ -83,6 +83,14 @@ export default function App() {
     (blip) => !blip.deleted && (blip.status === 'retired' || blip.status === 'promoted'),
   ).length
 
+  // "Every capture is acknowledged and counted." A capture that vanished silently is
+  // the failure this app exists to avoid, so the count is visible rather than assumed.
+  const capturedToday = useMemo(() => {
+    const today = new Date().toDateString()
+    return blips.filter((blip) => !blip.deleted && new Date(blip.created).toDateString() === today)
+      .length
+  }, [blips])
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col p-4">
       {screen !== 'home' ? (
@@ -110,6 +118,7 @@ export default function App() {
           waiting={waiting}
           total={blips.filter((blip) => !blip.deleted).length}
           attic={attic}
+          capturedToday={capturedToday}
           serverWarning={
             serverConfig.status === 'ok' || serverConfig.status === 'loading'
               ? null
@@ -163,7 +172,13 @@ export default function App() {
         />
       ) : null}
       {ready && screen === 'settings' ? (
-        <Settings syncState={syncState} events={events} serverConfig={serverConfig} theme={theme} />
+        <Settings
+          syncState={syncState}
+          events={events}
+          blips={blips}
+          serverConfig={serverConfig}
+          theme={theme}
+        />
       ) : null}
     </div>
   )

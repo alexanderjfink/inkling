@@ -1,5 +1,13 @@
-import type { Blip, DeferralChoice, LLMProvider, MoveSpec, RelatedBlip } from '@inkling/domain'
+import type {
+  Blip,
+  BlipType,
+  DeferralChoice,
+  LLMProvider,
+  MoveSpec,
+  RelatedBlip,
+} from '@inkling/domain'
 import {
+  BLIP_TYPES,
   DEFERRAL_CHOICES,
   buildDailyFeed,
   deferUntil,
@@ -7,15 +15,17 @@ import {
   requestGuidance,
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Blocks } from '../components/Blocks'
 import { Markdown } from '../components/Markdown'
 import { ButtonLabel, Spinner } from '../components/Spinner'
+import { StoredImage } from '../components/StoredImage'
 import { formatDeferral, formatWhen } from '../format'
 import { type LookupResult, lookupVia } from '../llm/proxy'
 import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
 import { useSuggestedMove } from '../state/useSuggestedMove'
 
-type Decision = 'advanced' | 'deferred' | 'retired' | 'promoted' | 'revived'
+type Decision = 'advanced' | 'deferred' | 'retired' | 'deleted' | 'promoted' | 'revived'
 /** Today's finite feed, or everything you have. */
 type Scope = 'today' | 'all'
 
@@ -205,6 +215,8 @@ export function Review({
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftBody, setDraftBody] = useState('')
+  const [draftType, setDraftType] = useState<BlipType>('idea')
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   /** null means "not asked yet"; an empty list means "nothing came back". */
   const [guidance, setGuidance] = useState<string[] | null>(null)
   const [guidanceLoading, setGuidanceLoading] = useState(false)
@@ -320,6 +332,7 @@ export function Review({
     setEntry('')
     setGuidance(null)
     setEditing(false)
+    setConfirmingDelete(false)
   }
 
   async function saveForLater() {
@@ -354,7 +367,11 @@ export function Review({
 
   async function saveEdit() {
     if (!current) return
-    await actions.editBlip(current.id, { title: draftTitle.trim(), body: draftBody })
+    await actions.editBlip(current.id, {
+      title: draftTitle.trim(),
+      body: draftBody,
+      type: draftType,
+    })
     setEditing(false)
   }
 
@@ -386,6 +403,13 @@ export function Review({
     settle('retired')
   }
 
+  /** Deliberately not the same word as retire. This one leaves the app. */
+  async function remove() {
+    if (!current) return
+    await actions.deleteBlip(current.id)
+    settle('deleted')
+  }
+
   async function revive() {
     if (!current) return
     await actions.revive(current.id)
@@ -410,6 +434,7 @@ export function Review({
     const advanced = counts.filter((value) => value === 'advanced').length
     const deferred = counts.filter((value) => value === 'deferred').length
     const retired = counts.filter((value) => value === 'retired').length
+    const deleted = counts.filter((value) => value === 'deleted').length
     const promoted = counts.filter((value) => value === 'promoted').length
     const revived = counts.filter((value) => value === 'revived').length
 
@@ -419,6 +444,7 @@ export function Review({
         {done > 0 ? (
           <p className="text-sm text-ink-soft">
             {advanced} advanced · {deferred} put down · {promoted} to notes · {retired} retired
+            {deleted > 0 ? ` · ${deleted} deleted` : ''}
             {revived > 0 ? ` · ${revived} revived` : ''} · nothing lost.
           </p>
         ) : (
@@ -497,6 +523,7 @@ export function Review({
             onClick={() => {
               setDraftTitle(current.title)
               setDraftBody(current.body)
+              setDraftType(current.type)
               setEditing(true)
             }}
             className="quiet ml-auto text-[11px] underline"
@@ -518,6 +545,23 @@ export function Review({
               rows={5}
               className="w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent"
             />
+            {/* A blip that started as a question often turns out to be something else. */}
+            <div className="flex flex-wrap gap-1.5">
+              {BLIP_TYPES.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setDraftType(option)}
+                  className={`rounded-full px-2.5 py-1 text-[11px] capitalize ${
+                    draftType === option
+                      ? 'bg-accent text-surface'
+                      : 'border border-line text-ink-faint'
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => setEditing(false)} className="quiet text-xs">
                 cancel
@@ -551,7 +595,18 @@ export function Review({
           </a>
         ) : null}
         {images.length > 0 ? (
-          <p className="mt-2 text-xs text-ink-faint">🖼 {images.length} image attachment(s)</p>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {images.map((image) => (
+              <li key={image.id}>
+                {image.mediaId ? (
+                  <StoredImage
+                    hash={image.mediaId}
+                    className="h-28 w-28 rounded-xl border border-line object-cover"
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ul>
         ) : null}
         {notes.length > 0 ? (
           <ul className="mt-3 flex flex-col gap-2">
@@ -570,6 +625,8 @@ export function Review({
             ))}
           </ul>
         ) : null}
+
+        <Blocks blip={current} actions={actions} />
 
         {composer ? (
           <div className="mt-5 flex flex-col gap-3">
@@ -761,7 +818,41 @@ export function Review({
             retire
           </button>
         )}
+        {confirmingDelete ? (
+          <>
+            <span className="text-ink-faint">delete for good?</span>
+            <button
+              type="button"
+              onClick={() => void remove()}
+              className="font-medium text-warn underline"
+            >
+              yes, delete
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmingDelete(false)}
+              className="quiet underline"
+            >
+              keep it
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setConfirmingDelete(true)}
+            className="quiet underline"
+          >
+            delete
+          </button>
+        )}
       </div>
+
+      {confirmingDelete ? (
+        <p className="mt-2 text-center text-[11px] text-ink-faint">
+          retire means “not now” — it goes to the attic and can come back. delete means “not this”:
+          it leaves the app. Neither is a hard erase from the log.
+        </p>
+      ) : null}
 
       {lastNote ? (
         <p className="mt-3 rounded-2xl bg-canvas p-3 text-center text-xs text-good">

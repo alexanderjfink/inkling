@@ -25,6 +25,13 @@ export interface ServerConfig {
   embedSimilarity?: number | null
   vault?: string
   folder?: string
+  /**
+   * For a Trusted Web Activity APK. The package name and the SHA-256 signing
+   * fingerprint, which together let Android drop the URL bar and run the app
+   * full-screen instead of as a browser tab.
+   */
+  twaPackage?: string
+  twaFingerprint?: string
   /** Accepted on write; never returned. */
   apiKey?: string
   embedApiKey?: string
@@ -104,9 +111,36 @@ export function publicConfig(config: ServerConfig, runtime: Runtime) {
     configured: runtime.status.configured,
     vault: runtime.vault.vault,
     folder: runtime.vault.folder,
+    twaPackage: config.twaPackage ?? null,
+    twaFingerprint: config.twaFingerprint ?? null,
     apiKeySet: Boolean(config.apiKey),
     embedApiKeySet: Boolean(config.embedApiKey),
   }
+}
+
+/** A SHA-256 fingerprint as Android prints it: 32 colon-separated hex pairs. */
+const FINGERPRINT = /^([0-9A-Fa-f]{2}:){31}[0-9A-Fa-f]{2}$/
+
+/**
+ * The Digital Asset Links document a TWA needs, or null when it is not configured.
+ *
+ * Without this, Android shows the URL bar and the APK is a browser tab in a costume.
+ * With it, the site and the app are declared to be the same thing.
+ */
+export function assetLinks(config: ServerConfig): unknown[] | null {
+  const pkg = config.twaPackage?.trim()
+  const fingerprint = config.twaFingerprint?.trim().toUpperCase()
+  if (!pkg || !fingerprint) return null
+  return [
+    {
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: {
+        namespace: 'android_app',
+        package_name: pkg,
+        sha256_cert_fingerprints: [fingerprint],
+      },
+    },
+  ]
 }
 
 export interface ConfigProblem {
@@ -127,6 +161,28 @@ export function validateConfig(patch: ServerConfig): ConfigProblem[] {
   check('provider', patch.provider, 'provider')
   check('model', patch.model, 'model')
   check('vault', patch.vault, 'vault')
+
+  // The two TWA fields are checked only when they hold something: an empty string is
+  // how you clear them, and mergeConfig reads it that way. Sending "" to remove a
+  // package name should not be an error about a package name being empty.
+  if (patch.twaPackage !== undefined && patch.twaPackage.trim().length > 0) {
+    const value = patch.twaPackage.trim()
+    // Android package names are reverse-DNS-ish and must contain at least two segments.
+    if (!/^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/.test(value)) {
+      problems.push({
+        field: 'twaPackage',
+        message: 'must be a package name like app.inkling.mobile',
+      })
+    }
+  }
+  if (patch.twaFingerprint !== undefined && patch.twaFingerprint.trim().length > 0) {
+    if (!FINGERPRINT.test(patch.twaFingerprint.trim())) {
+      problems.push({
+        field: 'twaFingerprint',
+        message: 'must be a SHA-256 fingerprint like AA:BB:… (32 colon-separated hex pairs)',
+      })
+    }
+  }
 
   if (patch.provider !== undefined && !findPreset(patch.provider)) {
     problems.push({ field: 'provider', message: `unknown provider "${patch.provider}"` })
@@ -175,6 +231,8 @@ export function mergeConfig(current: ServerConfig, patch: ServerConfig): ServerC
       key === 'folder' ||
       key === 'apiKey' ||
       key === 'embedApiKey' ||
+      key === 'twaPackage' ||
+      key === 'twaFingerprint' ||
       key === 'embedSimilarity'
     ) {
       Object.assign(next, { [key]: value })

@@ -1,4 +1,4 @@
-import type { BlipEvent } from '@inkling/domain'
+import type { Blip, BlipEvent } from '@inkling/domain'
 
 /**
  * The escape hatch.
@@ -15,6 +15,101 @@ export function downloadBackup(events: BlipEvent[]): void {
     `${jsonl}\n`,
     'application/x-ndjson',
   )
+}
+
+/**
+ * The same data as something a person can read without this app.
+ *
+ * JSONL is complete but opaque; this is the version you could open in ten years in a
+ * text editor and still understand. Losing the app should not mean losing the notes.
+ */
+export function renderMarkdownBackup(blips: Blip[], now = new Date()): string {
+  const live = blips.filter((blip) => !blip.deleted)
+  const attic = live.filter((blip) => blip.status === 'retired' || blip.status === 'promoted')
+
+  const lines: string[] = [
+    `# Inkling backup — ${now.toISOString().slice(0, 10)}`,
+    '',
+    `${live.length} Inkling${live.length === 1 ? '' : 's'}${
+      attic.length > 0 ? ` · ${attic.length} in the attic` : ''
+    }`,
+  ]
+
+  for (const blip of live) {
+    lines.push('', '---', '')
+    lines.push(`## ${blip.title || '(untitled)'}`)
+    lines.push('')
+
+    const facts = [
+      blip.type,
+      `created ${blip.created.slice(0, 10)}`,
+      blip.status !== 'active' ? blip.status : null,
+      blip.topics.length > 0 ? blip.topics.map((topic) => `#${topic}`).join(' ') : null,
+    ].filter(Boolean)
+    lines.push(`*${facts.join(' · ')}*`)
+
+    if (blip.body && blip.body !== blip.title) lines.push('', blip.body)
+    if (blip.input?.url) lines.push('', `<${blip.input.url}>`)
+
+    for (const entry of blip.entries) {
+      const text = entry.text ?? entry.url ?? ''
+      if (text.trim()) lines.push('', text.trim())
+    }
+
+    for (const block of blip.blocks) {
+      lines.push('', `### ${block.title || block.kind}`)
+      if (block.kind === 'checklist') {
+        for (const item of block.items) {
+          if ((item.text ?? '').trim()) lines.push(`- [${item.done ? 'x' : ' '}] ${item.text}`)
+        }
+      } else if (block.kind === 'poll') {
+        for (const item of block.items) {
+          if ((item.text ?? '').trim()) lines.push(`- ${item.text} — ${item.votes ?? 0} vote(s)`)
+        }
+      } else if (block.kind === 'readingProgress') {
+        const { current, total } = block.progress ?? { current: 0, total: 0 }
+        lines.push(`${current} of ${total}`)
+      } else {
+        const filled = block.items.filter((item) => item.mediaId).length
+        lines.push(`${filled} image(s), stored by content hash — not included here`)
+      }
+    }
+
+    const done = blip.moves.filter((move) => move.outcome === 'done')
+    if (done.length > 0) {
+      lines.push('', '**Moves done**')
+      for (const move of done) {
+        lines.push(`- ${move.spec.title}${move.doneAt ? ` (${move.doneAt.slice(0, 10)})` : ''}`)
+      }
+    }
+
+    if (blip.export?.notePath) lines.push('', `Promoted to: ${blip.export.notePath}`)
+  }
+
+  lines.push('')
+  return lines.join('\n')
+}
+
+export function downloadMarkdownBackup(blips: Blip[], now = new Date()): void {
+  triggerDownload(
+    `inkling-notes-${now.toISOString().slice(0, 10)}.md`,
+    renderMarkdownBackup(blips, now),
+    'text/markdown;charset=utf-8',
+  )
+}
+
+/**
+ * When a backup was last taken, so a stale one can be pointed out.
+ *
+ * Kept as a plain key here and read/written by the screen, so this module stays pure
+ * rendering and has no opinion about where storage lives.
+ */
+export const BACKUP_LAST_KEY = 'backup:lastAt'
+
+/** Days since the last backup, or null if there has never been one. */
+export function daysSince(date: Date | null, now = new Date()): number | null {
+  if (!date) return null
+  return Math.floor((now.getTime() - date.getTime()) / 86_400_000)
 }
 
 function triggerDownload(filename: string, body: string, type: string): void {

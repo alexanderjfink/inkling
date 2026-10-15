@@ -13,6 +13,14 @@
   },
   "javascript": { "formatter": { "quoteStyle": "single", "semicolons": "asNeeded" } },
   "files": {
-    "includes": ["**/*.ts", "**/*.tsx", "**/*.json", "!**/node_modules", "!**/dist", "!**/bun.lock"]
+    "includes": [
+      "**/*.ts",
+      "**/*.tsx",
+      "**/*.json",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/bun.lock",
+      "!apps/pwa/android"
+    ]
   }
 }

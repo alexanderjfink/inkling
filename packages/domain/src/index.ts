@@ -23,6 +23,24 @@ export { devicesIn, eventKey, mergeEvents, parseLog, serializeLog, serializeLogB
 export type { MoveContext, MoveTemplate, SelectMoveOptions } from './moves'
 export type { GuidanceContext } from './moves'
 export {
+  BLOCK_KINDS,
+  blockKindInfo,
+  blockSummary,
+  checklistCounts,
+  newBlock,
+  newItem,
+  pollLeader,
+  progressFraction,
+  withItemAdded,
+  withItemRemoved,
+  withItemText,
+  withProgress,
+  withToggledItem,
+  withTotal,
+  withVote,
+} from './blocks'
+export type { BlockKindInfo } from './blocks'
+export {
   buildGuidancePrompt,
   buildMovePrompt,
   candidateTemplates,

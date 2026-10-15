@@ -139,6 +139,9 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       if (block) Object.assign(block, event.patch)
       break
     }
+    case 'blockRemoved':
+      blip.blocks = blip.blocks.filter((b) => b.id !== event.blockId)
+      break
     case 'moveShown':
       blip.moves.push({
         moveId: event.moveId,

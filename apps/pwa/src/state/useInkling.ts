@@ -1,4 +1,11 @@
-import type { BlipEvent, BlipEventBody, BlipType, CaptureInput, MoveSpec } from '@inkling/domain'
+import type {
+  BlipEvent,
+  BlipEventBody,
+  BlipType,
+  Block,
+  CaptureInput,
+  MoveSpec,
+} from '@inkling/domain'
 import { newId, project, snoozeUntil } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { type CaptureDraft, extractTopics, guessType, inferBody } from '../capture'
@@ -21,6 +28,11 @@ export interface InklingActions {
   snoozeAfter(id: string, reason: SnoozeReason, streak?: number): Promise<BlipEvent>
   retire(id: string, reason?: string): Promise<BlipEvent>
   revive(id: string): Promise<BlipEvent>
+  /**
+   * Take it out of the app entirely. Distinct from retiring on purpose: retiring says
+   * "not now", deleting says "not this". Both are tombstones, so neither is a rewrite.
+   */
+  deleteBlip(id: string): Promise<BlipEvent>
   pinToDesktop(id: string): Promise<BlipEvent>
   unpinFromDesktop(id: string): Promise<BlipEvent>
   /** Record that a move was put in front of the user, so it is not repeated blindly. */
@@ -30,8 +42,17 @@ export interface InklingActions {
   unsaveMove(id: string, moveId: string): Promise<BlipEvent>
   /** Remove something you added. A tombstone, so nothing is really rewritten. */
   removeEntry(id: string, entryId: string): Promise<BlipEvent>
-  /** Correct the Inkling itself. */
-  editBlip(id: string, patch: { title?: string; body?: string }): Promise<BlipEvent>
+  /** Correct the Inkling itself, including what kind of thing it turned out to be. */
+  editBlip(
+    id: string,
+    patch: { title?: string; body?: string; type?: BlipType },
+  ): Promise<BlipEvent>
+  /** Malleable structure: add, change or drop a block. */
+  addBlock(id: string, block: Block): Promise<BlipEvent>
+  updateBlock(id: string, blockId: string, patch: Partial<Omit<Block, 'id'>>): Promise<BlipEvent>
+  removeBlock(id: string, blockId: string): Promise<BlipEvent>
+  /** Store an image and hand back what to put in a block item. */
+  storeImage(file: File): Promise<{ hash: string; mime: string }>
   /** Finish a move: keep the result, log the move with its completion time, and
    * stretch the interval. */
   completeMove(id: string, moveSpec: MoveSpec, text: string): Promise<BlipEvent>
@@ -120,6 +141,22 @@ export function useInkling() {
       },
       revive(id) {
         return storage().append({ t: 'revived', id })
+      },
+      deleteBlip(id) {
+        return storage().append({ t: 'deleted', id })
+      },
+      addBlock(id, block) {
+        return storage().append({ t: 'blockAdded', id, block })
+      },
+      updateBlock(id, blockId, patch) {
+        return storage().append({ t: 'blockUpdated', id, blockId, patch })
+      },
+      removeBlock(id, blockId) {
+        return storage().append({ t: 'blockRemoved', id, blockId })
+      },
+      async storeImage(file) {
+        const stored = await storage().putBlob(file)
+        return { hash: stored.hash, mime: stored.mime }
       },
       pinToDesktop(id) {
         return storage().append({ t: 'promoteToDesktop', id })

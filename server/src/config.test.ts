@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import {
   type Runtime,
   type ServerConfig,
+  assetLinks,
   buildRuntime,
   configPath,
   loadConfig,
@@ -251,5 +252,120 @@ describe('config routes', () => {
       }),
     )
     expect(bad.status).toBe(400)
+  })
+})
+
+const GOOD_FINGERPRINT =
+  'AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99'
+
+describe('Digital Asset Links (for a TWA APK)', () => {
+  test('nothing is served until both fields are set', () => {
+    expect(assetLinks({})).toBeNull()
+    expect(assetLinks({ twaPackage: 'app.inkling.twa' })).toBeNull()
+    expect(assetLinks({ twaFingerprint: GOOD_FINGERPRINT })).toBeNull()
+  })
+
+  test('the document has the shape Android expects', () => {
+    const links = assetLinks({ twaPackage: 'app.inkling.twa', twaFingerprint: GOOD_FINGERPRINT })
+    expect(links).toEqual([
+      {
+        relation: ['delegate_permission/common.handle_all_urls'],
+        target: {
+          namespace: 'android_app',
+          package_name: 'app.inkling.twa',
+          sha256_cert_fingerprints: [GOOD_FINGERPRINT],
+        },
+      },
+    ])
+  })
+
+  test('a lowercase fingerprint is upper-cased, since Android prints it that way', () => {
+    const links = assetLinks({
+      twaPackage: 'app.inkling.twa',
+      twaFingerprint: GOOD_FINGERPRINT.toLowerCase(),
+    })
+    const target = (links?.[0] as { target: { sha256_cert_fingerprints: string[] } }).target
+    expect(target.sha256_cert_fingerprints[0]).toBe(GOOD_FINGERPRINT)
+  })
+
+  test('a fingerprint that is not 32 hex pairs is rejected rather than half-working', () => {
+    // A wrong fingerprint is worse than none: the APK installs and then shows a URL
+    // bar, which looks like the feature not working rather than a typo.
+    expect(validateConfig({ twaFingerprint: 'AA:BB:CC' })).toHaveLength(1)
+    expect(
+      validateConfig({
+        twaFingerprint:
+          'ZZ:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:00:11:22:33:44:55:66:77:88:99',
+      }),
+    ).toHaveLength(1)
+    expect(validateConfig({ twaFingerprint: GOOD_FINGERPRINT })).toHaveLength(0)
+  })
+
+  test('an empty fingerprint clears it, and is not an error', () => {
+    expect(validateConfig({ twaFingerprint: '' })).toHaveLength(0)
+  })
+
+  test('an empty package name clears it too, rather than complaining it is empty', () => {
+    // mergeConfig treats "" as "unset", so validation must not contradict it — otherwise
+    // there is no way to undo a TWA setup once it is wrong.
+    expect(validateConfig({ twaPackage: '' })).toHaveLength(0)
+    expect(mergeConfig({ twaPackage: 'app.inkling.mobile' }, { twaPackage: '' })).toEqual({})
+  })
+
+  test('clearing both leaves nothing to serve', () => {
+    const configured: ServerConfig = {
+      twaPackage: 'app.inkling.mobile',
+      twaFingerprint: GOOD_FINGERPRINT,
+    }
+    expect(assetLinks(configured)).not.toBeNull()
+    expect(assetLinks(mergeConfig(configured, { twaPackage: '', twaFingerprint: '' }))).toBeNull()
+  })
+
+  test('a package name needs at least two segments', () => {
+    expect(validateConfig({ twaPackage: 'inkling' })).toHaveLength(1)
+    expect(validateConfig({ twaPackage: 'app.inkling.mobile' })).toHaveLength(0)
+  })
+
+  test('both fields survive a merge and are readable back', () => {
+    const merged = mergeConfig(
+      {},
+      { twaPackage: 'app.inkling.twa', twaFingerprint: GOOD_FINGERPRINT },
+    )
+    expect(merged.twaPackage).toBe('app.inkling.twa')
+    expect(merged.twaFingerprint).toBe(GOOD_FINGERPRINT)
+  })
+
+  test('the endpoint serves the document, and explains itself when unset', async () => {
+    let config: ServerConfig = {}
+    let runtime: Runtime = buildRuntime(config)
+    const dir = await mkdtemp(join(tmpdir(), 'inkling-twa-'))
+    const handle = createHandler(new FileStore(dir), {
+      runtime: () => runtime,
+      settings: {
+        read: async () => ({ config, runtime }),
+        update: async (patch) => {
+          config = mergeConfig(config, patch)
+          runtime = buildRuntime(config)
+          return { config, runtime, problems: [] }
+        },
+      },
+    })
+
+    try {
+      const before = await handle(new Request('http://localhost/.well-known/assetlinks.json'))
+      expect(before.status).toBe(404)
+      expect((await before.json()).hint).toContain('Settings')
+
+      config = mergeConfig(config, {
+        twaPackage: 'app.inkling.twa',
+        twaFingerprint: GOOD_FINGERPRINT,
+      })
+      const after = await handle(new Request('http://localhost/.well-known/assetlinks.json'))
+      expect(after.status).toBe(200)
+      const body = (await after.json()) as Array<{ target: { package_name: string } }>
+      expect(body[0]?.target.package_name).toBe('app.inkling.twa')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

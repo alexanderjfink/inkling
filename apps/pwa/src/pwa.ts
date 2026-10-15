@@ -1,5 +1,7 @@
 /** Service worker, share-target intake, and notifications. */
 
+import { isNative } from './native'
+
 export type ServiceWorkerStatus = 'unknown' | 'pending' | 'ready' | 'failed'
 
 let swStatus: ServiceWorkerStatus = 'unknown'
@@ -18,6 +20,13 @@ export function serviceWorkerStatus(): { status: ServiceWorkerStatus; error: str
  * "why will it not install?" unanswerable.
  */
 export function registerServiceWorker(): void {
+  // Inside a native shell the app is already on the device, so a service worker would
+  // be caching a bundle that is not going anywhere — and registering one under
+  // `https://localhost` is how a stale asset survives a rebuild.
+  if (isNative()) {
+    swStatus = 'ready'
+    return
+  }
   if (!('serviceWorker' in navigator)) {
     swStatus = 'failed'
     swError = 'this browser has no service worker support'

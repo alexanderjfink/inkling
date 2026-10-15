@@ -1,6 +1,6 @@
 import { type LLMProvider, noteFilename, parseLog, sha256Hex } from '@inkling/domain'
 import type { ConfigProblem, Runtime, ServerConfig } from './config'
-import { publicConfig, validateConfig } from './config'
+import { assetLinks, publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
 import { lookupTopic } from './lookup'
 import type { ModelStatus } from './provider'
@@ -57,6 +57,8 @@ function configPatch(body: Record<string, unknown>): ServerConfig {
     'embedModel',
     'vault',
     'folder',
+    'twaPackage',
+    'twaFingerprint',
     'apiKey',
     'embedApiKey',
   ] as const) {
@@ -149,6 +151,23 @@ export function createHandler(
 
     if (parts.length === 1 && parts[0] === 'health') {
       return json({ ok: true, service: 'inkling', time: new Date().toISOString() })
+    }
+
+    // Digital Asset Links, for a Trusted Web Activity APK. Served here rather than
+    // kept as a file so it is generated from settings and cannot drift from them.
+    if (url.pathname === '/.well-known/assetlinks.json') {
+      const read = options.settings ? (await options.settings.read()).config : undefined
+      const links = read ? assetLinks(read) : null
+      if (!links) {
+        return json(
+          {
+            error: 'not configured',
+            hint: 'Set the TWA package name and signing fingerprint in the app: Home → ⚙ → Settings.',
+          },
+          404,
+        )
+      }
+      return json(links)
     }
 
     if (parts.length === 1 && parts[0] === 'devices') {

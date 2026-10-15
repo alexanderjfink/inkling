@@ -64,6 +64,8 @@ export interface BlockItem {
   id: string
   text?: string
   mediaId?: string
+  /** Carried with the item so a block's image syncs with the mime it was stored as. */
+  mime?: string
   done?: boolean
   votes?: number
 }
@@ -78,6 +80,11 @@ export interface Block {
   kind: BlockKind
   title?: string
   items: BlockItem[]
+  /**
+   * For `readingProgress` only. A fraction rather than items-with-done, because
+   * "page 42 of 120" is not a list of things you tick — it is one number that moves.
+   */
+  progress?: { current: number; total: number }
 }
 
 /** A scaffolded microtask. The system prompts you; it never does the blip. */
@@ -122,6 +129,7 @@ export type BlipEventBody =
   | { t: 'entry'; id: string; entry: Entry; moveId?: string }
   | { t: 'blockAdded'; id: string; block: Block }
   | { t: 'blockUpdated'; id: string; blockId: string; patch: Partial<Omit<Block, 'id'>> }
+  | { t: 'blockRemoved'; id: string; blockId: string }
   | { t: 'moveShown'; id: string; moveId: string; moveSpec: MoveSpec }
   | { t: 'moveDone'; id: string; moveId: string }
   | { t: 'moveSkipped'; id: string; moveId: string }

@@ -2,6 +2,7 @@ export function Home({
   waiting,
   total,
   attic,
+  capturedToday,
   serverWarning,
   onAdd,
   onReview,
@@ -11,6 +12,8 @@ export function Home({
   waiting: number
   total: number
   attic: number
+  /** Captures made today, so a silent loss would be visible rather than assumed. */
+  capturedToday: number
   /** Set when the server cannot be reached, so the app is not silently degraded. */
   serverWarning: string | null
   onAdd: () => void
@@ -83,6 +86,12 @@ export function Home({
         >
           ⚠ {serverWarning} — tap to fix
         </button>
+      ) : null}
+
+      {capturedToday > 0 ? (
+        <p className="mt-3 text-center text-xs text-ink-faint">
+          {capturedToday} captured today — all saved
+        </p>
       ) : null}
 
       <button

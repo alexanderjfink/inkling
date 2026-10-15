@@ -1,5 +1,8 @@
 import type { Blip, BlipEvent } from '@inkling/domain'
+import { validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
+import { changeOwnPassword } from '../admin'
+import type { Auth } from '../state/useAuth'
 import { BACKUP_LAST_KEY, daysSince, downloadBackup, downloadMarkdownBackup } from '../backup'
 import { ButtonLabel } from '../components/Spinner'
 import {
@@ -142,14 +145,22 @@ export function Settings({
   blips,
   serverConfig,
   theme,
+  serverUrl,
+  onSaveServerUrl,
+  auth,
+  onOpenAdmin,
 }: {
   syncState: ReturnType<typeof useSync>
   events: BlipEvent[]
   blips: Blip[]
   serverConfig: ReturnType<typeof useServerConfig>
   theme: ReturnType<typeof useTheme>
+  serverUrl: string
+  onSaveServerUrl: (url: string) => Promise<void>
+  auth: Auth
+  onOpenAdmin: () => void
 }) {
-  const { report, syncing, sync, serverUrl, saveServerUrl } = syncState
+  const { report, syncing, sync } = syncState
   const { config, providers, error, saving, save, loaded, load, status } = serverConfig
   const diagnosis = diagnoseServer(serverUrl, status)
 
@@ -159,6 +170,34 @@ export function Settings({
   const [swReady, setSwReady] = useState<boolean | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
   const [lastBackup, setLastBackup] = useState<Date | null>(null)
+  const [changingPassword, setChangingPassword] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [nextPassword, setNextPassword] = useState('')
+  const [savingPassword, setSavingPassword] = useState(false)
+  const [passwordNote, setPasswordNote] = useState<{ ok: boolean; message: string } | null>(null)
+
+  async function saveOwnPassword() {
+    setPasswordNote(null)
+    const problem = validatePassword(nextPassword)
+    if (problem) {
+      setPasswordNote({ ok: false, message: `password: ${problem}` })
+      return
+    }
+    setSavingPassword(true)
+    try {
+      const result = await changeOwnPassword(serverUrl, currentPassword, nextPassword)
+      if (result.ok) {
+        setChangingPassword(false)
+        setCurrentPassword('')
+        setNextPassword('')
+        setPasswordNote(null)
+      } else {
+        setPasswordNote({ ok: false, message: result.error })
+      }
+    } finally {
+      setSavingPassword(false)
+    }
+  }
 
   // Read when the last export was, so a stale one can be pointed out rather than
   // silently forgotten — which is how escape hatches fail.
@@ -287,7 +326,7 @@ export function Settings({
   async function applyServerUrl(url: string) {
     setSavingServer(true)
     try {
-      await saveServerUrl(url)
+      await onSaveServerUrl(url)
       await load()
     } finally {
       setSavingServer(false)
@@ -354,6 +393,97 @@ export function Settings({
 
   return (
     <div className="flex flex-1 flex-col gap-6">
+      <Section
+        title="Account"
+        hint={
+          auth.accounts
+            ? `${auth.user?.username ?? 'signed in'} · ${auth.user?.role ?? ''}`
+            : 'This server has no accounts, so there is nothing to sign in to.'
+        }
+      >
+        {auth.accounts && auth.user ? (
+          <>
+            {changingPassword ? (
+              <div className="flex flex-col gap-2">
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(event) => setCurrentPassword(event.target.value)}
+                  placeholder="your current password"
+                  autoComplete="current-password"
+                  className={inputClass}
+                />
+                <input
+                  type="password"
+                  value={nextPassword}
+                  onChange={(event) => setNextPassword(event.target.value)}
+                  placeholder="a new password"
+                  autoComplete="new-password"
+                  className={inputClass}
+                />
+                <p className="text-xs text-ink-faint">
+                  Your other devices will be signed out. This one keeps working.
+                </p>
+                {passwordNote ? (
+                  <p className={passwordNote.ok ? 'text-xs text-good' : 'text-xs text-warn'}>
+                    {passwordNote.message}
+                  </p>
+                ) : null}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setChangingPassword(false)
+                      setPasswordNote(null)
+                    }}
+                    className="quiet text-xs"
+                  >
+                    cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={savingPassword}
+                    onClick={() => void saveOwnPassword()}
+                    className={primaryButtonClass}
+                  >
+                    <ButtonLabel busy={savingPassword}>
+                      {savingPassword ? 'Saving…' : 'Change password'}
+                    </ButtonLabel>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setChangingPassword(true)}
+                  className={buttonClass}
+                >
+                  Change my password
+                </button>
+                {auth.user.role === 'admin' ? (
+                  <button type="button" onClick={onOpenAdmin} className={buttonClass}>
+                    Manage accounts
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => void auth.signOut()}
+                  className="quiet text-xs underline"
+                >
+                  sign out
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          <p className="text-xs text-ink-faint">
+            Anyone who can reach this server can use it. Set an account by restarting it — the first
+            account created becomes the admin.
+          </p>
+        )}
+      </Section>
+
       <Section title="Theme">
         <div className="flex flex-wrap gap-2">
           {THEME_CHOICES.map((option) => (

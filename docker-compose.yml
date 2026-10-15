@@ -38,9 +38,14 @@ services:
     environment:
       - TZ=${TZ:-UTC}
 
-      # Everything below is normally set in the app (Home → ⚙) and saved into
-      # /data/config.json, which overrides these. Set them here only to get the
-      # first start going without typing keys into a phone.
+      # Create the first account without clicking through setup. Leave both out and the
+      # app asks you to make one on first open — that account becomes the admin.
+      # - INKLING_ADMIN_USER=sam
+      # - INKLING_ADMIN_PASSWORD=
+
+      # Everything below is normally set in the app (Home → ⚙) and saved per account
+      # into /data/users/<id>/config.json. Set them here only to get the first start
+      # going without typing keys into a phone.
       #
       # - INKLING_VAULT=/vault
       # - INKLING_VAULT_FOLDER=00 Seedbox

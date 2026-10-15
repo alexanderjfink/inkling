@@ -5,6 +5,8 @@ function toBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy
 }
 
+import { apiFetch } from '../api'
+
 export interface PeerLog {
   deviceId: string
   size: number
@@ -42,7 +44,7 @@ export class HttpTransport implements SyncTransport {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), this.#timeoutMs)
     try {
-      return await fetch(`${this.baseUrl}${path}`, { ...init, signal: controller.signal })
+      return await apiFetch(`${this.baseUrl}${path}`, { ...init, signal: controller.signal })
     } finally {
       clearTimeout(timer)
     }

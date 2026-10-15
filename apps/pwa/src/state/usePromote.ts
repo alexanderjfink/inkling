@@ -1,6 +1,7 @@
 import type { Blip, LLMProvider } from '@inkling/domain'
 import { draftNextSteps, renderObsidianNote } from '@inkling/domain'
 import { useCallback, useState } from 'react'
+import { apiFetch } from '../api'
 import type { InklingActions } from './useInkling'
 
 export interface PromoteResult {
@@ -41,7 +42,7 @@ export function usePromote() {
         const draft = await draftNextSteps(blip, { provider: options.provider, related })
         const markdown = renderObsidianNote(blip, { nextSteps: draft.steps, related })
 
-        const res = await fetch(join(options.baseUrl, '/obsidian/note'), {
+        const res = await apiFetch(join(options.baseUrl, '/obsidian/note'), {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({

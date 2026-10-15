@@ -33,6 +33,7 @@ companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 | **Voice** — 🎙 Ramble transcribes on the device | done |
 | **Installable** — manifest, icons, service worker, offline shell | done |
 | **Backups** — the log exports as the JSONL it already is, plus a readable Markdown one | done |
+| **Accounts** — username, password, per-account settings and Inklings, an admin page | done |
 | Storage engine | **decided**: IndexedDB (10.3k writes/s vs OPFS 806/s on the Android phone) |
 
 ## Layout
@@ -524,6 +525,55 @@ context, so everything works without a certificate.
 Note: each origin (scheme + host + port) gets its own local datastore, so blips
 captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5173`.
 
+## Accounts
+
+The server has users. A user is a username and a password, and then **the settings screen
+as it already was** — their model, their keys, their vault. Nothing about an account is a
+second kind of thing.
+
+The first account you create is the **admin**. The admin page (Settings → Account →
+Manage accounts) adds people, deletes them, changes their passwords and makes them an
+admin or not.
+
+```
+data/
+  auth/
+    users.json          usernames, roles, argon2id hashes
+    sessions.json       token hashes and expiry
+  users/
+    <id>/
+      logs/             this person's Inklings, one file per device
+      blobs/            their images, by content hash
+      digests/          convergence checks
+      config.json       their model, keys and vault
+  config.json           server-wide: the TWA package name and fingerprint
+```
+
+**Everything is per account.** Two people on one server cannot see each other's Inklings,
+cannot read each other's logs by guessing a device id, and do not share a model key. The
+local database in the browser is per account too — signing out and in as someone else on
+the same laptop opens their store, not the previous person's.
+
+**Passwords** are argon2id via Bun, never stored in the clear and never returned over
+HTTP. **Session tokens** are stored as SHA-256, so a copy of `sessions.json` is not a
+copy of anyone's live session. Signing in answers the same way for a wrong password and
+an unknown username, so the response cannot be used to find out who has an account.
+
+**Sessions are bearer tokens, not cookies.** The Android build is served from the device
+while the server is elsewhere, and a cookie there would be a third-party cookie and
+dropped. The token lives in `localStorage`, which means script on the page can read it —
+fine for a self-hosted tool on your own network, not fine in general.
+
+**The first-run window.** Before any account exists, the first person to reach the server
+can claim the admin. On Tailscale that is you. To close the window entirely, set
+`INKLING_ADMIN_USER` and `INKLING_ADMIN_PASSWORD` so the account exists before the server
+is reachable.
+
+**Nothing is a hard delete.** Deleting an account removes the login and its sessions; the
+Inklings stay in `data/users/<id>/` and the admin page says where. The last admin cannot
+be deleted or demoted, and you cannot delete yourself — either would lock the server with
+no way back in short of editing files by hand.
+
 ## Running it somewhere always on
 
 Everything that makes two devices agree already lives on the server: the append-only
@@ -554,10 +604,16 @@ offline.
 
 ### Two things to know
 
-**There is no login on the API.** Anyone who can reach the port can read and write your
-Inklings and spend your model key. Binding to `127.0.0.1` and reaching it over Tailscale
-is what makes that safe — Tailscale authenticates the device before it gets anywhere
-near the port. Do not forward this port to the internet as it stands.
+**Accounts.** The server has them: the first one you create is the admin, and the admin
+page adds, removes and re-passeswords everyone else. Each account gets its own Inklings,
+its own model settings and its own vault, in `data/users/<id>/`. Set
+`INKLING_ADMIN_USER` and `INKLING_ADMIN_PASSWORD` to create the first one without
+clicking through setup, or leave them out and do it in the app.
+
+Sessions are bearer tokens, not cookies — the Android build is served from the device
+while the server is elsewhere, where a cookie would be a third-party cookie and dropped.
+The token lives in `localStorage`, so script on the page can read it. Fine for a
+self-hosted tool on your own network; worth knowing before you put it anywhere else.
 
 **The vault has to move too.** "Promote to note" writes into your Obsidian vault, and the
 server is what does the writing. Point the mount at the folder your notes already sync to:
@@ -567,8 +623,8 @@ server is what does the writing. Point the mount at the folder your notes alread
       - /volume1/Notebook:/vault
 ```
 
-and set the vault to `/vault` in Settings. Without it, everything works except promotion,
-which says plainly that it could not write.
+and set the vault to `/vault` in Settings. Each account sets its own. Without it,
+everything works except promotion, which says plainly that it could not write.
 
 ### Why not put the data in mdbase instead
 
@@ -606,9 +662,13 @@ starts from an empty data directory with no keys, no `~/.local/share/opencode` a
 file and no vault, still serves the app, still works without a model, and accepts
 settings at runtime that take effect with no restart.
 
-**No auth on the API.** It is the one thing standing between "self-hosted" and "safe on
-the open internet". A shared secret would be a small change; Tailscale is the answer
-until then.
+**No password reset by email.** There is no email here, so a forgotten password is an
+admin setting a new one for you. The last admin cannot be deleted or demoted, because
+that would lock the server with no way back in short of editing files by hand.
+
+**Deleting an account keeps its data.** It removes the login and the sessions; the
+Inklings stay in `data/users/<id>/` and the admin page says so. One tap should not be
+able to destroy years of someone's notes.
 
 **Scheduled notifications** still need the native build. The nudge arrives when you open
 the app, not at a time you choose, because the web cannot wake itself.

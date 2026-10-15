@@ -40,6 +40,12 @@ export class AppendOnlyLog implements StorageAdapter {
   #seq = -1
   #listeners = new Set<() => void>()
   #objectUrls = new Map<string, string>()
+  /** The database name. One per account, so two accounts never share a local log. */
+  readonly #name: string
+
+  constructor(name: string = DB_NAME) {
+    this.#name = name
+  }
 
   get deviceId(): string {
     return this.#deviceId
@@ -52,15 +58,15 @@ export class AppendOnlyLog implements StorageAdapter {
 
   async #doInit(): Promise<void> {
     await this.#open()
-    const storedDeviceId = await this.getSetting(DEVICE_KEY)
+    const storedDeviceId = await this.#readSetting(DEVICE_KEY)
     if (storedDeviceId) {
       this.#deviceId = storedDeviceId
     } else {
       this.#deviceId = newId()
-      await this.setSetting(DEVICE_KEY, this.#deviceId)
+      await this.#writeSetting(DEVICE_KEY, this.#deviceId)
     }
 
-    const events = await this.allEvents()
+    const events = await this.#readAllEvents()
     this.#seq = events
       .filter((event) => event.deviceId === this.#deviceId)
       .reduce((max, event) => Math.max(max, event.seq), -1)
@@ -68,7 +74,7 @@ export class AppendOnlyLog implements StorageAdapter {
 
   async #open(): Promise<void> {
     if (this.#db) return
-    this.#db = await openDatabase(DB_NAME, DB_VERSION, (database, transaction) => {
+    this.#db = await openDatabase(this.#name, DB_VERSION, (database, transaction) => {
       if (!database.objectStoreNames.contains(EVENTS)) {
         database.createObjectStore(EVENTS, { autoIncrement: true })
       }
@@ -97,6 +103,12 @@ export class AppendOnlyLog implements StorageAdapter {
   }
 
   async allEvents(): Promise<BlipEvent[]> {
+    await this.init()
+    return this.#readAllEvents()
+  }
+
+  /** The raw read, for use during init itself — where calling init would deadlock. */
+  async #readAllEvents(): Promise<BlipEvent[]> {
     const db = this.#requireDb()
     return runTransaction(db, EVENTS, 'readonly', (tx) =>
       request<BlipEvent[]>(tx.objectStore(EVENTS).getAll()),
@@ -104,6 +116,7 @@ export class AppendOnlyLog implements StorageAdapter {
   }
 
   async append(body: BlipEventBody): Promise<BlipEvent> {
+    await this.init()
     const db = this.#requireDb()
     const event = {
       ...body,
@@ -133,6 +146,7 @@ export class AppendOnlyLog implements StorageAdapter {
    */
   async appendRemote(events: BlipEvent[]): Promise<number> {
     if (events.length === 0) return 0
+    await this.init()
     const db = this.#requireDb()
     let added = 0
     await runTransaction(
@@ -177,6 +191,7 @@ export class AppendOnlyLog implements StorageAdapter {
       size: file.size,
       blob: file,
     }
+    await this.init()
     const db = this.#requireDb()
     await runTransaction(
       db,
@@ -197,6 +212,7 @@ export class AppendOnlyLog implements StorageAdapter {
       size: bytes.byteLength,
       blob: new Blob([toBuffer(bytes)], { type: mime }),
     }
+    await this.init()
     const db = this.#requireDb()
     await runTransaction(
       db,
@@ -216,6 +232,7 @@ export class AppendOnlyLog implements StorageAdapter {
   }
 
   async localBlobHashes(): Promise<string[]> {
+    await this.init()
     const db = this.#requireDb()
     const keys = await runTransaction(db, BLOBS, 'readonly', (tx) =>
       request<IDBValidKey[]>(tx.objectStore(BLOBS).getAllKeys()),
@@ -234,6 +251,23 @@ export class AppendOnlyLog implements StorageAdapter {
   }
 
   async getSetting(key: string): Promise<string | null> {
+    await this.init()
+    return this.#readSetting(key)
+  }
+
+  async setSetting(key: string, value: string): Promise<void> {
+    await this.init()
+    await this.#writeSetting(key, value)
+  }
+
+  /**
+   * The raw settings reads and writes.
+   *
+   * Separate from the public pair because `init()` uses them, and an `init()` that
+   * awaits a method which awaits `init()` waits for itself forever — which is exactly
+   * what happened the first time this was written.
+   */
+  async #readSetting(key: string): Promise<string | null> {
     const db = this.#requireDb()
     const value = await runTransaction(db, META, 'readonly', (tx) =>
       request<unknown>(tx.objectStore(META).get(key)),
@@ -241,7 +275,7 @@ export class AppendOnlyLog implements StorageAdapter {
     return typeof value === 'string' ? value : null
   }
 
-  async setSetting(key: string, value: string): Promise<void> {
+  async #writeSetting(key: string, value: string): Promise<void> {
     const db = this.#requireDb()
     await runTransaction(
       db,
@@ -268,6 +302,7 @@ export class AppendOnlyLog implements StorageAdapter {
   }
 
   async #blobRecord(hash: string): Promise<StoredBlobRecord | undefined> {
+    await this.init()
     const db = this.#requireDb()
     return runTransaction(db, BLOBS, 'readonly', (tx) =>
       request<StoredBlobRecord | undefined>(tx.objectStore(BLOBS).get(hash)),

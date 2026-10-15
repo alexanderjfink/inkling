@@ -1,4 +1,5 @@
 import type { LLMProvider, StructuredRequest } from '@inkling/domain'
+import { apiFetch } from '../api'
 
 function join(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, '')}${path}`
@@ -56,7 +57,7 @@ export class ProxyProvider implements LLMProvider {
     // model for the rest of the session for no good reason.
     if (this.#health?.configured) return this.#health
     try {
-      const res = await fetch(join(this.#baseUrl, '/llm/health'))
+      const res = await apiFetch(join(this.#baseUrl, '/llm/health'))
       if (!res.ok) return UNKNOWN
       const body = (await res.json()) as Partial<ModelHealth>
       const health: ModelHealth = { ...UNKNOWN, ...body }
@@ -77,7 +78,7 @@ export class ProxyProvider implements LLMProvider {
   }
 
   async completeStructured(request: StructuredRequest): Promise<string> {
-    const res = await fetch(join(this.#baseUrl, '/llm/complete'), {
+    const res = await apiFetch(join(this.#baseUrl, '/llm/complete'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(request),
@@ -89,7 +90,7 @@ export class ProxyProvider implements LLMProvider {
   }
 
   async embed(texts: string[]): Promise<number[][]> {
-    const res = await fetch(join(this.#baseUrl, '/llm/embed'), {
+    const res = await apiFetch(join(this.#baseUrl, '/llm/embed'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ texts }),
@@ -122,7 +123,7 @@ export interface LookupResult {
  */
 export async function lookupVia(baseUrl: string, query: string): Promise<LookupResult | null> {
   try {
-    const res = await fetch(join(baseUrl, '/lookup'), {
+    const res = await apiFetch(join(baseUrl, '/lookup'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ query }),
@@ -138,7 +139,7 @@ export async function lookupVia(baseUrl: string, query: string): Promise<LookupR
 /** Fetch a page's title and excerpt through the server, avoiding browser CORS. */
 export async function fetchPageVia(baseUrl: string, url: string): Promise<FetchedPage | null> {
   try {
-    const res = await fetch(join(baseUrl, '/fetch'), {
+    const res = await apiFetch(join(baseUrl, '/fetch'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ url }),

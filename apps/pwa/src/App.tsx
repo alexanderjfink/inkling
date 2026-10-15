@@ -3,18 +3,22 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Spinner } from './components/Spinner'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
 import { Add } from './screens/Add'
+import { Admin } from './screens/Admin'
 import { AllBlips } from './screens/AllBlips'
 import { Home } from './screens/Home'
 import { Review } from './screens/Review'
 import { Settings } from './screens/Settings'
+import { SignIn } from './screens/SignIn'
+import { useAuth } from './state/useAuth'
 import { storage, useInkling } from './state/useInkling'
 import { usePromote } from './state/usePromote'
 import { useRelated } from './state/useRelated'
 import { useServerConfig } from './state/useServerConfig'
+import { useServerUrl } from './state/useServerUrl'
 import { useSync } from './state/useSync'
 import { useTheme } from './state/useTheme'
 
-type Screen = 'home' | 'add' | 'review' | 'all' | 'settings'
+type Screen = 'home' | 'add' | 'review' | 'all' | 'settings' | 'admin'
 
 const TITLES: Record<Screen, string> = {
   home: 'Inkling',
@@ -22,6 +26,7 @@ const TITLES: Record<Screen, string> = {
   review: 'Review',
   all: 'All Inklings',
   settings: 'Settings',
+  admin: 'Accounts',
 }
 
 export default function App() {
@@ -32,8 +37,26 @@ export default function App() {
   /** A blip chosen from the list, to open straight away in Review. */
   const [focusId, setFocusId] = useState<string | null>(null)
 
-  const { ready, events, blips, actions } = useInkling()
-  const syncState = useSync()
+  const server = useServerUrl()
+  const auth = useAuth(server.serverUrl)
+
+  /**
+   * Declared before sync on purpose.
+   *
+   * Selecting the account's store is a synchronous side effect of this hook, and sync
+   * reads `storage()`. With the order reversed, the first sync after signing in would
+   * run against the previous account's database — which looked exactly like "the server
+   * has none of my Inklings".
+   */
+  const { ready, events, blips, actions } = useInkling(auth.user?.id ?? null)
+
+  /** Sync waits for a session: before signing in every request would be a 401. */
+  const signedIn = auth.ready && (!auth.accounts || !auth.signedOut)
+  const syncState = useSync({
+    serverUrl: server.serverUrl,
+    enabled: signedIn,
+    accountId: auth.user?.id ?? null,
+  })
   const related = useRelated(
     blips,
     syncState.provider,
@@ -41,7 +64,7 @@ export default function App() {
     syncState.model?.embedSimilarity ?? null,
   )
   const promoteState = usePromote()
-  const serverConfig = useServerConfig(syncState.serverUrl)
+  const serverConfig = useServerConfig(server.serverUrl, auth.user?.id ?? null)
   const theme = useTheme()
 
   const onPromote = useCallback(
@@ -91,6 +114,29 @@ export default function App() {
       .length
   }, [blips])
 
+  // Signing in comes before everything: until we know who you are, there is no store
+  // to open and no Inklings to show.
+  if (!server.loaded || !auth.ready) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center">
+        <Spinner className="h-6 w-6 text-ink-faint" />
+      </div>
+    )
+  }
+
+  if (auth.accounts && auth.signedOut) {
+    return (
+      <div className="mx-auto flex min-h-dvh max-w-xl flex-col p-4">
+        <SignIn
+          auth={auth}
+          serverUrl={server.serverUrl}
+          onSaveServerUrl={server.save}
+          reachable={auth.state?.reachable ?? true}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col p-4">
       {screen !== 'home' ? (
@@ -120,7 +166,9 @@ export default function App() {
           attic={attic}
           capturedToday={capturedToday}
           serverWarning={
-            serverConfig.status === 'ok' || serverConfig.status === 'loading'
+            serverConfig.status === 'ok' ||
+            serverConfig.status === 'loading' ||
+            serverConfig.status === 'signed-out'
               ? null
               : 'the server is not reachable, so sync and the model are off'
           }
@@ -129,6 +177,10 @@ export default function App() {
           onAttic={() => setScreen('all')}
           onSettings={() => setScreen('settings')}
         />
+      ) : null}
+
+      {ready && screen === 'admin' && auth.user ? (
+        <Admin serverUrl={server.serverUrl} me={auth.user} />
       ) : null}
 
       {ready && screen === 'add' ? (
@@ -178,6 +230,10 @@ export default function App() {
           blips={blips}
           serverConfig={serverConfig}
           theme={theme}
+          serverUrl={server.serverUrl}
+          onSaveServerUrl={server.save}
+          auth={auth}
+          onOpenAdmin={() => setScreen('admin')}
         />
       ) : null}
     </div>

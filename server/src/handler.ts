@@ -1,4 +1,12 @@
-import { type LLMProvider, noteFilename, parseLog, sha256Hex } from '@inkling/domain'
+import {
+  type LLMProvider,
+  type PublicUser,
+  isRole,
+  noteFilename,
+  parseLog,
+  sha256Hex,
+} from '@inkling/domain'
+import type { Auth } from './auth'
 import type { ConfigProblem, Runtime, ServerConfig } from './config'
 import { assetLinks, publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
@@ -21,9 +29,45 @@ function json(body: unknown, status = 200): Response {
 /** Permissive CORS: this is a personal server the PWA may reach on another origin. */
 function withCors(headers: Headers): Headers {
   headers.set('access-control-allow-origin', '*')
-  headers.set('access-control-allow-methods', 'GET, HEAD, PUT, OPTIONS')
-  headers.set('access-control-allow-headers', 'content-type')
+  headers.set('access-control-allow-methods', 'GET, HEAD, PUT, POST, PATCH, DELETE, OPTIONS')
+  headers.set('access-control-allow-headers', 'content-type, authorization')
   return headers
+}
+
+/**
+ * The session token, if the request carries one.
+ *
+ * A bearer header rather than a cookie: the app can be served from a different origin
+ * (the Android build is), where a cookie would be a third-party cookie and quietly
+ * dropped. The cost is that the token is readable by script on the page, which is
+ * acceptable for a self-hosted tool on your own network and not acceptable in general.
+ */
+function bearer(request: Request): string | null {
+  const header = request.headers.get('authorization')
+  if (!header) return null
+  const match = /^Bearer\s+(.+)$/i.exec(header.trim())
+  return match?.[1]?.trim() || null
+}
+
+/**
+ * Where an account's data lives.
+ *
+ * A single `Store` means everyone shares one — which is what a server without user
+ * management is, and what the storage tests want. A function is what production
+ * passes, so each account gets its own logs, blobs and settings.
+ */
+export type StoreSource = Store | ((userId: string) => Store)
+
+function resolveStore(source: StoreSource, userId: string): Store {
+  return typeof source === 'function' ? source(userId) : source
+}
+
+/** The Digital Asset Links document, from the server's own settings. */
+async function assetLinksFor(options: HandlerOptions): Promise<unknown[] | null> {
+  const bridge = options.serverSettings ?? options.settings
+  if (!bridge) return null
+  const { config } = await bridge.read()
+  return assetLinks(config)
 }
 
 /** BodyInit wants a concretely-typed ArrayBuffer, so copy into a fresh one. */
@@ -105,6 +149,12 @@ export interface SettingsBridge {
   ) => Promise<{ config: ServerConfig; runtime: Runtime; problems: ConfigProblem[] }>
 }
 
+/** Everything that differs between accounts: their model, their vault, their keys. */
+export interface AccountContext {
+  runtime: Runtime
+  settings?: SettingsBridge
+}
+
 export interface HandlerOptions {
   llm?: LLMProvider
   /** Serves embeddings when set; otherwise the main provider is asked. */
@@ -118,19 +168,206 @@ export interface HandlerOptions {
    */
   runtime?: () => Runtime
   settings?: SettingsBridge
+  /**
+   * With accounts, the runtime and settings above come from here instead, per user.
+   * Called on every request so a settings change takes effect immediately.
+   */
+  accountFor?: (user: PublicUser) => Promise<AccountContext> | AccountContext
+  /**
+   * Settings that belong to the server rather than to a person: the TWA package name
+   * and fingerprint, which describe one APK pointing at one server.
+   */
+  serverSettings?: SettingsBridge
+  /** When set, every route except the public ones requires a session. */
+  auth?: Auth
   /** Directory of the built PWA. When set, the server serves the app itself. */
   staticDir?: string
 }
 
+/** Routes that must work before anyone has signed in. */
+function isPublic(path: string): boolean {
+  if (path === '/health') return true
+  if (path === '/auth/state') return true
+  if (path === '/auth/setup') return true
+  if (path === '/auth/login') return true
+  return false
+}
+
+/**
+ * The TWA package name and fingerprint describe one APK pointing at one server, so
+ * they belong to the server rather than to a person. Everything else on the settings
+ * screen is per account.
+ */
+function isServerField(key: string): boolean {
+  return key === 'twaPackage' || key === 'twaFingerprint'
+}
+
+function splitPatch(patch: ServerConfig): { server: ServerConfig; account: ServerConfig } {
+  const server: ServerConfig = {}
+  const account: ServerConfig = {}
+  for (const [key, value] of Object.entries(patch)) {
+    Object.assign(isServerField(key) ? server : account, { [key]: value })
+  }
+  return { server, account }
+}
+
+function str(body: Record<string, unknown> | null, key: string): string {
+  const value = body?.[key]
+  return typeof value === 'string' ? value : ''
+}
+
+/** Health, and the three things you can do before you have an account. */
+async function handlePublic(
+  path: string,
+  request: Request,
+  options: HandlerOptions,
+): Promise<Response> {
+  if (path === '/health') {
+    return json({ ok: true, service: 'inkling', time: new Date().toISOString() })
+  }
+
+  const auth = options.auth
+  if (!auth) {
+    // A server with no accounts at all. The app uses this to decide whether to show a
+    // login screen, so it must answer rather than 401.
+    return json({ accounts: false, needsSetup: false, signedOut: false, user: null })
+  }
+
+  if (path === '/auth/state') {
+    const user = await auth.resolve(bearer(request))
+    return json({
+      accounts: true,
+      needsSetup: await auth.needsSetup(),
+      signedOut: user === null,
+      user,
+    })
+  }
+
+  if (request.method !== 'POST') return json({ error: 'method not allowed' }, 405)
+
+  if (path === '/auth/setup') {
+    const body = await readJson(request)
+    const result = await auth.setup(str(body, 'username'), str(body, 'password'))
+    if (!result.ok) return json({ error: result.error }, 400)
+    return json({ token: result.value.token, user: result.value.user })
+  }
+
+  if (path === '/auth/login') {
+    const body = await readJson(request)
+    const result = await auth.login(str(body, 'username'), str(body, 'password'))
+    // The same 401 for a wrong password and an unknown name, so the response cannot
+    // be used to find out who has an account here.
+    if (!result.ok) return json({ error: result.error }, 401)
+    return json({ token: result.value.token, user: result.value.user })
+  }
+
+  return json({ error: 'not found' }, 404)
+}
+
+/** The account routes: anything a signed-in person may do to their own account. */
+async function handleAccount(
+  path: string,
+  request: Request,
+  user: PublicUser,
+  auth: Auth,
+  token: string | null,
+): Promise<Response | null> {
+  if (path === '/auth/me') return json({ user })
+
+  if (path === '/auth/logout' && request.method === 'POST') {
+    await auth.logout(token)
+    return json({ ok: true })
+  }
+
+  if (path === '/auth/password' && request.method === 'POST') {
+    const body = await readJson(request)
+    const result = await auth.changeOwnPassword(
+      user.id,
+      str(body, 'current'),
+      str(body, 'password'),
+      token ?? undefined,
+    )
+    if (!result.ok) return json({ error: result.error }, 400)
+    return json({ ok: true })
+  }
+
+  if (path === '/admin' || path.startsWith('/admin/')) {
+    if (user.role !== 'admin') return json({ error: 'admins only' }, 403)
+    return handleAdmin(path, request, user, auth)
+  }
+
+  return null
+}
+
+/** Admin routes. The caller has already checked the role. */
+async function handleAdmin(
+  path: string,
+  request: Request,
+  actor: PublicUser,
+  auth: Auth,
+): Promise<Response> {
+  const rest = path
+    .slice('/admin/'.length)
+    .split('/')
+    .filter((part) => part.length > 0)
+
+  if (rest.length === 1 && rest[0] === 'users') {
+    if (request.method === 'GET') return json({ users: await auth.list() })
+
+    if (request.method === 'POST') {
+      const body = await readJson(request)
+      const role = isRole(body?.role) ? body.role : 'member'
+      const result = await auth.add(str(body, 'username'), str(body, 'password'), role)
+      if (!result.ok) return json({ error: result.error }, 400)
+      return json({ user: result.value })
+    }
+
+    return json({ error: 'method not allowed' }, 405)
+  }
+
+  if (rest.length === 2 && rest[0] === 'users') {
+    const id = rest[1] ?? ''
+
+    if (request.method === 'DELETE') {
+      const result = await auth.remove(id, actor.id)
+      if (!result.ok) return json({ error: result.error }, 400)
+      // Their Inklings are left on disk on purpose. Deleting an account should not be
+      // able to destroy a year of someone's notes in one click.
+      return json({ ok: true, dataKept: `data/users/${id}` })
+    }
+
+    if (request.method === 'PATCH') {
+      const body = await readJson(request)
+      if (!isRole(body?.role)) return json({ error: 'invalid role' }, 400)
+      const result = await auth.setRole(id, body.role, actor.id)
+      if (!result.ok) return json({ error: result.error }, 400)
+      return json({ ok: true })
+    }
+
+    return json({ error: 'method not allowed' }, 405)
+  }
+
+  if (
+    rest.length === 3 &&
+    rest[0] === 'users' &&
+    rest[2] === 'password' &&
+    request.method === 'POST'
+  ) {
+    const body = await readJson(request)
+    const result = await auth.setPassword(rest[1] ?? '', str(body, 'password'))
+    if (!result.ok) return json({ error: result.error }, 400)
+    return json({ ok: true })
+  }
+
+  return json({ error: 'not found' }, 404)
+}
+
 export function createHandler(
-  store: Store,
+  storeSource: StoreSource,
   options: HandlerOptions = {},
 ): (request: Request) => Promise<Response> {
   const { llm, embed, model: status, vault } = options
   return async function handle(request: Request): Promise<Response> {
-    // Re-read on every request when a runtime was supplied, so settings changes
-    // take effect immediately.
-    const live = options.runtime?.() ?? { llm, embed, status, vault }
     const url = new URL(request.url)
     const path = url.pathname.startsWith('/api') ? url.pathname.slice(4) : url.pathname
     const parts = path.split('/').filter((part) => part.length > 0)
@@ -139,35 +376,57 @@ export function createHandler(
       return new Response(null, { status: 204, headers: withCors(new Headers()) })
     }
 
-    // Anything that is not the API is the app itself, when it has been built.
+    // Anything that is not the API is the app itself, when it has been built. This has
+    // to come before the session check: the login screen is part of that app.
     if (!url.pathname.startsWith('/api')) {
+      if (url.pathname === '/.well-known/assetlinks.json') {
+        const links = await assetLinksFor(options)
+        if (!links) {
+          return json(
+            {
+              error: 'not configured',
+              hint: 'Set the TWA package name and signing fingerprint in the app: Home → ⚙ → Settings.',
+            },
+            404,
+          )
+        }
+        return json(links)
+      }
       if (options.staticDir) {
         const file = await serveStatic(options.staticDir, url.pathname)
         if (file) return file
       } else if (url.pathname === '/' || url.pathname === '/index.html') {
         return notBuiltPage()
       }
+      return json({ error: 'not found' }, 404)
+    }
+
+    if (isPublic(path)) {
+      return handlePublic(path, request, options)
+    }
+
+    // Everything below here needs an account. Without `auth` configured the server is
+    // single-account, which is what a bare `bun run server` and the tests use.
+    const token = bearer(request)
+    const user = options.auth ? await options.auth.resolve(token) : null
+    if (options.auth && !user) {
+      return json({ error: 'sign in first', signedOut: true }, 401)
+    }
+
+    const account = user && options.accountFor ? await options.accountFor(user) : null
+    const store = resolveStore(storeSource, user?.id ?? '')
+    // Re-read on every request when a runtime was supplied, so settings changes
+    // take effect immediately.
+    const live = account?.runtime ?? options.runtime?.() ?? { llm, embed, status, vault }
+    const settingsBridge = account?.settings ?? options.settings
+
+    if (user && options.auth) {
+      const accountRoute = await handleAccount(path, request, user, options.auth, token)
+      if (accountRoute) return accountRoute
     }
 
     if (parts.length === 1 && parts[0] === 'health') {
       return json({ ok: true, service: 'inkling', time: new Date().toISOString() })
-    }
-
-    // Digital Asset Links, for a Trusted Web Activity APK. Served here rather than
-    // kept as a file so it is generated from settings and cannot drift from them.
-    if (url.pathname === '/.well-known/assetlinks.json') {
-      const read = options.settings ? (await options.settings.read()).config : undefined
-      const links = read ? assetLinks(read) : null
-      if (!links) {
-        return json(
-          {
-            error: 'not configured',
-            hint: 'Set the TWA package name and signing fingerprint in the app: Home → ⚙ → Settings.',
-          },
-          404,
-        )
-      }
-      return json(links)
     }
 
     if (parts.length === 1 && parts[0] === 'devices') {
@@ -309,26 +568,54 @@ export function createHandler(
     }
 
     if (parts.length === 1 && parts[0] === 'config') {
-      const bridge = options.settings
+      const bridge = settingsBridge
       if (!bridge) return json({ error: 'settings are not available on this server' }, 503)
+
+      // The settings screen is one screen, but two destinations: what describes the
+      // server, and what describes the person signed in.
+      const serverNow = async () => {
+        if (!options.serverSettings) return {}
+        return (await options.serverSettings.read()).config
+      }
+      const withServer = (config: ServerConfig, runtime: Runtime, server: ServerConfig) => ({
+        ...publicConfig(config, runtime),
+        twaPackage: server.twaPackage ?? null,
+        twaFingerprint: server.twaFingerprint ?? null,
+      })
 
       if (request.method === 'GET') {
         const { config, runtime } = await bridge.read()
-        return json({ config: publicConfig(config, runtime), providers: providerList() })
+        return json({
+          config: withServer(config, runtime, await serverNow()),
+          providers: providerList(),
+        })
       }
 
       if (request.method === 'PUT') {
         const body = await readJson(request)
         if (!body) return json({ error: 'invalid json body' }, 400)
 
-        const patch = configPatch(body)
-        const problems = validateConfig(patch)
+        const { server, account } = splitPatch(configPatch(body))
+        const problems = [...validateConfig(account), ...validateConfig(server)]
         if (problems.length > 0) {
           return json({ error: 'invalid settings', problems }, 400)
         }
 
-        const { config, runtime } = await bridge.update(patch)
-        return json({ config: publicConfig(config, runtime), providers: providerList() })
+        if (Object.keys(server).length > 0) {
+          if (user?.role !== 'admin') {
+            return json({ error: 'only an admin can change the app settings' }, 403)
+          }
+          if (!options.serverSettings) {
+            return json({ error: 'server settings are not available here' }, 503)
+          }
+          await options.serverSettings.update(server)
+        }
+
+        const { config, runtime } = await bridge.update(account)
+        return json({
+          config: withServer(config, runtime, await serverNow()),
+          providers: providerList(),
+        })
       }
 
       return json({ error: 'method not allowed' }, 405)

@@ -12,8 +12,25 @@ import { type CaptureDraft, extractTopics, guessType, inferBody } from '../captu
 import { AppendOnlyLog } from '../storage/appendOnlyLog'
 
 let singleton: AppendOnlyLog | null = null
+let singletonKey: string | null = null
 
-/** Process-wide storage instance (a single device log). */
+/**
+ * Point storage at an account.
+ *
+ * The local database is per-*origin*, not per-person. Without this, signing out and
+ * signing in as someone else on the same browser would open the first person's
+ * Inklings — their log is still in this browser, and nothing about the origin says
+ * whose it is. The account id becomes part of the database name, so two accounts on one
+ * device are genuinely two stores rather than one shared by accident.
+ */
+export function setAccount(userId: string | null): void {
+  const key = userId ?? 'local'
+  if (key === singletonKey && singleton) return
+  singletonKey = key
+  singleton = new AppendOnlyLog(key === 'local' ? undefined : `inkling:${key}`)
+}
+
+/** Process-wide storage instance for the current account (a single device log). */
 export function storage(): AppendOnlyLog {
   singleton ??= new AppendOnlyLog()
   return singleton
@@ -62,11 +79,15 @@ export interface InklingActions {
   link(id: string, otherId: string, reason?: string): Promise<BlipEvent>
 }
 
-export function useInkling() {
+export function useInkling(accountId: string | null = null) {
   const [events, setEvents] = useState<BlipEvent[]>([])
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
+    // Switching accounts switches stores, so this starts over rather than showing the
+    // previous account's Inklings for a moment.
+    setAccount(accountId)
+    setReady(false)
     const store = storage()
     let alive = true
     const refresh = () => {
@@ -84,7 +105,7 @@ export function useInkling() {
       alive = false
       unsubscribe()
     }
-  }, [])
+  }, [accountId])
 
   const blips = useMemo(() => project(events), [events])
 

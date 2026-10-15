@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { apiFetch } from '../api'
 import { needsServerUrl } from '../native'
 
 export interface PublicConfig {
@@ -40,7 +41,7 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-export type ServerStatus = 'loading' | 'ok' | 'no-endpoint' | 'unreachable'
+export type ServerStatus = 'loading' | 'ok' | 'no-endpoint' | 'unreachable' | 'signed-out'
 
 export interface ServerDiagnosis {
   status: ServerStatus
@@ -87,6 +88,9 @@ export function diagnoseServer(serverUrl: string, status: ServerStatus): ServerD
   if (status === 'loading') {
     return { status, detail: 'checking…', suggestions }
   }
+  if (status === 'signed-out') {
+    return { status, detail: 'Sign in to load the settings from this server.', suggestions }
+  }
   if (status === 'no-endpoint') {
     return {
       status,
@@ -120,7 +124,7 @@ export function diagnoseServer(serverUrl: string, status: ServerStatus): ServerD
  * Keys are only ever written: the server reports whether one is set, never what it
  * is, so nothing secret round-trips through the browser.
  */
-export function useServerConfig(baseUrl: string) {
+export function useServerConfig(baseUrl: string, accountId: string | null = null) {
   const [config, setConfig] = useState<PublicConfig | null>(null)
   const [providers, setProviders] = useState<ProviderOption[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -131,7 +135,14 @@ export function useServerConfig(baseUrl: string) {
   const load = useCallback(async () => {
     setStatus('loading')
     try {
-      const res = await fetch(join(baseUrl, '/config'))
+      const res = await apiFetch(join(baseUrl, '/config'))
+      if (res.status === 401) {
+        // Not signed in yet. That is not a broken server, and saying so would send
+        // someone off to check an address that is perfectly fine.
+        setStatus('signed-out')
+        setError(null)
+        return
+      }
       if (res.status === 503) {
         setStatus('no-endpoint')
         setError('this server has no settings endpoint')
@@ -149,7 +160,8 @@ export function useServerConfig(baseUrl: string) {
     } finally {
       setLoaded(true)
     }
-  }, [baseUrl])
+    // Reloads when the account changes: the settings belong to whoever is signed in.
+  }, [baseUrl, accountId])
 
   useEffect(() => {
     void load()
@@ -159,7 +171,7 @@ export function useServerConfig(baseUrl: string) {
     async (patch: ConfigPatch): Promise<boolean> => {
       setSaving(true)
       try {
-        const res = await fetch(join(baseUrl, '/config'), {
+        const res = await apiFetch(join(baseUrl, '/config'), {
           method: 'PUT',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify(patch),
@@ -222,7 +234,7 @@ export function useModelTools(baseUrl: string) {
     async (kind: 'chat' | 'embed' = 'chat'): Promise<TestResult> => {
       setTesting(kind)
       try {
-        const res = await fetch(join(baseUrl, '/llm/test'), {
+        const res = await apiFetch(join(baseUrl, '/llm/test'), {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ kind }),
@@ -241,7 +253,7 @@ export function useModelTools(baseUrl: string) {
     async (kind: 'chat' | 'embed' = 'chat'): Promise<ModelsResult> => {
       setListing(kind)
       try {
-        const res = await fetch(join(baseUrl, `/llm/models?kind=${kind}`))
+        const res = await apiFetch(join(baseUrl, `/llm/models?kind=${kind}`))
         const body = (await res.json().catch(() => ({}))) as {
           models?: string[]
           error?: string

@@ -383,14 +383,39 @@ describe('guidance', () => {
 
   test('the prompt asks for one short sentence each', () => {
     const blip = makeBlip('idea', 'an idea')
-    const { system } = buildGuidancePrompt(blip, null, null)
+    const { system } = buildGuidancePrompt({ blip })
     expect(system).toContain('20 words')
     expect(system).toContain('never generic advice')
   })
 
   test('without a provider there is simply no guidance', async () => {
     const blip = makeBlip('idea', 'an idea')
-    expect(await requestGuidance(blip, null, null)).toBeNull()
+    expect(await requestGuidance({ blip })).toBeNull()
+  })
+
+  test('asking from inside the move includes what they have started writing', () => {
+    const blip = makeBlip('idea', 'an idea')
+    const { prompt } = buildGuidancePrompt({ blip, draft: 'FRESS was a hypertext system' })
+    expect(prompt).toContain('STARTED WRITING JUST NOW')
+    expect(prompt).toContain('FRESS was a hypertext system')
+    expect(prompt).toContain('do not repeat it back')
+  })
+
+  test('asking again is told what was already said, and asks for something new', () => {
+    const blip = makeBlip('idea', 'an idea')
+    const { system, prompt } = buildGuidancePrompt({
+      blip,
+      previous: ['Check what FRESS missed'],
+    })
+    expect(prompt).toContain('ADVICE THEY ALREADY HAVE')
+    expect(prompt).toContain('Check what FRESS missed')
+    expect(system).toContain('different, more specific angles')
+  })
+
+  test('a blank draft is not sent as if it were writing', () => {
+    const blip = makeBlip('idea', 'an idea')
+    const { prompt } = buildGuidancePrompt({ blip, draft: '   ' })
+    expect(prompt).not.toContain('STARTED WRITING JUST NOW')
   })
 })
 

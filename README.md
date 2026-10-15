@@ -454,6 +454,74 @@ context, so everything works without a certificate.
 Note: each origin (scheme + host + port) gets its own local datastore, so blips
 captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5173`.
 
+## Running it somewhere always on
+
+Everything that makes two devices agree already lives on the server: the append-only
+log, the content-addressed blobs, and your model settings. None of that needs a second
+*device* to be awake — it needs the **server** to be awake. So the whole answer to "how
+do I use this on my phone and my laptop for real" is: run the server on something
+always on, and open its address on both.
+
+There is a `Dockerfile` and a `docker-compose.yml` for exactly that:
+
+```bash
+docker compose up -d --build
+```
+
+Then reach it from the phone and the laptop at the same address. Because the server
+serves the built app itself, there is **nothing to configure on either device**: `/api`
+is relative, so the app you loaded is already talking to the server you got it from.
+Settings, keys and Inklings are simply there, on both.
+
+The compose file binds to `127.0.0.1` and expects Tailscale in front:
+
+```bash
+tailscale serve --bg 8787
+```
+
+That gives a real certificate, which is also what makes the app installable and usable
+offline.
+
+### Two things to know
+
+**There is no login on the API.** Anyone who can reach the port can read and write your
+Inklings and spend your model key. Binding to `127.0.0.1` and reaching it over Tailscale
+is what makes that safe — Tailscale authenticates the device before it gets anywhere
+near the port. Do not forward this port to the internet as it stands.
+
+**The vault has to move too.** "Promote to note" writes into your Obsidian vault, and the
+server is what does the writing. Point the mount at the folder your notes already sync to:
+
+```yaml
+    volumes:
+      - /volume1/Notebook:/vault
+```
+
+and set the vault to `/vault` in Settings. Without it, everything works except promotion,
+which says plainly that it could not write.
+
+### Why not put the data in mdbase instead
+
+A fair question, and the answer is that mdbase and Inkling's sync are shaped differently
+in the way that matters most.
+
+mdbase is **records**: a Markdown file with a type, a current value for each field, and a
+folder marker that makes it a collection. That is a good shape for notes and tasks. It is
+not the shape of an append-only log — and the log is exactly what lets two devices agree
+without conflict resolution. Each device only ever appends, so merging is a union, and
+the worst case is doing something twice rather than losing it.
+
+Storing Inklings as mdbase records would mean deciding what a record *is* (the Inkling's
+current state?) and then re-solving the problem the log does not have: two devices editing
+the same record. That is a rewrite of the one layer that is already tested and
+conflict-free by construction, for no capability gained.
+
+Where mdbase does fit is the other direction, and it is a small, real step: **the promoted
+notes**. Those already are typed Markdown records in a folder, with frontmatter. Making
+the vault an mdbase collection with a `blip` type — so the mdbase editor or TaskNotes
+could read what Inkling promoted — costs nothing and touches no sync code. Worth doing;
+just not as the backbone.
+
 ## Not yet
 
 A native shell. Everything M6 set out to fix — share-sheet capture, offline, an
@@ -461,3 +529,15 @@ installed app, voice, backups — is now done as a PWA, because that is verifiab
 this machine and covers the same ground on Android. A Capacitor wrap is still the way
 to get *scheduled* notifications and a real app-store presence, and it needs a native
 toolchain (no Android SDK here) plus a trusted certificate.
+
+**The container image has not been built.** There is no Docker on the machine this was
+written on, so the `Dockerfile` is written against the commands that are known to work
+(`bun install --frozen-lockfile`, `bun run build`, `bun server/src/index.ts`) but has not
+itself been run. What *has* been verified is the behaviour a container depends on: the
+server starts from an empty data directory with no keys, no `~/.local/share/opencode`
+auth file and no vault, still serves the app, still works without a model, and accepts
+settings at runtime that take effect with no restart.
+
+**No auth on the API.** See above — it is the one thing standing between "self-hosted"
+and "safe on the open internet". A shared secret would be a small change; Tailscale is
+the answer until then.

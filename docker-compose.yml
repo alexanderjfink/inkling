@@ -1,0 +1,54 @@
+# Run Inkling on something that is always on — a NAS, a home server, a small VPS.
+#
+#   docker compose up -d --build
+#
+# Then reach it from your phone and your laptop at the same address. Because the
+# server serves the app itself, there is nothing to configure on either device:
+# open the address, and `/api` is already right.
+
+services:
+  inkling:
+    build: .
+    image: inkling:latest
+    container_name: inkling
+    restart: unless-stopped
+
+    ports:
+      # Bound to this machine only. Put Tailscale in front for the phone:
+      #
+      #   tailscale serve --bg 8787
+      #
+      # and open the https://….ts.net address it prints. That gives you a real
+      # certificate, so the service worker installs and the app works offline.
+      #
+      # Change to "8787:8787" only if you trust every device on this network —
+      # there is no login on the API, so anyone who can reach the port can read
+      # and write your Inklings and spend your model key.
+      - "127.0.0.1:8787:8787"
+
+    volumes:
+      # The log, the blobs, and your model settings. Back this up; it is everything.
+      - inkling-data:/data
+
+      # Optional — the Obsidian vault, so "Promote to note" can write. Point this at
+      # the folder your notes sync to. Without it everything works except promotion,
+      # which says plainly that it could not write.
+      # - /volume1/Notebook:/vault
+
+    environment:
+      - TZ=${TZ:-UTC}
+
+      # Everything below is normally set in the app (Home → ⚙) and saved into
+      # /data/config.json, which overrides these. Set them here only to get the
+      # first start going without typing keys into a phone.
+      #
+      # - INKLING_VAULT=/vault
+      # - INKLING_VAULT_FOLDER=00 Seedbox
+      # - INKLING_PROVIDER=opencode-go
+      # - INKLING_MODEL=deepseek-v4.1-flash
+      # - INKLING_API_KEY=
+      # - INKLING_EMBED_PROVIDER=omlx
+      # - INKLING_EMBED_MODEL=granite-embedding-small-english-r2
+
+volumes:
+  inkling-data:

@@ -27,6 +27,75 @@ const DEFERRAL_LABEL: Record<DeferralChoice, string> = {
   'next-month': 'a month',
 }
 
+/** Whatever the move turned up to read, or a word about why there is nothing. */
+function Material({
+  loading,
+  material,
+  className = 'mt-3',
+}: {
+  loading: boolean
+  material: LookupResult | null
+  className?: string
+}) {
+  return (
+    <div className={`${className} rounded-xl border border-line bg-surface/60 p-3`}>
+      {loading ? (
+        <span className="flex items-center gap-2 text-xs text-ink-faint">
+          <Spinner className="h-3 w-3" />
+          finding something to read…
+        </span>
+      ) : material ? (
+        <>
+          <a
+            href={material.url}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs font-medium text-accent underline"
+          >
+            {material.title}
+          </a>
+          {material.description ? (
+            <span className="text-xs text-ink-faint"> — {material.description}</span>
+          ) : null}
+          <p className="mt-1 text-xs leading-relaxed text-ink-soft">{material.extract}</p>
+        </>
+      ) : (
+        <span className="text-xs text-ink-faint">
+          nothing worth reading turned up — the move works without it
+        </span>
+      )}
+    </div>
+  )
+}
+
+/**
+ * What to look for. Rendered wherever the move is — including inside the composer,
+ * so advice you asked for is still there when you sit down to use it.
+ */
+function Guidance({ items, className = 'mt-3' }: { items: string[] | null; className?: string }) {
+  if (!items) return null
+  return (
+    <div className={`${className} rounded-xl border border-line bg-surface/60 p-3`}>
+      {items.length === 0 ? (
+        <p className="text-xs text-ink-faint">
+          nothing came back — ask again, or just start and see
+        </p>
+      ) : (
+        <>
+          <p className="text-[11px] tracking-wide text-ink-faint uppercase">what to look for</p>
+          <ul className="mt-1 flex flex-col gap-1.5">
+            {items.map((item) => (
+              <li key={item} className="text-xs leading-relaxed text-ink-soft">
+                · {item}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  )
+}
+
 function ActionButton({
   icon,
   label,
@@ -203,6 +272,13 @@ export function Review({
 
   const deferLabel = formatDeferral(deferUntil(DEFAULT_DEFERRAL, new Date()))
 
+  // Advice belongs to the move it was asked about. A different move means different
+  // advice, so clear it rather than show something that no longer applies.
+  const moveId = move?.id ?? ''
+  useEffect(() => {
+    setGuidance(null)
+  }, [moveId])
+
   // Record what was put in front of you, so it is not offered again. Once per move
   // per Inkling, and only if the log does not already have it.
   const recorded = useRef(new Set<string>())
@@ -254,14 +330,20 @@ export function Review({
     settle('deferred')
   }
 
-  async function askForGuidance() {
+  async function askForGuidance(again = false) {
     if (!current) return
     setGuidanceLoading(true)
     try {
       const result = await requestGuidance(
-        current,
-        move,
-        material ? { title: material.title, extract: material.extract } : null,
+        {
+          blip: current,
+          move,
+          material: material ? { title: material.title, extract: material.extract } : null,
+          // Asking from inside the move: what they have started writing is context,
+          // and what they already have is what not to say again.
+          draft: composer?.move ? entry : undefined,
+          previous: again ? (guidance ?? []) : [],
+        },
         provider,
       )
       setGuidance(result?.items ?? [])
@@ -496,6 +578,11 @@ export function Review({
                 doing: {composer.move.title}
               </p>
             ) : null}
+            {/* What the move turned up, and anything the app suggested, stay here
+                while you write — that is the whole point of having asked. */}
+            {composer.move && move?.materialQuery ? (
+              <Material loading={materialLoading} material={material} className="" />
+            ) : null}
             <textarea
               value={entry}
               onChange={(event) => setEntry(event.target.value)}
@@ -503,6 +590,25 @@ export function Review({
               placeholder={composer.move ? composer.move.goal : 'What did you get?'}
               className="w-full resize-none rounded-2xl border border-line p-4 text-sm outline-none focus:border-accent"
             />
+            {composer.move ? (
+              <div className="flex flex-wrap items-center gap-4 text-xs">
+                <button
+                  type="button"
+                  onClick={() => void askForGuidance(true)}
+                  disabled={guidanceLoading}
+                  className="quiet underline disabled:no-underline disabled:opacity-60"
+                >
+                  <ButtonLabel busy={guidanceLoading}>
+                    {guidanceLoading
+                      ? 'thinking…'
+                      : guidance
+                        ? 'help me further'
+                        : 'help me with this'}
+                  </ButtonLabel>
+                </button>
+              </div>
+            ) : null}
+            <Guidance items={guidance} className="" />
             <div className="flex items-center gap-3">
               <button type="button" onClick={() => setComposer(null)} className="quiet text-xs">
                 cancel
@@ -532,35 +638,7 @@ export function Review({
               <p className="mt-1 text-[11px] text-good">saved — this is the move you kept</p>
             ) : null}
 
-            {move.materialQuery ? (
-              <div className="mt-3 rounded-xl border border-line bg-surface/60 p-3">
-                {materialLoading ? (
-                  <span className="flex items-center gap-2 text-xs text-ink-faint">
-                    <Spinner className="h-3 w-3" />
-                    finding something to read…
-                  </span>
-                ) : material ? (
-                  <>
-                    <a
-                      href={material.url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-xs font-medium text-accent underline"
-                    >
-                      {material.title}
-                    </a>
-                    {material.description ? (
-                      <span className="text-xs text-ink-faint"> — {material.description}</span>
-                    ) : null}
-                    <p className="mt-1 text-xs leading-relaxed text-ink-soft">{material.extract}</p>
-                  </>
-                ) : (
-                  <span className="text-xs text-ink-faint">
-                    nothing worth reading turned up — the move works without it
-                  </span>
-                )}
-              </div>
-            ) : null}
+            {move.materialQuery ? <Material loading={materialLoading} material={material} /> : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button
@@ -603,28 +681,7 @@ export function Review({
               </button>
             </div>
 
-            {guidance ? (
-              <div className="mt-3 rounded-xl border border-line bg-surface/60 p-3">
-                {guidance.length === 0 ? (
-                  <p className="text-xs text-ink-faint">
-                    nothing came back — ask again, or just start and see
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-[11px] tracking-wide text-ink-faint uppercase">
-                      what to look for
-                    </p>
-                    <ul className="mt-1 flex flex-col gap-1.5">
-                      {guidance.map((item) => (
-                        <li key={item} className="text-xs leading-relaxed text-ink-soft">
-                          · {item}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-              </div>
-            ) : null}
+            <Guidance items={guidance} />
           </div>
         ) : (
           <p className="mt-5 flex items-center gap-2 text-xs text-ink-faint">

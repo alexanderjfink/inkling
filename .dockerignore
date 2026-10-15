@@ -1,0 +1,18 @@
+node_modules
+**/node_modules
+
+# Built in the image, not carried in from the host.
+dist
+**/dist
+
+.git
+.gitignore
+
+# Your log, your blobs, and your API keys. Never in an image.
+server/data
+
+*.log
+.DS_Store
+.coverage
+coverage
+README.md

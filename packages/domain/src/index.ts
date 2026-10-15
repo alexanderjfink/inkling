@@ -21,6 +21,7 @@ export type { LLMProvider, StructuredRequest } from './llm'
 export type { MergeResult } from './log'
 export { devicesIn, eventKey, mergeEvents, parseLog, serializeLog, serializeLogBytes } from './log'
 export type { MoveContext, MoveTemplate, SelectMoveOptions } from './moves'
+export type { GuidanceContext } from './moves'
 export {
   buildGuidancePrompt,
   buildMovePrompt,

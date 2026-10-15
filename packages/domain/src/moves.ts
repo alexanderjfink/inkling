@@ -576,26 +576,39 @@ export function parseMoveResponse(text: string, candidates: MoveTemplate[]): Mov
   return spec
 }
 
+export interface GuidanceContext {
+  blip: Blip
+  move?: MoveSpec | null
+  material?: { title: string; extract: string } | null
+  /** What they have started writing, when asking from inside the move. */
+  draft?: string
+  /** Advice already given, so asking again gives something new. */
+  previous?: string[]
+}
+
 /**
  * Ask for a short list of things to look for.
  *
  * Deliberately not "do the work for me": the answer is what to *watch for*, so the
- * person still has to look. The move and any material found for it are given to the
- * model, so the list is about this specific thing rather than the topic in general.
+ * person still has to look. The move, any material found for it, and anything they
+ * have started writing all go in, so the list is about this specific thing.
  */
-export function buildGuidancePrompt(
-  blip: Blip,
-  move: MoveSpec | null,
-  material?: { title: string; extract: string } | null,
-): { system: string; prompt: string } {
+export function buildGuidancePrompt(ctx: GuidanceContext): { system: string; prompt: string } {
+  const { blip, move, material, draft, previous } = ctx
+
   const system = [
     'You help someone know what to look for before they go and look.',
     'You do NOT do the work, answer their question, or write the note for them.',
     'Give between two and four items. Each is ONE short sentence of at most 20 words —',
     'a single thing to notice, compare or check.',
     'Each item must be specific to this material — never generic advice like "take notes".',
+    previous && previous.length > 0
+      ? 'They have already been given advice; give different, more specific angles.'
+      : '',
     'Reply with JSON only.',
-  ].join(' ')
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const entries = blip.entries
     .slice(-6)
@@ -608,6 +621,11 @@ export function buildGuidancePrompt(
     move ? `THE MOVE THEY ARE ABOUT TO DO: ${move.title} (goal: ${move.goal})` : '',
     material ? `WHAT THEY ARE ABOUT TO READ: ${material.title}\n${material.extract}` : '',
     entries ? `WHAT THEY HAVE WRITTEN SO FAR:\n${entries}` : '',
+    draft?.trim() ? `WHAT THEY HAVE STARTED WRITING JUST NOW:\n${draft.trim()}` : '',
+    previous && previous.length > 0
+      ? `ADVICE THEY ALREADY HAVE:\n${previous.map((item) => `- ${item}`).join('\n')}`
+      : '',
+    draft?.trim() ? 'Build on what they have started; do not repeat it back to them.' : '',
     '',
     'Reply with exactly:',
     '{"items": ["...", "..."]}',
@@ -642,15 +660,13 @@ export function parseGuidance(text: string): string[] | null {
 
 /** Never throws: without a model, or on any failure, there is simply no guidance. */
 export async function requestGuidance(
-  blip: Blip,
-  move: MoveSpec | null,
-  material: { title: string; extract: string } | null,
+  ctx: GuidanceContext,
   provider?: LLMProvider,
 ): Promise<{ items: string[]; generatedBy: 'llm' } | null> {
   if (!provider) return null
   try {
     if (!(await provider.available())) return null
-    const { system, prompt } = buildGuidancePrompt(blip, move, material)
+    const { system, prompt } = buildGuidancePrompt(ctx)
     const items = parseGuidance(await provider.completeStructured({ system, prompt }))
     return items ? { items, generatedBy: 'llm' } : null
   } catch {

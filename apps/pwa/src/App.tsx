@@ -18,9 +18,9 @@ type Screen = 'home' | 'add' | 'review' | 'all' | 'settings'
 
 const TITLES: Record<Screen, string> = {
   home: 'Inkling',
-  add: 'Add a blip',
+  add: 'Add an Inkling',
   review: 'Review',
-  all: 'All blips',
+  all: 'All Inklings',
   settings: 'Settings',
 }
 
@@ -145,6 +145,7 @@ export default function App() {
             setScreen('home')
           }}
           onBrowse={() => setScreen('all')}
+          onOpenBlip={(id) => setFocusId(id)}
           focusId={focusId}
           serverUrl={syncState.serverUrl}
         />

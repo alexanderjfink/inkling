@@ -459,6 +459,14 @@ export function buildMovePrompt(
     .slice(0, 4)
     .map((other) => `- ${other.title}`)
     .join('\n')
+
+  // What has already been put in front of them. The same prompt twice is exactly the
+  // "ugh, this again" the design exists to avoid, so the model is told what to avoid.
+  const history = blip.moves
+    .slice(-8)
+    .map((entry) => `- "${entry.spec.title}" — ${entry.outcome === 'done' ? 'done' : 'put down'}`)
+    .join('\n')
+
   const menu = candidates
     .slice(0, 8)
     .map(
@@ -474,11 +482,14 @@ export function buildMovePrompt(
     blip.topics.length > 0 ? `TOPICS: ${blip.topics.join(', ')}` : '',
     entries ? `WHAT THEY HAVE ALREADY WRITTEN:\n${entries}` : '',
     related ? `RELATED BLIPS:\n${related}` : '',
+    history ? `MOVES ALREADY PUT IN FRONT OF THEM:\n${history}` : '',
     `TIMES THEY HAVE PUT THIS DOWN: ${blip.schedule.timesSkipped}`,
     '',
     `MOVES TO CHOOSE FROM:\n${menu}`,
     '',
     'Choose one id from the list and adapt its title, why and goal to this specific blip.',
+    'Do not repeat a move they have already had: either pick a different one, or take the',
+    'same kind of move from an angle you have not used yet.',
     'Keep the time limit under 5 minutes.',
     'Reply with exactly:',
     '{"id": "<one id from the list>", "title": "...", "why": "...", "goal": "...", "timeLimitSec": 120, "query": "<only if the move looks something up>"}',

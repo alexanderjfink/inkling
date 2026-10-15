@@ -57,6 +57,13 @@ export function Add({
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
+          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+            event.preventDefault()
+            void submit()
+          }
+        }}
         placeholder="What did you notice?"
         rows={6}
         className={`${inputClass} resize-none text-lg`}
@@ -133,6 +140,7 @@ export function Add({
       <p className="text-center text-xs text-ink-faint">
         Written to this device instantly — never blocked on the network.
         {saved > 0 ? ` ${saved} captured.` : ''}
+        <span className="hidden sm:inline"> ⌘↵ or Ctrl+↵ to keep it.</span>
       </p>
     </div>
   )

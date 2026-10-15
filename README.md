@@ -233,25 +233,28 @@ playbook".
 Three screens, and two of them are the only things you do.
 
 ```
-Home ─┬─ Add a blip    text, a link, a photo, or your voice
-      ├─ Review        one blip at a time, full screen
-      └─ ⚙ Settings    sync, model, notes, reminders, backup, storage
+Home ─┬─ Add an Inkling   text, a link, a photo, or your voice (⌘↵ / Ctrl+↵ to keep it)
+      ├─ Review          one Inkling at a time, full screen
+      └─ ⚙ Settings      theme, sync, model, notes, reminders, backup, storage
 ```
 
-**Review** shows a single blip and three actions, and nothing else competes with them:
+**Review** shows a single Inkling and three actions, and nothing else competes with them:
 
 | | |
 |---|---|
-| **↑ Promote to note** | drafts next steps and writes the note into your vault. The blip is done |
-| **＋ Add entry** | write something down, with the suggested move as the prompt |
+| **↑ Promote to note** | drafts next steps and writes the note into your vault. The Inkling is done |
+| **＋ Add entry** | write something down, free-form |
 | **✓ until Saturday** | put it down; the label is the date it comes back |
 
-A **Today / All** toggle at the top switches between the finite daily feed and
-everything you have — same ordering, same three actions, no cap. **browse** opens the
-full list, where tapping a blip opens it here, focused, whether or not it was due.
-Retiring is a quiet link below — or *revive*, if you opened something out of the
-attic. There is no separate desktop mode: the same three screens run on both devices,
-and sync keeps them the same.
+A suggested **move** sits above them with a **Do this** button: it opens the same
+composer, bound to that move, and records the move as done when you keep the result.
+Under the move, **moves so far** lists what has been put in front of you and when —
+behind a tap, so the card stays clean. Related Inklings are listed and open on tap.
+
+A **Today / All** toggle switches between the finite daily feed and everything you
+have. **browse** opens the full list, where tapping an Inkling opens it here, focused,
+whether or not it was due. Retiring is a quiet link below — or *revive*, if you opened
+something out of the attic.
 
 ## Related blips
 

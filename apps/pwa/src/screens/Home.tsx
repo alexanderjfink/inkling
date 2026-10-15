@@ -31,6 +31,13 @@ export function Home({
             ⚙
           </button>
         </div>
+        <img
+          src="/icon-192.png"
+          alt=""
+          width={72}
+          height={72}
+          className="mx-auto mb-4 h-18 w-18 rounded-2xl"
+        />
         <h1 className="text-center text-3xl font-semibold tracking-tight">Inkling</h1>
         <p className="mt-1 text-center text-sm text-ink-faint">
           Help yourself make progress on your inklings.
@@ -44,7 +51,7 @@ export function Home({
       >
         <span className="circle circle--accent h-12 w-12 shrink-0 text-2xl leading-none">+</span>
         <span>
-          <span className="block text-lg font-semibold">Add a blip</span>
+          <span className="block text-lg font-semibold">Add an Inkling</span>
           <span className="block text-sm text-ink-soft">
             Notice something — text, a link, a photo, or your voice
           </span>
@@ -85,8 +92,8 @@ export function Home({
         className="quiet mt-2 text-center text-xs underline disabled:no-underline disabled:opacity-50"
       >
         {total === 0
-          ? 'no blips yet'
-          : `all ${total} blip${total === 1 ? '' : 's'}${attic > 0 ? ` · ${attic} in the attic` : ''}`}
+          ? 'no Inklings yet'
+          : `all ${total} Inkling${total === 1 ? '' : 's'}${attic > 0 ? ` · ${attic} in the attic` : ''}`}
       </button>
     </div>
   )

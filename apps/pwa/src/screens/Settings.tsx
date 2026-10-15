@@ -351,7 +351,7 @@ export function Settings({
 
       <Section
         title="Server"
-        hint="The app keeps your blips on this device. The server is what syncs them between devices, and where the model and the vault live."
+        hint="The app keeps your Inklings on this device. The server is what syncs them between devices, and where the model and the vault live."
       >
         <input
           value={value}
@@ -613,7 +613,7 @@ export function Settings({
           saved === 'notes' ? (
             <span className="text-good">saved</span>
           ) : (
-            'Promoted blips are written here, into this folder.'
+            'Promoted Inklings are written here, into this folder.'
           )
         }
       >
@@ -670,7 +670,7 @@ export function Settings({
           className={buttonClass}
         >
           <ButtonLabel busy={savingNudge}>
-            {nudge ? 'Turn reminders off' : 'Remind me when blips are waiting'}
+            {nudge ? 'Turn reminders off' : 'Remind me when Inklings are waiting'}
           </ButtonLabel>
         </button>
         <p className="text-xs text-ink-faint">

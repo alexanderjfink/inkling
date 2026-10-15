@@ -15,3 +15,13 @@ export function formatDeferral(until: string, from: Date = new Date()): string {
 export function formatShortDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
+
+/** A move's timestamp: the time if it was today, the date otherwise. */
+export function formatWhen(iso: string, now: Date = new Date()): string {
+  const then = new Date(iso)
+  if (Number.isNaN(then.getTime())) return ''
+  if (then.toDateString() === now.toDateString()) {
+    return then.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  }
+  return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}

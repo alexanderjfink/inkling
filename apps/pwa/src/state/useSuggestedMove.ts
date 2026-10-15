@@ -39,6 +39,17 @@ export function useSuggestedMove(
   const relatedIds = related.map((other) => other.id).join(',')
   const key = blip ? `${blipId}:${avoidIds.join(',')}` : ''
 
+  /**
+   * The blip, without depending on its identity.
+   *
+   * Any event write — including recording that a move was shown — produces a new
+   * blip object. Depending on it would refetch the move on every write, and since
+   * showing a move writes one, that is a loop: fetch, record, refetch, forever.
+   * The fetch is keyed on the blip's id and its re-rolls, and reads the rest here.
+   */
+  const latest = useRef(blip)
+  latest.current = blip
+
   // A move fetched for a different blip is wrong, not merely stale, so it goes. A
   // re-roll keeps the current one on screen instead, because watching it sit there
   // unchanged is what made "not this one" look broken.
@@ -50,15 +61,17 @@ export function useSuggestedMove(
   }, [blipId])
 
   useEffect(() => {
-    if (!blip) {
+    const target = latest.current
+    if (!target || target.id !== blipId) {
       setMove(null)
       setLoading(false)
       return
     }
+
     let cancelled = false
     setLoading(true)
-    const seen = [...blip.moves.map((entry) => entry.moveId), ...avoidIds]
-    void requestMove(key, { blip, related, seenMoveIds: seen }, { provider, related }).then(
+    const seen = [...target.moves.map((entry) => entry.moveId), ...avoidIds]
+    void requestMove(key, { blip: target, related, seenMoveIds: seen }, { provider, related }).then(
       (spec) => {
         if (cancelled) return
         setMove(spec)
@@ -68,8 +81,8 @@ export function useSuggestedMove(
     return () => {
       cancelled = true
     }
-    // `related` is covered by relatedIds; `avoidIds` by key.
-  }, [key, relatedIds, provider, blip])
+    // `related` is covered by relatedIds; `avoidIds` by key; the blip by blipId.
+  }, [key, relatedIds, provider, blipId])
 
   function reroll() {
     if (!move) return

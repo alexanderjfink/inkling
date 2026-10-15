@@ -33,6 +33,12 @@ function makeBlip(type: BlipType, text: string, url?: string): Blip {
   return blip
 }
 
+function blipFrom(events: BlipEvent[]): Blip {
+  const [blip] = project(events)
+  if (!blip) throw new Error('expected a blip')
+  return blip
+}
+
 function fakeProvider(behaviour: {
   available?: boolean
   text?: string
@@ -265,6 +271,63 @@ describe('moves that bring something to read', () => {
     expect(system).toContain('Never invent a URL')
     expect(prompt).toContain('looks something up: yes')
     expect(prompt).toContain('"query"')
+  })
+})
+
+describe('move history', () => {
+  const spec = toMoveSpec(MOVE_LIBRARY[0]!)
+
+  test('a completed move records when it was done', () => {
+    const blip = blipFrom([
+      ev(
+        { t: 'captured', id: 'b1', input: { kind: 'text', text: 'a thought' }, type: 'idea' },
+        0,
+        '2026-01-01T00:00:00Z',
+      ),
+      ev({ t: 'moveShown', id: 'b1', moveId: spec.id, moveSpec: spec }, 1, '2026-01-02T09:00:00Z'),
+      ev({ t: 'moveDone', id: 'b1', moveId: spec.id }, 2, '2026-01-02T09:04:00Z'),
+    ])
+    const move = blip.moves[0]
+    expect(move?.outcome).toBe('done')
+    expect(move?.shownAt).toBe('2026-01-02T09:00:00Z')
+    expect(move?.doneAt).toBe('2026-01-02T09:04:00Z')
+  })
+
+  test('a move that was only offered has no completion time', () => {
+    const blip = blipFrom([
+      ev(
+        { t: 'captured', id: 'b1', input: { kind: 'text', text: 'a thought' }, type: 'idea' },
+        0,
+        '2026-01-01T00:00:00Z',
+      ),
+      ev({ t: 'moveShown', id: 'b1', moveId: spec.id, moveSpec: spec }, 1, '2026-01-02T09:00:00Z'),
+    ])
+    expect(blip.moves[0]?.outcome).toBe('shown')
+    expect(blip.moves[0]?.doneAt).toBeUndefined()
+  })
+
+  test('moves already offered are not offered again', () => {
+    const blip = makeBlip('idea', 'an idea')
+    const first = candidateTemplates({ blip })
+    const seen = first.slice(0, 3).map((template) => template.id)
+    const next = candidateTemplates({ blip, seenMoveIds: seen })
+    for (const id of seen) expect(next.map((template) => template.id)).not.toContain(id)
+  })
+
+  test('the prompt tells the model what it has already offered, and not to repeat', () => {
+    const blip = blipFrom([
+      ev(
+        { t: 'captured', id: 'b1', input: { kind: 'text', text: 'a thought' }, type: 'question' },
+        0,
+        '2026-01-01T00:00:00Z',
+      ),
+      ev({ t: 'moveShown', id: 'b1', moveId: spec.id, moveSpec: spec }, 1, '2026-01-02T09:00:00Z'),
+      ev({ t: 'moveDone', id: 'b1', moveId: spec.id }, 2, '2026-01-02T09:04:00Z'),
+    ])
+    const { prompt } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
+    expect(prompt).toContain('MOVES ALREADY PUT IN FRONT OF THEM')
+    expect(prompt).toContain('done')
+    expect(prompt).toContain('Do not repeat a move')
   })
 })
 

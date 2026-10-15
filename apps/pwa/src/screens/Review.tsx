@@ -1,9 +1,9 @@
-import type { Blip, DeferralChoice, LLMProvider, RelatedBlip } from '@inkling/domain'
+import type { Blip, DeferralChoice, LLMProvider, MoveSpec, RelatedBlip } from '@inkling/domain'
 import { DEFERRAL_CHOICES, buildDailyFeed, deferUntil, rankBlips } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { formatDeferral } from '../format'
-import { type LookupResult, lookupVia } from '../llm/proxy'
 import { ButtonLabel, Spinner } from '../components/Spinner'
+import { formatDeferral, formatWhen } from '../format'
+import { type LookupResult, lookupVia } from '../llm/proxy'
 import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
 import { useSuggestedMove } from '../state/useSuggestedMove'
@@ -59,13 +59,36 @@ function ActionButton({
   )
 }
 
-/**
- * One blip, full screen.
- *
- * The whole interface is three actions: send it to the Mac, add something to it,
- * or put it down for a while. Everything else — retiring, promoting to a note — is
- * a quiet link, because those are rare and should not compete with the main three.
- */
+/** The moves already put in front of you, quietly, behind a tap. */
+function MoveLog({ moves }: { moves: Blip['moves'] }) {
+  if (moves.length === 0) return null
+  return (
+    <details className="mt-5 border-t border-line pt-3">
+      <summary className="cursor-pointer text-[11px] tracking-wide text-ink-faint uppercase">
+        moves so far · {moves.length}
+      </summary>
+      <ul className="mt-2 flex flex-col gap-1.5">
+        {[...moves].reverse().map((entry) => (
+          <li key={`${entry.moveId}-${entry.shownAt}`} className="text-xs text-ink-soft">
+            <span className={entry.outcome === 'done' ? 'text-good' : 'text-ink-faint'}>
+              {entry.outcome === 'done' ? '✓' : '·'}
+            </span>{' '}
+            {entry.spec.title}
+            <span className="text-ink-faint">
+              {' — '}
+              {entry.outcome === 'done' && entry.doneAt
+                ? `done ${formatWhen(entry.doneAt)}`
+                : entry.outcome === 'skipped'
+                  ? `put down ${formatWhen(entry.shownAt)}`
+                  : `offered ${formatWhen(entry.shownAt)}`}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
 export function Review({
   blips,
   actions,
@@ -76,6 +99,7 @@ export function Review({
   promotingId,
   onExit,
   onBrowse,
+  onOpenBlip,
   focusId,
   serverUrl,
 }: {
@@ -88,19 +112,21 @@ export function Review({
   promotingId: string | null
   onExit: () => void
   onBrowse: () => void
-  /** A blip picked from the list, to open first. */
+  onOpenBlip: (id: string) => void
+  /** An Inkling picked from the list, or from the related list, to open first. */
   focusId?: string | null
   serverUrl: string
 }) {
   const [session, setSession] = useState<string[] | null>(null)
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
-  const [entryOpen, setEntryOpen] = useState(false)
-  const [entry, setEntry] = useState('')
   const [busy, setBusy] = useState(false)
   const [lastNote, setLastNote] = useState<{ title: string; path: string } | null>(null)
   const [material, setMaterial] = useState<LookupResult | null>(null)
   const [materialLoading, setMaterialLoading] = useState(false)
-  // A blip picked from the list may not be due today, so focus starts in "all".
+  /** Open when non-null. A move means "doing that move"; null means a free note. */
+  const [composer, setComposer] = useState<{ move: MoveSpec | null } | null>(null)
+  const [entry, setEntry] = useState('')
+  // A picked Inkling may not be due today, so focus starts in "all".
   const [scope, setScope] = useState<Scope>(focusId ? 'all' : 'today')
 
   const today = useMemo(() => buildDailyFeed(blips, { now: new Date() }), [blips])
@@ -110,22 +136,31 @@ export function Review({
   const focus = focusId ? blips.find((blip) => blip.id === focusId) : undefined
   const focusKey = focus?.id ?? ''
 
-  // Changing scope starts a new round, rather than mixing two queues.
+  // Changing scope, or opening a different Inkling, starts a new round.
   const lastScope = useRef(scope)
   useEffect(() => {
     if (lastScope.current === scope) return
     lastScope.current = scope
     setSession(null)
     setDecisions({})
-    setEntryOpen(false)
+    setComposer(null)
     setLastNote(null)
   }, [scope])
 
-  // Freeze the round when it starts, so acting on a blip cannot reshuffle the queue.
+  const lastFocus = useRef(focusKey)
+  useEffect(() => {
+    if (lastFocus.current === focusKey) return
+    lastFocus.current = focusKey
+    setSession(null)
+    setDecisions({})
+    setComposer(null)
+  }, [focusKey])
+
+  // Freeze the round when it starts, so acting on an Inkling cannot reshuffle it.
   useEffect(() => {
     if (session !== null) return
     const ids = candidates.map((blip) => blip.id)
-    // A focused blip opens first, whether or not it is in the queue — and it opens
+    // A focused Inkling opens first, whether or not it is in the queue — and it opens
     // even if it is retired, which is how you get one back.
     const ordered = focusKey ? [focusKey, ...ids.filter((id) => id !== focusKey)] : ids
     if (ordered.length > 0) setSession(ordered)
@@ -155,6 +190,19 @@ export function Review({
 
   const deferLabel = formatDeferral(deferUntil(DEFAULT_DEFERRAL, new Date()))
 
+  // Record what was put in front of you, so it is not offered again. Once per move
+  // per Inkling, and only if the log does not already have it.
+  const recorded = useRef(new Set<string>())
+  useEffect(() => {
+    if (!current || !move || moveLoading) return
+    const key = `${current.id}:${move.id}`
+    if (recorded.current.has(key)) return
+    recorded.current.add(key)
+    if (!current.moves.some((entry_) => entry_.moveId === move.id)) {
+      void actions.recordMoveShown(current.id, move)
+    }
+  }, [current, move, moveLoading, actions])
+
   // If the move brings something to read, go and get it.
   const materialQuery = move?.materialQuery ?? ''
   useEffect(() => {
@@ -179,16 +227,20 @@ export function Review({
   function settle(decision: Decision) {
     if (!current) return
     setDecisions((previous) => ({ ...previous, [current.id]: decision }))
-    setEntryOpen(false)
+    setComposer(null)
     setEntry('')
   }
 
-  async function keepEntry() {
-    if (!current || busy) return
+  async function saveEntry() {
+    if (!current || !composer || busy) return
     setBusy(true)
     try {
-      if (entry.trim()) await actions.addNote(current.id, entry.trim())
-      await actions.snoozeAfter(current.id, 'engaged', current.schedule.timesEngaged)
+      if (composer.move) {
+        await actions.completeMove(current.id, composer.move, entry)
+      } else {
+        if (entry.trim()) await actions.addNote(current.id, entry.trim())
+        await actions.snoozeAfter(current.id, 'engaged', current.schedule.timesEngaged)
+      }
       settle('advanced')
     } finally {
       setBusy(false)
@@ -220,8 +272,7 @@ export function Review({
       currentRelated.map((entry_) => entry_.blip),
     )
     if (result.ok && result.path) {
-      // The blip leaves the queue on success, so remember where it went — otherwise
-      // the note's location vanishes with it.
+      // The Inkling leaves the queue on success, so remember where it went.
       setLastNote({ title: current.title, path: result.path })
       settle('promoted')
     }
@@ -343,22 +394,27 @@ export function Review({
           </ul>
         ) : null}
 
-        {entryOpen ? (
+        {composer ? (
           <div className="mt-5 flex flex-col gap-3">
+            {composer.move ? (
+              <p className="text-[11px] tracking-wide text-accent uppercase">
+                doing: {composer.move.title}
+              </p>
+            ) : null}
             <textarea
               value={entry}
               onChange={(event) => setEntry(event.target.value)}
               rows={6}
-              placeholder={move ? move.goal : 'What did you get?'}
+              placeholder={composer.move ? composer.move.goal : 'What did you get?'}
               className="w-full resize-none rounded-2xl border border-line p-4 text-sm outline-none focus:border-accent"
             />
             <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setEntryOpen(false)} className="quiet text-xs">
+              <button type="button" onClick={() => setComposer(null)} className="quiet text-xs">
                 cancel
               </button>
               <button
                 type="button"
-                onClick={() => void keepEntry()}
+                onClick={() => void saveEntry()}
                 disabled={busy}
                 className="ml-auto rounded-full bg-ink px-6 py-3 text-sm font-semibold text-surface disabled:opacity-40"
               >
@@ -377,22 +433,6 @@ export function Review({
             </p>
             <p className="mt-1 text-sm font-medium">{move.title}</p>
             <p className="mt-1 text-xs text-ink-soft">goal: {move.goal}</p>
-            <div className="mt-2 flex items-center gap-4 text-xs">
-              <span className="text-ink-faint">
-                {Math.max(1, Math.round(move.timeLimitSec / 60))} min ·{' '}
-                {move.generatedBy === 'llm' ? 'adapted' : 'from the playbook'}
-              </span>
-              <button
-                type="button"
-                onClick={reroll}
-                disabled={moveLoading}
-                className="quiet underline disabled:no-underline disabled:opacity-60"
-              >
-                <ButtonLabel busy={moveLoading}>
-                  {moveLoading ? 'finding another…' : 'not this one'}
-                </ButtonLabel>
-              </button>
-            </div>
 
             {move.materialQuery ? (
               <div className="mt-3 rounded-xl border border-line bg-surface/60 p-3">
@@ -423,6 +463,31 @@ export function Review({
                 )}
               </div>
             ) : null}
+
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setComposer({ move })}
+                disabled={moveLoading}
+                className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
+              >
+                Do this
+              </button>
+              <span className="text-xs text-ink-faint">
+                {Math.max(1, Math.round(move.timeLimitSec / 60))} min ·{' '}
+                {move.generatedBy === 'llm' ? 'adapted' : 'from the playbook'}
+              </span>
+              <button
+                type="button"
+                onClick={reroll}
+                disabled={moveLoading}
+                className="quiet ml-auto underline disabled:no-underline disabled:opacity-60"
+              >
+                <ButtonLabel busy={moveLoading}>
+                  {moveLoading ? 'finding another…' : 'not this one'}
+                </ButtonLabel>
+              </button>
+            </div>
           </div>
         ) : (
           <p className="mt-5 flex items-center gap-2 text-xs text-ink-faint">
@@ -431,18 +496,34 @@ export function Review({
           </p>
         )}
 
+        <MoveLog moves={current.moves} />
+
         {currentRelated.length > 0 ? (
           <div className="mt-5 border-t border-line pt-3">
             <p className="text-[11px] tracking-wide text-ink-faint uppercase">related</p>
             <ul className="mt-1 flex flex-col gap-1">
               {currentRelated.map((entry_) => (
-                <li key={entry_.blip.id} className="text-xs text-ink-soft">
-                  <span className="text-ink">{entry_.blip.title}</span> —{' '}
-                  {entry_.reasons.join('; ')}
+                <li key={entry_.blip.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpenBlip(entry_.blip.id)}
+                    className="text-left text-xs text-ink-soft"
+                  >
+                    <span className="text-ink underline decoration-dotted">
+                      {entry_.blip.title}
+                    </span>{' '}
+                    — {entry_.reasons.join('; ')}
+                  </button>
                 </li>
               ))}
             </ul>
           </div>
+        ) : null}
+
+        {current.export?.notePath ? (
+          <p className="mt-4 text-xs text-good">
+            this one became a note: {current.export.notePath}
+          </p>
         ) : null}
       </div>
 
@@ -458,7 +539,7 @@ export function Review({
           icon="+"
           label="Add entry"
           accent
-          onClick={() => setEntryOpen((open) => !open)}
+          onClick={() => setComposer({ move: null })}
         />
         <ActionButton icon="✓" label={deferLabel} onClick={() => void defer(DEFAULT_DEFERRAL)} />
       </div>
@@ -487,12 +568,6 @@ export function Review({
           </button>
         )}
       </div>
-
-      {current.export?.notePath ? (
-        <p className="mt-2 text-center text-xs text-good">
-          this one became a note: {current.export.notePath}
-        </p>
-      ) : null}
 
       {lastNote ? (
         <p className="mt-3 rounded-2xl bg-canvas p-3 text-center text-xs text-good">

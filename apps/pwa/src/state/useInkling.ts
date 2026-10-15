@@ -25,8 +25,11 @@ export interface InklingActions {
   unpinFromDesktop(id: string): Promise<BlipEvent>
   /** Record that a move was put in front of the user, so it is not repeated blindly. */
   recordMoveShown(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
-  /** Finish a move: keep the result, mark the move done, and stretch the interval. */
-  completeMove(id: string, moveId: string, text: string): Promise<BlipEvent>
+  /**
+   * Finish a move: keep the result, log the move with its completion time, and
+   * stretch the interval.
+   */
+  completeMove(id: string, moveSpec: MoveSpec, text: string): Promise<BlipEvent>
   /** A blip has been written out as a note; the path is where it landed. */
   promote(id: string, notePath: string): Promise<BlipEvent>
   classify(id: string, type: BlipType): Promise<BlipEvent>
@@ -125,19 +128,27 @@ export function useInkling() {
       recordMoveShown(id, moveSpec) {
         return storage().append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
       },
-      async completeMove(id, moveId, text) {
+      async completeMove(id, moveSpec, text) {
         const store = storage()
         const before = project(await store.allEvents()).find((blip) => blip.id === id)
         const streak = before?.schedule.timesEngaged ?? 0
+
+        // A move can be completed without having been recorded as shown, so make sure
+        // the history has an entry for it — otherwise the log would miss it.
+        const alreadyShown = before?.moves.some((move) => move.moveId === moveSpec.id) ?? false
+        if (!alreadyShown) {
+          await store.append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
+        }
+
         if (text.trim()) {
           await store.append({
             t: 'entry',
             id,
-            moveId,
+            moveId: moveSpec.id,
             entry: { id: newId(), kind: 'note', text: text.trim(), at: new Date().toISOString() },
           })
         }
-        await store.append({ t: 'moveDone', id, moveId })
+        await store.append({ t: 'moveDone', id, moveId: moveSpec.id })
         return store.append({
           t: 'snoozed',
           id,

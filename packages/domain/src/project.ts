@@ -25,6 +25,8 @@ export interface MoveHistoryEntry {
   spec: MoveSpec
   shownAt: string
   outcome: 'shown' | 'done' | 'skipped'
+  /** When it was completed, if it was. */
+  doneAt?: string
 }
 
 export type BlipStatus = 'active' | 'snoozed' | 'retired' | 'promoted'
@@ -146,7 +148,10 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       break
     case 'moveDone': {
       const move = blip.moves.find((m) => m.moveId === event.moveId)
-      if (move) move.outcome = 'done'
+      if (move) {
+        move.outcome = 'done'
+        move.doneAt = event.at
+      }
       blip.schedule.heat = clamp01(blip.schedule.heat + 0.15)
       blip.schedule.timesEngaged += 1
       blip.schedule.lastTouched = event.at

@@ -2,11 +2,13 @@ import { describe, expect, test } from 'bun:test'
 import type { Blip, BlipEvent, BlipEventBody, BlipType } from '../src/index'
 import {
   buildDailyFeed,
+  buildRound,
   deferUntil,
   isDue,
   newId,
   project,
   rankBlips,
+  roundQueue,
   scoreBlip,
   snoozeUntil,
 } from '../src/index'
@@ -180,5 +182,90 @@ describe('scheduler', () => {
     ])
     expect(isDue(deferred, NOW)).toBe(false)
     expect(isDue(deferred, new Date(NOW.getTime() + 31 * 86_400_000))).toBe(true)
+  })
+})
+
+describe('buildRound and roundQueue', () => {
+  /**
+   * These exist because of a real bug: a focused Inkling was pinned to the front of
+   * every new round, and switching scope cleared the decisions — so a blip that had
+   * already been deleted came back and could be deleted again. It was deleted twice in
+   * the log before anyone noticed.
+   */
+  function blips(...ids: string[]): { list: Blip[]; byId: Map<string, Blip> } {
+    const list = ids.map((id) => only(blipFrom(id, '2026-02-28T12:00:00Z').events))
+    return { list, byId: new Map(list.map((blip) => [blip.id, blip])) }
+  }
+
+  test('with no focus, the round is the candidates in order', () => {
+    const { list, byId } = blips('a', 'b', 'c')
+    expect(buildRound(list, byId)).toEqual(list.map((blip) => blip.id))
+  })
+
+  test('a focused Inkling goes first — this is how you open one from the attic', () => {
+    const { list, byId } = blips('a', 'b', 'c')
+    const third = list[2]
+    if (!third) throw new Error('expected three')
+    expect(buildRound(list, byId, third.id)[0]).toBe(third.id)
+  })
+
+  test('a retired Inkling can still be focused — retiring is "not now"', () => {
+    const { list } = blips('a')
+    const first = list[0]
+    if (!first) throw new Error('expected one')
+    const retired = { ...first, status: 'retired' as const }
+    const withRetired = new Map([[retired.id, retired]])
+    expect(buildRound([], withRetired, retired.id)).toEqual([retired.id])
+  })
+
+  test('a DELETED Inkling is not focused back into the round', () => {
+    const { list, byId } = blips('a', 'b')
+    const gone = list[0]
+    if (!gone) throw new Error('expected one')
+    // The override must come last: spreading byId after it would put the live blip back.
+    const withDeleted = new Map([...byId, [gone.id, { ...gone, deleted: true }] as const])
+    expect(buildRound([list[1]!], withDeleted, gone.id)).not.toContain(gone.id)
+  })
+
+  test('a focused id that does not exist is ignored rather than crashing', () => {
+    const { list, byId } = blips('a')
+    expect(buildRound(list, byId, 'nope')).toEqual(list.map((blip) => blip.id))
+  })
+
+  test('deleted candidates never enter a round', () => {
+    const { list, byId } = blips('a', 'b')
+    const gone = list[0]
+    if (!gone) throw new Error('expected one')
+    const mixed = [{ ...gone, deleted: true }, list[1]!]
+    expect(buildRound(mixed, byId)).toEqual([list[1]!.id])
+  })
+
+  test('the queue drops deleted Inklings from a frozen round', () => {
+    const { list, byId } = blips('a', 'b', 'c')
+    const session = list.map((blip) => blip.id)
+    const gone = list[1]
+    if (!gone) throw new Error('expected two')
+    const withDeleted = new Map(byId)
+    withDeleted.set(gone.id, { ...gone, deleted: true })
+    const queue = roundQueue(session, list, withDeleted, new Set())
+    expect(queue.map((blip) => blip.id)).toEqual([list[0]!.id, list[2]!.id])
+  })
+
+  test('the queue drops what was already decided this round', () => {
+    const { list, byId } = blips('a', 'b')
+    const session = list.map((blip) => blip.id)
+    const decided = new Set([list[0]!.id])
+    expect(roundQueue(session, list, byId, decided).map((blip) => blip.id)).toEqual([list[1]!.id])
+  })
+
+  test('a session id with no blip behind it is skipped, not shown as undefined', () => {
+    const { list, byId } = blips('a')
+    const queue = roundQueue(['missing', list[0]!.id], list, byId, new Set())
+    expect(queue.map((blip) => blip.id)).toEqual([list[0]!.id])
+  })
+
+  test('a null session falls back to the candidates', () => {
+    const { list, byId } = blips('a', 'b')
+    expect(roundQueue(null, list, byId, new Set())).toHaveLength(2)
   })
 })

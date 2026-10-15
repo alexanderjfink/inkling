@@ -74,6 +74,44 @@ function saturated(blip: Blip, counts: Map<string, number>): boolean {
 }
 
 /**
+ * The round of Inklings to work through, frozen at the moment it starts.
+ *
+ * Frozen so acting on one Inkling cannot reshuffle the rest mid-round. A focused
+ * Inkling goes first — that is how you open something out of the attic, so a *retired*
+ * one is allowed. A **deleted** one is not: deletion means "not this", and letting a
+ * deleted Inkling back into a round means it can be deleted again and again, which is
+ * exactly what happened before this guard existed.
+ */
+export function buildRound(
+  candidates: readonly Blip[],
+  byId: ReadonlyMap<string, Blip>,
+  focusId?: string | null,
+): string[] {
+  const ids = candidates.filter((blip) => !blip.deleted).map((blip) => blip.id)
+  if (!focusId) return ids
+  const focused = byId.get(focusId)
+  if (!focused || focused.deleted) return ids
+  return [focusId, ...ids.filter((id) => id !== focusId)]
+}
+
+/**
+ * What is left to show in this round: deleted Inklings never appear, and neither do
+ * ones already decided this round.
+ */
+export function roundQueue(
+  session: readonly string[] | null,
+  candidates: readonly Blip[],
+  byId: ReadonlyMap<string, Blip>,
+  decided: ReadonlySet<string>,
+): Blip[] {
+  const source =
+    session === null
+      ? candidates
+      : session.map((id) => byId.get(id)).filter((blip): blip is Blip => blip !== undefined)
+  return source.filter((blip) => !blip.deleted && !decided.has(blip.id))
+}
+
+/**
  * Build today's finite feed: due blips ranked by score, thinned so no single
  * topic dominates, always including at least one cold blip when one is available.
  */

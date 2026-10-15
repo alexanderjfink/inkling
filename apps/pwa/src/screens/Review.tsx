@@ -10,9 +10,11 @@ import {
   BLIP_TYPES,
   DEFERRAL_CHOICES,
   buildDailyFeed,
+  buildRound,
   deferUntil,
   rankBlips,
   requestGuidance,
+  roundQueue,
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Blocks } from '../components/Blocks'
@@ -226,6 +228,7 @@ export function Review({
   const today = useMemo(() => buildDailyFeed(blips, { now: new Date() }), [blips])
   const everything = useMemo(() => rankBlips(blips, { now: new Date() }), [blips])
   const candidates = scope === 'today' ? today : everything
+  const byId = useMemo(() => new Map(blips.map((blip) => [blip.id, blip])), [blips])
 
   const focus = focusId ? blips.find((blip) => blip.id === focusId) : undefined
   const focusKey = focus?.id ?? ''
@@ -253,21 +256,16 @@ export function Review({
   // Freeze the round when it starts, so acting on an Inkling cannot reshuffle it.
   useEffect(() => {
     if (session !== null) return
-    const ids = candidates.map((blip) => blip.id)
-    // A focused Inkling opens first, whether or not it is in the queue — and it opens
-    // even if it is retired, which is how you get one back.
-    const ordered = focusKey ? [focusKey, ...ids.filter((id) => id !== focusKey)] : ids
+    const ordered = buildRound(candidates, byId, focusKey)
     if (ordered.length > 0) setSession(ordered)
-  }, [candidates, session, focusKey])
+  }, [candidates, session, focusKey, byId])
 
-  const byId = useMemo(() => new Map(blips.map((blip) => [blip.id, blip])), [blips])
-  const queue = useMemo(() => {
-    if (session === null) return candidates
-    return session
-      .map((id) => byId.get(id))
-      .filter((blip): blip is Blip => blip !== undefined && !decisions[blip.id])
-  }, [session, candidates, byId, decisions])
-
+  const queue = useMemo(
+    () => roundQueue(session, candidates, byId, new Set(Object.keys(decisions))),
+    [session, candidates, byId, decisions],
+  )
+  // The round's size is frozen when it starts, not recomputed after a deletion — else
+  // deleting the last Inkling in a round would read as "nothing was waiting".
   const total = session?.length ?? candidates.length
   const done = total - queue.length
   const current = queue[0]

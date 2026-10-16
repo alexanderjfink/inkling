@@ -10,6 +10,7 @@ import {
   type SocialMessage,
   askContextFor,
   FRIEND_MOVE_MAX_SEC,
+  defaultColor,
   isSocialMessageKind,
   parseLog,
   project,
@@ -64,6 +65,7 @@ export function friendsOf(
   userId: string,
   events: FriendEvent[],
   usernames: Map<string, string>,
+  colors: Map<string, string> = new Map(),
 ): Friend[] {
   const out: Friend[] = []
   for (const event of foldFriendships(events).values()) {
@@ -80,6 +82,7 @@ export function friendsOf(
       username: usernames.get(other) ?? 'someone',
       status,
       at: event.at,
+      color: colors.get(other) ?? defaultColor(other),
     })
   }
   return out.sort((a, b) => a.username.localeCompare(b.username))

@@ -74,6 +74,17 @@ export function setUserRole(url: string, id: string, role: Role): Promise<Outcom
   return call(url, `/admin/users/${id}`, json({ role }, 'PATCH'))
 }
 
+/**
+ * How you appear to friends.
+ *
+ * The only account setting that is about other people rather than about you, which is why it
+ * is here and not on the admin screen: nobody else can set it.
+ */
+export async function setMyColor(url: string, color: string | null): Promise<Outcome<PublicUser>> {
+  const result = await call<{ user: PublicUser }>(url, '/auth/color', json({ color }, 'POST'))
+  return result.ok ? { ok: true, value: result.value.user } : result
+}
+
 /** Change your own password, from the settings screen. */
 export function changeOwnPassword(
   url: string,

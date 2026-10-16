@@ -25,6 +25,7 @@ import {
   unansweredFriendMove,
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Avatar } from '../components/Avatar'
 import { BlockPicker, Blocks } from '../components/Blocks'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { EntryContextPanel } from '../components/EntryContext'
@@ -291,7 +292,13 @@ function AskPanel({
   )
 }
 
-/** Whatever the move turned up to read. Absent entirely when it turned up nothing. */
+/**
+ * Whatever the move turned up to read.
+ *
+ * The extract is behind a tap. It is four or five lines of somebody else's prose — the most
+ * text on the card by a distance, on a screen whose whole job is to get you to a two-minute
+ * action — and the title and the description are enough to decide whether to read it.
+ */
 function Material({
   loading,
   material,
@@ -301,28 +308,42 @@ function Material({
   material: LookupResult | null
   className?: string
 }) {
-  return (
-    <div className={`${className} rounded-xl border border-line bg-surface/60 p-3`}>
-      {loading ? (
+  const [open, setOpen] = useState(false)
+
+  if (loading) {
+    return (
+      <div className={`${className} rounded-xl border border-line bg-surface/60 p-3`}>
         <span className="flex items-center gap-2 text-xs text-ink-faint">
           <Spinner className="h-3 w-3" />
           finding something to read…
         </span>
-      ) : material ? (
-        <>
-          <a
-            href={material.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-xs font-medium text-accent underline"
-          >
-            {material.title}
-          </a>
-          {material.description ? (
-            <span className="text-xs text-ink-faint"> — {material.description}</span>
-          ) : null}
-          <p className="mt-1 text-xs leading-relaxed text-ink-soft">{material.extract}</p>
-        </>
+      </div>
+    )
+  }
+  if (!material) return null
+
+  return (
+    <div className={`${className} rounded-xl border border-line bg-surface/60 p-3`}>
+      <a
+        href={material.url}
+        target="_blank"
+        rel="noreferrer"
+        className="text-xs font-medium text-accent underline"
+      >
+        {material.title}
+      </a>
+      {material.description ? (
+        <span className="text-xs text-ink-faint"> — {material.description}</span>
+      ) : null}
+      <button
+        type="button"
+        onClick={() => setOpen((shown) => !shown)}
+        className="quiet ml-2 text-[11px] underline"
+      >
+        {open ? 'hide' : 'read it'}
+      </button>
+      {open ? (
+        <p className="mt-1 text-xs leading-relaxed text-ink-soft">{material.extract}</p>
       ) : null}
     </div>
   )
@@ -352,45 +373,6 @@ function Guidance({ items, className = 'mt-3' }: { items: string[] | null; class
           </ul>
         </>
       )}
-    </div>
-  )
-}
-
-function ActionButton({
-  icon,
-  label,
-  onClick,
-  accent,
-  disabled,
-  busy,
-  busyLabel,
-}: {
-  icon: string
-  label: string
-  onClick: () => void
-  accent?: boolean
-  disabled?: boolean
-  busy?: boolean
-  busyLabel?: string
-}) {
-  return (
-    <div className="flex w-28 flex-col items-center gap-2">
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled || busy}
-        aria-busy={busy}
-        className={`circle h-[4.25rem] w-[4.25rem] ${accent ? 'circle--accent' : ''}`}
-      >
-        {busy ? (
-          <Spinner className="h-6 w-6" />
-        ) : (
-          <span className="text-2xl leading-none">{icon}</span>
-        )}
-      </button>
-      <span className="text-center text-xs text-ink-soft">
-        {busy ? (busyLabel ?? label) : label}
-      </span>
     </div>
   )
 }
@@ -463,7 +445,6 @@ export function Review({
   related,
   onPromote,
   promoteResults,
-  promotingId,
   onExit,
   onBrowse,
   onOpenBlip,
@@ -480,7 +461,6 @@ export function Review({
   related: Map<string, RelatedBlip[]>
   onPromote: (blip: Blip, relatedBlips: Blip[]) => Promise<PromoteResult>
   promoteResults: Record<string, PromoteResult>
-  promotingId: string | null
   onExit: () => void
   onBrowse: () => void
   onOpenBlip: (id: string) => void
@@ -1090,10 +1070,17 @@ export function Review({
         <Blocks blip={current} actions={actions} />
 
         {friendMove && !askOpen ? (
-          <div className="mt-5 rounded-2xl border border-accent/40 bg-accent-soft/60 p-4">
-            <p className="text-[11px] tracking-wide text-accent uppercase">
-              a move from {friendMove.fromUsername}
-            </p>
+          <div className="mt-5 rounded-2xl border border-line bg-surface/60 p-4">
+            <div className="flex items-center gap-2.5">
+              <Avatar
+                username={friendMove.fromUsername}
+                color={social.friends.find((f) => f.userId === friendMove.from)?.color}
+                size={28}
+              />
+              <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+                a move from {friendMove.fromUsername}
+              </p>
+            </div>
             <p className="mt-1 text-sm font-medium">{friendMove.spec.title}</p>
             <p className="mt-1 text-xs text-ink-soft">goal: {friendMove.spec.goal}</p>
             {friendMove.note ? (
@@ -1552,25 +1539,64 @@ export function Review({
         ) : null}
       </div>
 
-      <div className="mt-6 flex items-start justify-center gap-6">
+      {/* Three ways to get a move, on one line, then the two things you can do with the
+          Inkling itself. They used to be circles with a word under each, mixed in with the
+          move actions, which made one row of five things where three were a question and two
+          were an answer. */}
+      {!composer ? (
+        <div className="mt-6 flex flex-wrap items-stretch justify-center gap-2">
+          {move && !friendMove ? null : (
+            <button
+              type="button"
+              onClick={generateMove}
+              disabled={moveLoading}
+              className="rounded-full bg-ink px-4 py-3 text-sm font-semibold text-surface disabled:opacity-40"
+            >
+              <ButtonLabel busy={moveLoading}>
+                {moveLoading ? 'Thinking…' : 'Generate a Move'}
+              </ButtonLabel>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setComposer({ move: null })}
+            className="rounded-full border border-line px-4 py-3 text-sm font-medium text-ink-soft"
+          >
+            New Move
+          </button>
+          {socialOn && !current.demo ? (
+            <button
+              type="button"
+              onClick={() => setAskOpen((open) => !open)}
+              className="rounded-full border border-accent/50 px-4 py-3 text-sm font-medium text-accent"
+            >
+              Ask a Friend
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-xs">
         {PROMOTE_ENABLED ? (
-          <ActionButton
-            icon="↑"
-            label="Promote to note"
-            onClick={() => void promote()}
-            busy={promotingId === current.id}
-            busyLabel="writing the note…"
-          />
+          <button type="button" onClick={() => void promote()} className="quiet underline">
+            promote
+          </button>
         ) : (
-          <ActionButton icon="↑" label="Export to note" onClick={() => setExporting((on) => !on)} />
+          <button
+            type="button"
+            onClick={() => setExporting((on) => !on)}
+            className="quiet underline"
+          >
+            export
+          </button>
         )}
-        <ActionButton
-          icon="+"
-          label="Make a Move"
-          accent
-          onClick={() => setComposer({ move: null })}
-        />
-        <ActionButton icon="✓" label={deferLabel} onClick={() => void defer(DEFAULT_DEFERRAL)} />
+        <button
+          type="button"
+          onClick={() => void defer(DEFAULT_DEFERRAL)}
+          className="quiet underline"
+        >
+          put it down {deferLabel}
+        </button>
       </div>
 
       <div className="mt-3 flex justify-center gap-4 text-xs">

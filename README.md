@@ -295,7 +295,12 @@ the field is gone. It carries a **preview of the first Inkling you would be show
 you can decide whether now is the moment without opening it — and it only appears when
 something is actually waiting, so the screen stays a place to write.
 
-**Entry is one field.** It takes words, a link, or a picture — pasted, dropped, or picked
+**Entry opens as a button.** "What did you notice?" is a button, not a placeholder — it is an
+invitation rather than a form, and tapping it opens the field with the cursor in it. That is
+also the only way a phone will raise the keyboard, since it will not do it for a focus nobody
+asked for.
+
+It is one field. It takes words, a link, or a picture — pasted, dropped, or picked
 with the paperclip — and works out what it was given rather than asking. **Structure goes in
 the same box**: choose a checklist and a chip appears under what you are writing, marked *on
 keep*, because it is part of what you are writing rather than a setting about it. It used to be three
@@ -419,9 +424,15 @@ rather than quietly counted as empty.
 
 | | |
 |---|---|
-| **↑ Export to note** | renders the note and hands it over — download, copy or share |
-| **＋ Make a Move** | write something down, free-form, with a link or a picture if there is one |
-| **✓ until Saturday** | put it down; the label is the date it comes back |
+**Three ways to get a move, on one line** — *Generate a Move*, *New Move* (write your own),
+and *Ask a Friend* — and below them the two things you can do with the Inkling itself:
+**export** and **put it down until Monday**, which says the date it picked. They used to be
+circles with a word under each, mixed in with the move actions, which made one row of five
+things where three were a question and two were an answer.
+
+**The Wikipedia extract is behind a "read it."** It is four or five lines of somebody else's
+prose — the most text on the card by a distance — and the title and description are enough to
+decide whether to read it.
 
 **Nothing is generated until you ask.** An Inkling opens with two buttons — **Generate a
 Move** and **Ask a Friend for a Move** — and no spinner.
@@ -457,7 +468,9 @@ with the move you liked) and **help me with the next step** (a short list of wha
 look for, specific to the move and to whatever material was found).
 
 **Structure is added where you are writing**, not on the card you are reading: a button in
-the field that starts an Inkling and in the field that adds to one.
+the field that starts an Inkling and in the field that adds to one. **And it is shown, not
+named** — choosing a grid draws a grid inside the writing box, inert until there is an Inkling
+to attach it to. "Grid ×" told you nothing you had not just chosen.
 
 Two kinds are offered, because two of them are *shapes* — a checklist is parts to tick off, a
 grid is variations side by side, and both arrange something you already have. Reading progress
@@ -558,6 +571,18 @@ whether or not it was due.
 Home carries one small trust line: **"3 captured today — all saved."** A capture that
 vanished silently is the failure this app exists to avoid, so the count is visible
 rather than assumed.
+
+## How people appear
+
+Every account has a **colour**, and it is theirs — set in Settings → You, and nobody else can
+change it. It is drawn with their initial wherever they appear: on a card asking for help, on
+the button that says *Suggest a move for Priya*, on the move they sent you, in the friends
+list. The point is that a suggestion you did not ask for is easier to take from a person you
+can picture, and a name in grey capitals is not a person.
+
+Left alone, the colour comes from the account id — stable, and different people get different
+ones. **Not yet: a profile picture.** A colour and an initial carry the association, but a
+photo is the obvious next step.
 
 ## Friends, and moves from them
 
@@ -975,6 +1000,12 @@ context, so everything works without a certificate.
 
 Note: each origin (scheme + host + port) gets its own local datastore, so blips
 captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5173`.
+
+## Going back
+
+The back button and the Android back gesture go back a screen, because every screen pushes a
+history entry. Without that the gesture leaves the app entirely — from a card you were reading
+— and the entry screen is the one with nothing behind it.
 
 ## Admin
 

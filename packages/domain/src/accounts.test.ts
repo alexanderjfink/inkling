@@ -1,6 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import {
   PASSWORD_MIN,
+  PROFILE_COLORS,
+  colorOf,
+  defaultColor,
   USERNAME_MAX,
   USERNAME_MIN,
   isRole,
@@ -72,5 +75,32 @@ describe('isRole', () => {
     expect(isRole('member')).toBe(true)
     expect(isRole('root')).toBe(false)
     expect(isRole(undefined)).toBe(false)
+  })
+})
+
+describe('how somebody appears', () => {
+  test('a colour is stable for the same account', () => {
+    // It has to be: this is what makes a friend's suggestion recognisable at a glance, and
+    // a colour that changed would be a colour that means nothing.
+    expect(defaultColor('user-abc')).toBe(defaultColor('user-abc'))
+  })
+
+  test('and differs between accounts, which is the point of having one', () => {
+    const colors = new Set(
+      ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'].map(defaultColor),
+    )
+    expect(colors.size).toBeGreaterThan(3)
+  })
+
+  test('a chosen colour is used, and a nonsense one is not', () => {
+    expect(colorOf({ id: 'user-abc', color: PROFILE_COLORS[3] })).toBe(PROFILE_COLORS[3])
+    expect(colorOf({ id: 'user-abc', color: 'chartreuse' })).toBe(defaultColor('user-abc'))
+    expect(colorOf({ id: 'user-abc' })).toBe(defaultColor('user-abc'))
+  })
+
+  test('every default is one of the colours on offer', () => {
+    for (const id of ['a', 'bb', 'ccc', 'dddd', 'user-abc']) {
+      expect(PROFILE_COLORS).toContain(defaultColor(id) as never)
+    }
   })
 })

@@ -18,8 +18,8 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 const KINDS: Array<{ type: string; input: string; move: string }> = [
   {
     type: 'question',
-    input: 'Why does the sky go orange at sunset but not at noon?',
-    move: 'Answer it in one sentence, as if you had to',
+    input: 'Why do I make my best decisions in the shower?',
+    move: 'What would change your mind?',
   },
   {
     type: 'reference',
@@ -33,8 +33,8 @@ const KINDS: Array<{ type: string; input: string; move: string }> = [
   },
   {
     type: 'idea',
-    input: 'A tiny app that only does one thing',
-    move: 'What is the smallest test?',
+    input: 'What if the newsletter was one paragraph and one link?',
+    move: 'Describe it so a stranger would understand',
   },
   {
     type: 'quest',

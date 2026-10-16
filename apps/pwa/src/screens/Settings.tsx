@@ -1,7 +1,13 @@
-import type { Blip, BlipEvent, FeedbackContext, ShareDefault } from '@inkling/domain'
+import {
+  type Blip,
+  type BlipEvent,
+  type FeedbackContext,
+  PROFILE_COLORS,
+  type ShareDefault,
+} from '@inkling/domain'
 import { validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
-import { changeOwnPassword } from '../admin'
+import { changeOwnPassword, setMyColor } from '../admin'
 import { Admin } from './Admin'
 import { APP_BUILD } from '../build'
 import type { Auth } from '../state/useAuth'
@@ -13,6 +19,7 @@ import {
   downloadMarkdownBackup,
   downloadRejections,
 } from '../backup'
+import { Avatar } from '../components/Avatar'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { PROMOTE_ENABLED } from '../features'
 import {
@@ -156,6 +163,9 @@ export function Settings({
   const [socialEnabled, setSocialEnabled] = useState(true)
   const [shareDefault, setShareDefault] = useState<ShareDefault>('friends')
   const [tab, setTab] = useState<Tab>('you')
+  const [color, setColor] = useState<string | undefined>()
+  const [savingColor, setSavingColor] = useState(false)
+  const [colorSaved, setColorSaved] = useState(false)
 
   useEffect(() => {
     if (!config) return
@@ -212,6 +222,26 @@ export function Settings({
 
   /** Suggestions marked bad, which is the data that can improve them. */
   const badCount = blips.reduce((total, blip) => total + blip.rejections.length, 0)
+
+  /** Kept in step with whoever is signed in, including right after it changes. */
+  useEffect(() => {
+    setColor(auth.user?.color)
+  }, [auth.user?.color, auth.user?.id])
+
+  async function saveColor(next: string) {
+    setSavingColor(true)
+    setColorSaved(false)
+    try {
+      const result = await setMyColor(serverUrl, next)
+      if (result.ok) {
+        setColor(result.value.color)
+        setColorSaved(true)
+        void auth.refresh()
+      }
+    } finally {
+      setSavingColor(false)
+    }
+  }
 
   async function saveSocial() {
     if (await save({ socialEnabled, shareDefault })) setSaved('social')
@@ -358,6 +388,35 @@ export function Settings({
               first account created becomes the admin.
             </p>
           )}
+        </Section>
+      ) : null}
+
+      {tab === 'you' ? (
+        <Section title="How you appear">
+          <p className="text-xs text-ink-faint">
+            Friends see this beside your name — on a move you suggested, on a question you asked. It
+            is yours to set, and nobody else can change it.
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5">
+              <Avatar username={auth.user?.username ?? '?'} color={color} size={24} />
+              <span className="text-xs">{auth.user?.username}</span>
+            </span>
+            {PROFILE_COLORS.map((option) => (
+              <button
+                key={option}
+                type="button"
+                disabled={savingColor}
+                aria-label={`Use ${option}`}
+                onClick={() => void saveColor(option)}
+                className={`h-8 w-8 rounded-full transition disabled:opacity-40 ${
+                  color === option ? 'ring-2 ring-ink ring-offset-2 ring-offset-surface' : ''
+                }`}
+                style={{ background: option }}
+              />
+            ))}
+          </div>
+          {colorSaved ? <p className="text-xs text-good">saved</p> : null}
         </Section>
       ) : null}
 

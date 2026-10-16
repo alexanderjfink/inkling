@@ -53,11 +53,14 @@ export {
 } from './blocks'
 export type { BlockKindInfo } from './blocks'
 export {
+  PROFILE_COLORS,
   PASSWORD_MAX,
   PASSWORD_MIN,
   SESSION_DAYS,
   USERNAME_MAX,
   USERNAME_MIN,
+  colorOf,
+  defaultColor,
   isRole,
   usernameKey,
   validatePassword,

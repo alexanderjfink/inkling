@@ -4,6 +4,7 @@ import {
   blockKindInfo,
   blockSummary,
   checklistCounts,
+  newBlock,
   pollLeader,
   progressFraction,
   withItemAdded,
@@ -121,7 +122,30 @@ export function Blocks({ blip, actions }: { blip: Blip; actions: InklingActions 
   )
 }
 
-function BlockCard({
+/**
+ * A block, drawn but not usable.
+ *
+ * For showing what a choice will look like before the Inkling holding it exists. Inert by
+ * pointer events rather than by disarming every control inside, which keeps one renderer
+ * rather than two that drift.
+ */
+export function BlockPreview({ kind }: { kind: BlockKind }) {
+  return (
+    <div className="pointer-events-none opacity-70">
+      <ul className="flex flex-col gap-3">
+        <BlockCard
+          block={newBlock(kind)}
+          busy={null}
+          onPatch={() => {}}
+          onRemoveBlock={() => {}}
+          onStoreImage={async (file) => ({ hash: '', mime: file.type })}
+        />
+      </ul>
+    </div>
+  )
+}
+
+export function BlockCard({
   block,
   busy,
   onPatch,

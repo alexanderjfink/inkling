@@ -5,6 +5,7 @@ import {
   usernameKey,
   validatePassword,
   validateUsername,
+  PROFILE_COLORS,
 } from '@inkling/domain'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
@@ -48,7 +49,13 @@ const USERS_VERSION = 1
 const SESSIONS_VERSION = 1
 
 function toPublic(user: StoredUser): PublicUser {
-  return { id: user.id, username: user.username, role: user.role, createdAt: user.createdAt }
+  return {
+    id: user.id,
+    username: user.username,
+    role: user.role,
+    createdAt: user.createdAt,
+    color: user.color,
+  }
 }
 
 function newToken(): string {
@@ -302,6 +309,21 @@ export class Auth {
   }
 
   /** Set someone else's password. Admin only; signs their other devices out. */
+  /** How this account appears to other people. One of PROFILE_COLORS, or unset to be given one. */
+  async setColor(userId: string, color: string | null): Promise<Result<null>> {
+    return this.#serial(async () => {
+      const user = (await this.#loadUsers()).find((entry) => entry.id === userId)
+      if (!user) return { ok: false, error: 'no such account' }
+      if (color !== null && !PROFILE_COLORS.includes(color as never)) {
+        return { ok: false, error: 'that is not one of the colours' }
+      }
+      if (color) user.color = color
+      else delete user.color
+      await this.#saveUsers()
+      return { ok: true, value: null }
+    })
+  }
+
   async setPassword(userId: string, password: string): Promise<Result<null>> {
     return this.#serial(async () => {
       const user = (await this.#loadUsers()).find((entry) => entry.id === userId)

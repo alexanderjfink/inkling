@@ -14,6 +14,44 @@ export interface PublicUser {
   username: string
   role: Role
   createdAt: string
+  /**
+   * How this person appears to other people, one of {@link PROFILE_COLORS}.
+   *
+   * Never a picture: the point of it is that a friend's suggestion is recognisably *theirs*
+   * at a glance, and a colour plus an initial does that. It travels with the account rather
+   * than the device, because it is about them, not about where they are.
+   */
+  color?: string
+}
+
+/** The palette a person can be. Enough to tell people apart, few enough that they do not clash. */
+export const PROFILE_COLORS = [
+  '#7c5cff',
+  '#2f9e6f',
+  '#c2410c',
+  '#0e7490',
+  '#a21caf',
+  '#4d7c0f',
+  '#b91c1c',
+  '#1d4ed8',
+] as const
+
+/**
+ * The colour for somebody who has not chosen one.
+ *
+ * From the id, so it is stable, and from the name, so two people on one server are unlikely
+ * to match — which is the whole point of having one.
+ */
+export function defaultColor(id: string): string {
+  let hash = 0
+  for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
+  return PROFILE_COLORS[hash % PROFILE_COLORS.length] as string
+}
+
+export function colorOf(user: { id: string; color?: string }): string {
+  return user.color && PROFILE_COLORS.includes(user.color as never)
+    ? user.color
+    : defaultColor(user.id)
 }
 
 export const USERNAME_MIN = 3

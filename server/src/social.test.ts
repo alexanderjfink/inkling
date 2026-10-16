@@ -29,11 +29,21 @@ describe('friendships', () => {
   test('a request is not a friendship, and typing a name is not enough', () => {
     const events = [event('requested', 'u-priya', 'u-sam', '2026-01-01T00:00:00Z')]
     expect(areFriends('u-priya', 'u-sam', events)).toBe(false)
-    expect(friendsOf('u-priya', events, NAMES)).toEqual([
-      { userId: 'u-sam', username: 'sam', status: 'asked', at: '2026-01-01T00:00:00Z' },
+    // The colour is theirs and stable, so it is asserted only to be present: what matters
+    // is the status, which is the part that decides what you can do.
+    const priyas = friendsOf('u-priya', events, NAMES)
+    expect(priyas.map(({ userId, username, status }) => ({ userId, username, status }))).toEqual([
+      { userId: 'u-sam', username: 'sam', status: 'asked' },
     ])
+    expect(priyas[0]?.color).toBeTruthy()
     expect(friendsOf('u-sam', events, NAMES)).toEqual([
-      { userId: 'u-priya', username: 'priya', status: 'asked-of-you', at: '2026-01-01T00:00:00Z' },
+      {
+        userId: 'u-priya',
+        username: 'priya',
+        status: 'asked-of-you',
+        at: '2026-01-01T00:00:00Z',
+        color: expect.any(String),
+      },
     ])
   })
 

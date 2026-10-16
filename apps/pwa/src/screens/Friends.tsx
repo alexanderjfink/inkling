@@ -1,5 +1,6 @@
 import type { AskContext, Friend } from '@inkling/domain'
 import { useState } from 'react'
+import { Avatar } from '../components/Avatar'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 import type { SocialState } from '../state/useSocial'
 
@@ -81,6 +82,7 @@ export function Friends({
               key={friend.userId}
               className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-3"
             >
+              <Avatar username={friend.username} color={friend.color} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{friend.username}</span>
                 <span className="block text-[11px] text-ink-faint">
@@ -123,6 +125,7 @@ export function Friends({
               key={friend.userId}
               className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-3"
             >
+              <Avatar username={friend.username} color={friend.color} />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{friend.username}</span>
                 <span className="block text-[11px] text-ink-faint">since {when(friend.at)}</span>

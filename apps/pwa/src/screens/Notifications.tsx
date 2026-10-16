@@ -1,5 +1,6 @@
 import type { AskContext, Friend, MoveSpec } from '@inkling/domain'
 import { useState } from 'react'
+import { Avatar } from '../components/Avatar'
 import { ButtonLabel } from '../components/Spinner'
 import type { SocialState } from '../state/useSocial'
 
@@ -22,11 +23,13 @@ function Ask({
   context,
   note,
   username,
+  color,
   children,
 }: {
   context: AskContext
   note?: string
   username: string
+  color?: string
   /** The action, inside the box rather than under it: this is one person's request, and a
    *  button floating below the card belongs to no card in particular. */
   children?: React.ReactNode
@@ -38,9 +41,7 @@ function Ask({
           appeared. It used to open with the type and the name in small grey capitals, which
           reads as metadata rather than as somebody. */}
       <div className="flex items-center gap-2.5">
-        <span className="circle circle--accent h-8 w-8 shrink-0 text-sm font-semibold">
-          {username.slice(0, 1).toUpperCase()}
-        </span>
+        <Avatar username={username} color={color} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{username}</span>
           <span className="block text-[11px] tracking-wide text-ink-faint uppercase">
@@ -263,7 +264,12 @@ export function Notifications({
             const friend = friendFor(ask.userId)
             return (
               <div key={ask.messageId}>
-                <Ask context={ask.context} note={ask.note} username={ask.username}>
+                <Ask
+                  context={ask.context}
+                  note={ask.note}
+                  username={ask.username}
+                  color={friend.color}
+                >
                   {openFor !== ask.messageId ? (
                     <div className="mt-2 flex flex-wrap items-center gap-3">
                       {/* A button, and it says whose it is. "suggest a move" as an underline
@@ -272,7 +278,8 @@ export function Notifications({
                       <button
                         type="button"
                         onClick={() => setOpenFor(ask.messageId)}
-                        className="rounded-full bg-ink px-4 py-2.5 text-xs font-semibold text-surface"
+                        className="rounded-full px-4 py-2.5 text-xs font-semibold text-white"
+                        style={{ background: friend.color ?? 'var(--color-ink)' }}
                       >
                         Suggest a move for {ask.username}
                       </button>

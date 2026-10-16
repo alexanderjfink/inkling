@@ -44,6 +44,30 @@ export default function App() {
   const incoming = useMemo(() => readSharedContent(), [])
   const [shared, setShared] = useState(incoming)
   const [screen, setScreen] = useState<Screen>('add')
+
+  /**
+   * The back gesture goes back a screen.
+   *
+   * On Android that gesture is fired at the browser, and without a history entry for each
+   * screen it leaves the app entirely — from a card you were reading. The entry screen is the
+   * one with nothing behind it, so that is where back leaves.
+   */
+  useEffect(() => {
+    const onPop = (event: PopStateEvent) => {
+      const wanted = (event.state as { screen?: Screen } | null)?.screen
+      setScreen(wanted ?? 'add')
+      setFocusId(null)
+    }
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [])
+
+  const go = useCallback((next: Screen) => {
+    setScreen((current) => {
+      if (current !== next) window.history.pushState({ screen: next }, '')
+      return next
+    })
+  }, [])
   /** A blip chosen from the list, to open straight away in Review. */
   const [focusId, setFocusId] = useState<string | null>(null)
 
@@ -239,16 +263,14 @@ export default function App() {
         <header className="mb-4 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setScreen('add')}
+            onClick={() => window.history.back()}
             aria-label="Back"
             className="circle h-10 w-10 text-lg"
           >
             ‹
           </button>
           <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{TITLES[screen]}</h1>
-          {socialOn ? (
-            <FriendsButton count={friendsWaiting} onClick={() => setScreen('friends')} />
-          ) : null}
+          {socialOn ? <FriendsButton count={friendsWaiting} onClick={() => go('friends')} /> : null}
         </header>
       ) : null}
 
@@ -276,17 +298,17 @@ export default function App() {
               ? null
               : 'the server is not reachable, so sync and the model are off'
           }
-          onReview={() => setScreen('review')}
-          onAttic={() => setScreen('all')}
-          onSettings={() => setScreen('settings')}
-          onHelp={() => setScreen('help')}
+          onReview={() => go('review')}
+          onAttic={() => go('all')}
+          onSettings={() => go('settings')}
+          onHelp={() => go('help')}
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
           socialOn={socialOn}
           shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
           asking={social.asks}
-          onFriends={() => setScreen('friends')}
-          onNotifications={() => setScreen('notifications')}
+          onFriends={() => go('friends')}
+          onNotifications={() => go('notifications')}
           friendsWaiting={friendsWaiting}
         />
       ) : null}
@@ -299,12 +321,11 @@ export default function App() {
           related={related}
           onPromote={onPromote}
           promoteResults={promoteState.results}
-          promotingId={promoteState.busyId}
           onExit={() => {
             setFocusId(null)
-            setScreen('add')
+            go('add')
           }}
-          onBrowse={() => setScreen('all')}
+          onBrowse={() => go('all')}
           onOpenBlip={(id) => setFocusId(id)}
           focusId={focusId}
           serverUrl={syncState.serverUrl}
@@ -322,7 +343,7 @@ export default function App() {
           vault={serverConfig.config?.vault ?? ''}
           onOpen={(id) => {
             setFocusId(id)
-            setScreen('review')
+            go('review')
           }}
         />
       ) : null}
@@ -333,11 +354,11 @@ export default function App() {
             const first = inklings[0]
             if (!first) {
               setPicked(null)
-              setScreen('notifications')
+              go('notifications')
               return
             }
             setPicked({ friend, context: first })
-            setScreen('notifications')
+            go('notifications')
           }}
         />
       ) : null}
@@ -347,14 +368,14 @@ export default function App() {
           social={social}
           picked={picked}
           onClearPicked={() => setPicked(null)}
-          onOpenFriends={() => setScreen('friends')}
+          onOpenFriends={() => go('friends')}
         />
       ) : null}
 
       {ready && screen === 'help' ? (
         <Help
           onStartTour={() => {
-            setScreen('add')
+            go('add')
             setTourOpen(true)
           }}
         />
@@ -369,14 +390,14 @@ export default function App() {
           serverUrl={server.serverUrl}
           onSaveServerUrl={server.save}
           auth={auth}
-          onOpenHelp={() => setScreen('help')}
+          onOpenHelp={() => go('help')}
           adminServerConfig={serverConfig}
           adminModelStatus={syncState.model}
           onRefreshAdminModel={syncState.refreshModel}
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
           social={social}
-          onOpenFriends={() => setScreen('friends')}
+          onOpenFriends={() => go('friends')}
         />
       ) : null}
 

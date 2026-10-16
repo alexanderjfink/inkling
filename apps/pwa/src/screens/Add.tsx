@@ -1,7 +1,6 @@
 import {
   BLIP_TYPES,
   type BlockKind,
-  blockKindInfo,
   type Blip,
   type BlipType,
   type FeedbackContext,
@@ -11,7 +10,7 @@ import { useEffect, useState } from 'react'
 import { type CaptureDraft, findUrl, isOnlyALink } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { FriendsButton } from '../components/FriendsButton'
-import { BlockPicker } from '../components/Blocks'
+import { BlockPicker, BlockPreview } from '../components/Blocks'
 import { ButtonLabel } from '../components/Spinner'
 import type { ReceivedAsk } from '../state/useSocial'
 import { useSpeech } from '../state/useSpeech'
@@ -98,6 +97,15 @@ export function Add({
    * because a choice with no visible effect is a choice the app did not receive.
    */
   const [blocks, setBlocks] = useState<BlockKind[]>([])
+  /**
+   * Whether the field has been opened.
+   *
+   * It starts as a button saying what you might write, because that is what it is: an
+   * invitation, not a form. Tapping it opens the field with the cursor in it — which is also
+   * the only way a phone will raise the keyboard, since it will not do it for a focus nobody
+   * asked for.
+   */
+  const [started, setStarted] = useState(Boolean(initial?.text || initial?.url))
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(0)
 
@@ -150,6 +158,7 @@ export function Add({
       setFile(undefined)
       setType('auto')
       setBlocks([])
+      setStarted(false)
       setSaved((count) => count + 1)
     } finally {
       setBusy(false)
@@ -252,30 +261,41 @@ export function Add({
             field is attached to nothing in particular; a chip inside the box is part of what
             you are writing, which is what it is. */}
         <div className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent">
-          <textarea
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            onPaste={(event) => {
-              // A copied image attaches; copied words paste as words, which may include a
-              // link — that is found when it is kept.
-              takeImage(event.clipboardData)
-            }}
-            onKeyDown={(event) => {
-              // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
-              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                event.preventDefault()
-                void submit()
-              }
-            }}
-            // The cursor is here when the app opens, because that is what you came to do.
-            // Mobile browsers only raise the keyboard for a focus they trust, so on a phone
-            // this may leave the field ready without the keyboard until you tap it.
-            autoFocus
-            placeholder="What did you notice?"
-            rows={6}
-            data-tour="field"
-            className="w-full resize-none bg-transparent text-lg text-ink outline-none"
-          />
+          {started ? (
+            <textarea
+              ref={(node) => {
+                // Focused once, when it appears, so tapping the button leaves you writing.
+                if (node && document.activeElement !== node) node.focus()
+              }}
+              value={text}
+              onChange={(event) => setText(event.target.value)}
+              onPaste={(event) => {
+                // A copied image attaches; copied words paste as words, which may include a
+                // link — that is found when it is kept.
+                takeImage(event.clipboardData)
+              }}
+              onKeyDown={(event) => {
+                // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
+                if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                  event.preventDefault()
+                  void submit()
+                }
+              }}
+              placeholder="What did you notice?"
+              rows={6}
+              data-tour="field"
+              className="w-full resize-none bg-transparent text-lg text-ink outline-none"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setStarted(true)}
+              data-tour="field"
+              className="w-full py-8 text-left text-lg text-ink-faint"
+            >
+              What did you notice?
+            </button>
+          )}
 
           {file ? (
             <span className="flex items-center gap-3 rounded-xl border border-line bg-surface/60 p-2 pl-3 text-xs">
@@ -292,26 +312,22 @@ export function Add({
             </span>
           ) : null}
 
-          {blocks.length > 0 ? (
-            <ul className="flex flex-wrap gap-1.5">
-              {blocks.map((kind) => (
-                <li key={kind}>
-                  <span className="flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1.5 text-[11px]">
-                    {blockKindInfo(kind)?.label ?? kind}
-                    <span className="text-ink-faint">on keep</span>
-                    <button
-                      type="button"
-                      onClick={() => setBlocks((list) => list.filter((entry) => entry !== kind))}
-                      aria-label={`Remove the ${kind}`}
-                      className="quiet leading-none"
-                    >
-                      ×
-                    </button>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          {/* The structure itself, not its name: a checklist you can see is a checklist,
+              and "Checklist ×" told you nothing you had not just chosen. Inert here because
+              there is no Inkling yet to attach it to. */}
+          {blocks.map((kind) => (
+            <div key={kind} className="relative">
+              <BlockPreview kind={kind} />
+              <button
+                type="button"
+                onClick={() => setBlocks((list) => list.filter((entry) => entry !== kind))}
+                aria-label={`Remove the ${kind}`}
+                className="quiet absolute top-2 right-2 px-1 text-xs leading-none"
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -383,16 +399,9 @@ export function Add({
         </button>
       </div>
 
-      {!speech.supported && speech.reason ? (
-        <p className="text-xs text-ink-faint">{speech.reason}</p>
-      ) : null}
       {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
 
-      <p className="text-center text-xs text-ink-faint">
-        Written to this device instantly — never blocked on the network.
-        {saved > 0 ? ` ${saved} captured.` : ''}
-        <span className="hidden sm:inline"> ⌘↵ or Ctrl+↵ to keep it.</span>
-      </p>
+      {saved > 0 ? <p className="text-center text-xs text-ink-faint">{saved} captured.</p> : null}
 
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
         {capturedToday > 0 ? (

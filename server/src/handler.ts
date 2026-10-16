@@ -8,6 +8,7 @@ import {
   isRole,
   newId,
   noteFilename,
+  defaultColor,
   parseLog,
   sha256Hex,
 } from '@inkling/domain'
@@ -338,6 +339,15 @@ async function handleAccount(
   if (path === '/auth/logout' && request.method === 'POST') {
     await auth.logout(token)
     return json({ ok: true })
+  }
+
+  // How you appear to friends. Yours to set, and only yours.
+  if (path === '/auth/color' && request.method === 'POST') {
+    const body = await readJson(request)
+    const wanted = body && typeof body.color === 'string' ? body.color : null
+    const result = await auth.setColor(user.id, wanted)
+    if (!result.ok) return json({ error: result.error }, 400)
+    return json({ user: { ...user, color: wanted ?? undefined } })
   }
 
   if (path === '/auth/password' && request.method === 'POST') {
@@ -901,13 +911,15 @@ async function handleSocial(
 
   const users = await auth.list()
   const usernames = new Map(users.map((entry) => [entry.id, entry.username]))
+  const colors = new Map(users.map((entry) => [entry.id, defaultColor(entry.id)]))
+  for (const user of users) if (user.color) colors.set(user.id, user.color)
   const friendships = await social.friendships()
   const friendOf = (id: string) => users.find((entry) => entry.id === id)
 
   // --- who my friends are, and asking somebody to be one ------------------------------
   if (rest.length === 1 && rest[0] === 'friends') {
     if (request.method === 'GET') {
-      return json({ friends: friendsOf(user.id, friendships, usernames) })
+      return json({ friends: friendsOf(user.id, friendships, usernames, colors) })
     }
 
     if (request.method === 'POST') {
@@ -926,7 +938,7 @@ async function handleSocial(
       // shown what they have been noticing.
       await social.addFriendEvent({ t: 'requested', from: user.id, to: target.id })
       return json({
-        friends: friendsOf(user.id, await social.friendships(), usernames),
+        friends: friendsOf(user.id, await social.friendships(), usernames, colors),
       })
     }
 
@@ -984,7 +996,7 @@ async function handleSocial(
     const url = new URL(request.url)
     const offset = Math.max(0, Number(url.searchParams.get('offset') ?? '0') || 0)
     const { messages, size } = await social.readInbox(user.id, offset)
-    return json({ messages, size, friends: friendsOf(user.id, friendships, usernames) })
+    return json({ messages, size, friends: friendsOf(user.id, friendships, usernames, colors) })
   }
 
   // --- asking a friend for a move --------------------------------------------------------

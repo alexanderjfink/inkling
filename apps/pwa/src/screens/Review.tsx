@@ -45,10 +45,13 @@ const DEFERRAL_LABEL: Record<DeferralChoice, string> = {
 function Material({
   loading,
   material,
+  query,
   className = 'mt-3',
 }: {
   loading: boolean
   material: LookupResult | null
+  /** What was searched for, so an empty result is explainable rather than mysterious. */
+  query?: string
   className?: string
 }) {
   return (
@@ -75,7 +78,14 @@ function Material({
         </>
       ) : (
         <span className="text-xs text-ink-faint">
-          nothing worth reading turned up — the move works without it
+          {query ? (
+            <>
+              nothing close enough to <span className="text-ink-soft">“{query}”</span> — the move
+              works without it
+            </>
+          ) : (
+            'nothing worth reading turned up — the move works without it'
+          )}
         </span>
       )}
     </div>
@@ -652,7 +662,12 @@ export function Review({
             {/* What the move turned up, and anything the app suggested, stay here
                 while you write — that is the whole point of having asked. */}
             {composer.move && move?.materialQuery ? (
-              <Material loading={materialLoading} material={material} className="" />
+              <Material
+                loading={materialLoading}
+                material={material}
+                query={move?.materialQuery}
+                className=""
+              />
             ) : null}
             <textarea
               value={entry}
@@ -709,7 +724,9 @@ export function Review({
               <p className="mt-1 text-[11px] text-good">saved — this is the move you kept</p>
             ) : null}
 
-            {move.materialQuery ? <Material loading={materialLoading} material={material} /> : null}
+            {move.materialQuery ? (
+              <Material loading={materialLoading} material={material} query={move.materialQuery} />
+            ) : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button

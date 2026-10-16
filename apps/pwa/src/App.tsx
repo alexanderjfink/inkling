@@ -6,7 +6,6 @@ import { Spinner } from './components/Spinner'
 import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
 import { Add } from './screens/Add'
-import { Admin } from './screens/Admin'
 import { AllBlips } from './screens/AllBlips'
 import { Friends } from './screens/Friends'
 import { Help } from './screens/Help'
@@ -27,14 +26,13 @@ import { useTheme } from './state/useTheme'
 import { TOUR_KEY, TOUR_STEPS } from './tour'
 
 /** No home screen: the app opens on entry, which is what you came to do. */
-type Screen = 'add' | 'review' | 'all' | 'settings' | 'admin' | 'help' | 'friends' | 'notifications'
+type Screen = 'add' | 'review' | 'all' | 'settings' | 'help' | 'friends' | 'notifications'
 
 const TITLES: Record<Screen, string> = {
   add: 'Add an Inkling',
   review: 'Review',
   all: 'All Inklings',
   settings: 'Settings',
-  admin: 'Admin',
   help: 'Help',
   friends: 'Friends',
   notifications: 'Notifications',
@@ -247,16 +245,6 @@ export default function App() {
         </div>
       ) : null}
 
-      {ready && screen === 'admin' && auth.user ? (
-        <Admin
-          serverUrl={server.serverUrl}
-          me={auth.user}
-          serverConfig={serverConfig}
-          modelStatus={syncState.model}
-          onRefreshModel={syncState.refreshModel}
-        />
-      ) : null}
-
       {ready && screen === 'add' ? (
         <Add
           onCapture={actions.capture}
@@ -366,8 +354,10 @@ export default function App() {
           serverUrl={server.serverUrl}
           onSaveServerUrl={server.save}
           auth={auth}
-          onOpenAdmin={() => setScreen('admin')}
           onOpenHelp={() => setScreen('help')}
+          adminServerConfig={serverConfig}
+          adminModelStatus={syncState.model}
+          onRefreshAdminModel={syncState.refreshModel}
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
           social={social}

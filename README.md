@@ -559,16 +559,25 @@ list stays finite.
 
 ## Settings, and the model
 
-Settings is five tabs, because there is genuinely more than one kind of thing on it and a
-single column of twelve sections is a screen you scroll past rather than read.
+Settings is tabs, because there is genuinely more than one kind of thing on it and a single
+column of twelve sections is a screen you scroll past rather than read.
 
 | | |
 |---|---|
 | **You** | your account, the theme, reminders |
-| **Sync** | the server, backups, the Android app, storage |
-| **Notes** | where notes go, when writing them comes back |
 | **Friends** | the social half, and who you can ask |
-| **About** | help, feedback, the build |
+| **About** | help, feedback, the app and the build |
+| **Admin** | how it is going, the model, and accounts — **admins only** |
+
+**Sync and Notes are hidden for now.** Their sections are still there, still gated on the
+same names, so bringing either back is one line in `TABS` in `Settings.tsx`. Two things
+were moved rather than hidden with them: the build stamps now sit in **About**, because with
+the server settings out of sight that is the only place a stale build can be noticed, and
+the server address is still reachable at sign-in, which is where it is needed most — so
+hiding Sync is not a dead end.
+
+**Admin is a tab rather than a button**, and only an admin's screen has it at all: a member
+sees no trace of it rather than a tab that refuses to open.
 
 **The model is not in there any more.** It moved to the admin screen, and it is now one
 model for the whole server rather than one per account. That is the honest shape: it runs on
@@ -855,7 +864,10 @@ captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5
 
 ## Admin
 
-**Settings → Manage accounts** opens the admin screen, which is in two parts.
+**Settings → Admin** is the admin screen, and it is in three parts: *how it is going*, the
+*model*, and *accounts*. The old name — and the old place, a button at the top of the
+settings screen — were both confusing, because most of what an admin wants to know is not
+about accounts.
 
 **How it is going** is read from everybody's logs on demand rather than from a running
 tally, because the logs are the only thing guaranteed to be there and a counter beside them

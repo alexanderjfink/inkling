@@ -2,6 +2,7 @@ import type { Blip, BlipEvent, FeedbackContext, ShareDefault } from '@inkling/do
 import { validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import { changeOwnPassword } from '../admin'
+import { Admin } from './Admin'
 import { APP_BUILD } from '../build'
 import type { Auth } from '../state/useAuth'
 import type { SocialState } from '../state/useSocial'
@@ -37,15 +38,23 @@ import type { useSync } from '../state/useSync'
 import type { useTheme } from '../state/useTheme'
 import { THEME_CHOICES } from '../theme'
 
-type Tab = 'you' | 'sync' | 'notes' | 'friends' | 'about'
+type Tab = 'you' | 'sync' | 'notes' | 'friends' | 'about' | 'admin'
 
+/**
+ * The tabs, and which of them are showing.
+ *
+ * Sync and Notes are hidden for now. Their sections are still below, still gated on the
+ * same names, so bringing either back is one line here — and the server address is still
+ * reachable at sign-in, which is where it is needed most, so hiding Sync is not a dead end.
+ */
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'you', label: 'You' },
-  { id: 'sync', label: 'Sync' },
-  { id: 'notes', label: 'Notes' },
   { id: 'friends', label: 'Friends' },
   { id: 'about', label: 'About' },
 ]
+
+/** Added only for an admin, which is what makes the Admin half of the app discoverable. */
+const ADMIN_TAB: { id: Tab; label: string } = { id: 'admin', label: 'Admin' }
 
 export function Settings({
   syncState,
@@ -56,8 +65,10 @@ export function Settings({
   serverUrl,
   onSaveServerUrl,
   auth,
-  onOpenAdmin,
   onOpenHelp,
+  adminServerConfig,
+  adminModelStatus,
+  onRefreshAdminModel,
   social,
   onOpenFriends,
   feedbackEnv,
@@ -71,8 +82,10 @@ export function Settings({
   serverUrl: string
   onSaveServerUrl: (url: string) => Promise<void>
   auth: Auth
-  onOpenAdmin: () => void
   onOpenHelp: () => void
+  adminServerConfig: ReturnType<typeof useServerConfig>
+  adminModelStatus: { baseUrl: string | null; embedBaseUrl: string | null } | null
+  onRefreshAdminModel: () => Promise<void>
   social: SocialState
   onOpenFriends: () => void
   feedbackEnv: FeedbackEnv
@@ -241,7 +254,7 @@ export function Settings({
       {/* Tabs, because there is genuinely more than one kind of thing on this screen and a
           single column of twelve sections is a screen you scroll past rather than read. */}
       <div className="flex flex-wrap gap-1.5">
-        {TABS.map((entry) => (
+        {[...TABS, ...(auth.user?.role === 'admin' ? [ADMIN_TAB] : [])].map((entry) => (
           <button
             key={entry.id}
             type="button"
@@ -329,11 +342,6 @@ export function Settings({
                   >
                     Change my password
                   </button>
-                  {auth.user.role === 'admin' ? (
-                    <button type="button" onClick={onOpenAdmin} className={buttonClass}>
-                      Manage accounts
-                    </button>
-                  ) : null}
                   <button
                     type="button"
                     onClick={() => void auth.signOut()}
@@ -602,6 +610,18 @@ export function Settings({
         </Section>
       ) : null}
 
+      {/* Last, and only ever rendered for an admin, so a member's settings screen has no
+          trace of it rather than a tab that refuses to open. */}
+      {tab === 'admin' && auth.user?.role === 'admin' ? (
+        <Admin
+          serverUrl={serverUrl}
+          me={auth.user}
+          serverConfig={adminServerConfig}
+          modelStatus={adminModelStatus}
+          onRefreshModel={onRefreshAdminModel}
+        />
+      ) : null}
+
       {tab === 'about' ? (
         <Section title="Feedback">
           <p className="text-xs text-ink-faint">
@@ -629,7 +649,7 @@ export function Settings({
         </Section>
       ) : null}
 
-      {tab === 'sync' ? (
+      {tab === 'about' ? (
         <Section title="App">
           <p className="text-xs text-ink-faint">
             {swReady === null
@@ -639,6 +659,17 @@ export function Settings({
                 : (serviceWorkerStatus().error ??
                   'no service worker, so it will not install (a secure context is required)')}
           </p>
+          {/* Here rather than with the server address, because with the Sync tab hidden this
+              is the only place a stale build can be noticed — and a stale build is invisible
+              by definition. */}
+          <p className="text-xs text-ink-faint">
+            app {APP_BUILD} · server {syncState.model?.build ?? '—'}
+          </p>
+          {syncState.model?.build && syncState.model.build !== APP_BUILD ? (
+            <p className="text-xs text-warn">
+              the server is running a different build from this app — reload, or rebuild the image
+            </p>
+          ) : null}
         </Section>
       ) : null}
 

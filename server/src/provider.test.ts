@@ -158,14 +158,14 @@ describe('resolveProvider', () => {
     const resolved = resolveProvider(
       {
         INKLING_PROVIDER: 'custom',
-        INKLING_BASE_URL: 'http://192.168.1.9:8000/v1/',
+        INKLING_BASE_URL: 'http://192.0.2.10:8000/v1/',
         INKLING_MODEL: 'my-model',
         INKLING_EMBED_MODEL: 'my-embed',
         INKLING_API_KEY: 'k',
       },
       { authPath: NO_AUTH },
     )
-    expect(resolved.baseUrl).toBe('http://192.168.1.9:8000/v1')
+    expect(resolved.baseUrl).toBe('http://192.0.2.10:8000/v1')
     expect(resolved.model).toBe('my-model')
     expect(resolved.embedModel).toBe('my-embed')
     expect(resolved.configured).toBe(true)
@@ -222,13 +222,13 @@ describe('resolveEmbedProvider', () => {
   test('a custom embedding endpoint needs only a base url', () => {
     const embed = resolveEmbedProvider(
       {
-        INKLING_EMBED_BASE_URL: 'http://192.168.1.9:8080/v1/',
+        INKLING_EMBED_BASE_URL: 'http://192.0.2.10:8080/v1/',
         INKLING_EMBED_MODEL: 'some-embed',
         INKLING_EMBED_API_KEY: 'k',
       },
       { authPath: NO_AUTH },
     )
-    expect(embed?.baseUrl).toBe('http://192.168.1.9:8080/v1')
+    expect(embed?.baseUrl).toBe('http://192.0.2.10:8080/v1')
     expect(embed?.embedModel).toBe('some-embed')
     expect(embed?.apiKey).toBe('k')
     expect(embed?.configured).toBe(true)

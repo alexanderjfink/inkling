@@ -59,7 +59,7 @@ services:
       # without typing keys into a phone.
       #
       # - INKLING_VAULT=/vault
-      # - INKLING_VAULT_FOLDER=00 Seedbox
+      # - INKLING_VAULT_FOLDER=Notes
       # - INKLING_PROVIDER=opencode-go
       # - INKLING_MODEL=deepseek-v4.1-flash
       # - INKLING_API_KEY=

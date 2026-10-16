@@ -231,10 +231,10 @@ describe('next steps', () => {
 
   test('draftNextSteps uses the model when it behaves', async () => {
     const draft = await draftNextSteps(richBlip(), {
-      provider: fakeProvider({ text: '{"steps":["Ask Gena about the interventions"]}' }),
+      provider: fakeProvider({ text: '{"steps":["Ask the author about the interventions"]}' }),
     })
     expect(draft.generatedBy).toBe('llm')
-    expect(draft.steps).toEqual(['Ask Gena about the interventions'])
+    expect(draft.steps).toEqual(['Ask the author about the interventions'])
   })
 
   test('draftNextSteps falls back on no provider, a throw, or a bad reply', async () => {

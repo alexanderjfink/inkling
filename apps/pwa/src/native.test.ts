@@ -84,7 +84,7 @@ describe('needsServerUrl', () => {
 
   test('http counts as absolute — a LAN address is a legitimate choice', () => {
     withWindow({ Capacitor: { isNativePlatform: () => true } }, () =>
-      expect(needsServerUrl('http://192.168.1.9:8787/api')).toBe(false),
+      expect(needsServerUrl('http://192.0.2.10:8787/api')).toBe(false),
     )
   })
 })

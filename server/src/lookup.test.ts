@@ -15,26 +15,26 @@ function stubFetcher(pages: unknown, status = 200) {
 
 describe('lookupTopic', () => {
   test('finds a page and strips the search highlight markup', async () => {
-    // The real excerpt for this search. Note that neither "stages" nor "change" appears
-    // in the title or the description — Wikipedia matched them in the article body, and
-    // marks which words it matched.
+    // Neither "bread" nor "rise" is in the title, so this covers the case that matters
+    // most as well: Wikipedia marks which words it matched, and the right page need not
+    // share any word with the query.
     const { fetcher, calls } = stubFetcher([
       {
-        key: 'Transtheoretical_model',
-        title: 'Transtheoretical model',
-        description: 'Integrative theory of therapy',
+        key: 'Yeast',
+        title: 'Yeast',
+        description: 'Eukaryotic, single-celled microorganisms',
         excerpt:
-          'processes <span class="searchmatch">of</span> <span class="searchmatch">change</span> to guide the individual. The model is composed <span class="searchmatch">of</span> constructs such as: <span class="searchmatch">stages</span> of change, decisional balance, self-efficacy',
+          'a leavening agent: the dough <span class="searchmatch">rises</span> because the <span class="searchmatch">bread</span> traps gas produced as the yeast feeds',
       },
     ])
 
-    const result = await lookupTopic('stages of change', { fetcher })
-    expect(result?.title).toBe('Transtheoretical model')
-    expect(result?.url).toBe('https://en.wikipedia.org/wiki/Transtheoretical_model')
-    expect(result?.description).toBe('Integrative theory of therapy')
+    const result = await lookupTopic('what makes bread rise', { fetcher })
+    expect(result?.title).toBe('Yeast')
+    expect(result?.url).toBe('https://en.wikipedia.org/wiki/Yeast')
+    expect(result?.description).toBe('Eukaryotic, single-celled microorganisms')
     expect(result?.extract).not.toContain('<span')
-    expect(result?.extract).toContain('decisional balance')
-    expect(calls[0]).toContain('q=stages%20of%20change')
+    expect(result?.extract).toContain('leavening agent')
+    expect(calls[0]).toContain('q=what%20makes%20bread%20rise')
   })
 
   test('decodes the entities a search excerpt comes with', async () => {
@@ -162,14 +162,14 @@ describe('relevance — the failures that prompted this', () => {
     const { fetcher } = stubFetcher([
       { key: 'Piper_Alpha', title: 'Piper Alpha', excerpt: `learning ${LONG_ENOUGH}` },
       {
-        key: 'Supernormal',
-        title: 'Supernormal',
-        description: 'Video game',
-        excerpt: `the <span class="searchmatch">Supernormal</span> game ${LONG_ENOUGH}`,
+        key: 'Shipping_container',
+        title: 'Shipping container',
+        description: 'Standardised steel box for intermodal freight',
+        excerpt: `the <span class="searchmatch">shipping</span> <span class="searchmatch">container</span> ${LONG_ENOUGH}`,
       },
     ])
-    expect((await lookupTopic('Ursidice Supernormal who made it', { fetcher }))?.title).toBe(
-      'Supernormal',
+    expect((await lookupTopic('who invented the shipping container', { fetcher }))?.title).toBe(
+      'Shipping container',
     )
   })
 })
@@ -191,11 +191,16 @@ describe('relevance — the good results that must keep working', () => {
 
   test('a title match does not need the highlight markup to be understood', async () => {
     const { fetcher } = stubFetcher([
-      { key: 'Drawabox', title: 'Drawabox', description: 'Drawing course', excerpt: LONG_ENOUGH },
+      {
+        key: 'Drawing',
+        title: 'Drawing',
+        description: 'Visual art made with instruments',
+        excerpt: LONG_ENOUGH,
+      },
     ])
     expect(
-      (await lookupTopic('drawabox review from someone who finished', { fetcher }))?.title,
-    ).toBe('Drawabox')
+      (await lookupTopic('a drawing course review from someone who finished', { fetcher }))?.title,
+    ).toBe('Drawing')
   })
 
   test('a single-word query is allowed one match — it has only one word to match', async () => {
@@ -225,7 +230,11 @@ describe('relevance — the good results that must keep working', () => {
 
 describe('queryTerms', () => {
   test('question words and filler are dropped, the subject is kept', () => {
-    expect(queryTerms('Ursidice Supernormal who made it')).toEqual(['ursidice', 'supernormal'])
+    expect(queryTerms('who invented the shipping container')).toEqual([
+      'invented',
+      'shipping',
+      'container',
+    ])
     expect(queryTerms('who already tried a social learning platform')).toEqual([
       'social',
       'learning',
@@ -246,52 +255,47 @@ describe('queryTerms', () => {
 
 describe('a page that merely mentions the phrase', () => {
   test('Wikipedia ranking is followed — the article about the thing wins when it is first', async () => {
-    // "Better Living Through Algorithms Kritzer summary" returned "Robbie (short story)",
-    // because Robbie's article contains an awards table listing the title. Wikipedia puts
-    // the real article first; the job here is only to reject, never to re-rank.
+    // A page that lists a title in a table of award winners reads, to a word match, the
+    // same as a page about it. Wikipedia ranks the real article first; the job here is
+    // only to reject, never to re-rank.
     const { fetcher } = stubFetcher([
       {
-        key: 'Better_Living_Through_Algorithms',
-        title: 'Better Living Through Algorithms',
-        description: 'Short story by Naomi Kritzer',
+        key: 'The_Yellow_Wallpaper',
+        title: 'The Yellow Wallpaper',
+        description: 'Short story by Charlotte Perkins Gilman',
         excerpt: `a <span class="searchmatch">short</span> <span class="searchmatch">story</span> ${LONG_ENOUGH}`,
       },
       {
-        key: 'Robbie_(short_story)',
-        title: 'Robbie (short story)',
-        description: 'Science fiction short story by American writer Isaac Asimov',
+        key: 'American_literature',
+        title: 'American literature',
+        description: 'Literature written in the United States',
         excerpt:
-          'Pinsker (2022) &quot;Rabbit Test&quot; by Samantha Mills (2023) &quot;<span class="searchmatch">Better</span> <span class="searchmatch">Living</span> <span class="searchmatch">Through</span> <span class="searchmatch">Algorithms</span>&quot;',
+          'the canon includes &quot;<span class="searchmatch">The</span> <span class="searchmatch">Yellow</span> <span class="searchmatch">Wallpaper</span>&quot; and other works',
       },
     ])
-    const result = await lookupTopic('Better Living Through Algorithms Kritzer summary', {
+    const result = await lookupTopic('The Yellow Wallpaper short story summary', {
       fetcher,
     })
-    expect(result?.title).toBe('Better Living Through Algorithms')
+    expect(result?.title).toBe('The Yellow Wallpaper')
   })
 
   test('a better-ranked page is not displaced by a worse one with a matching title', async () => {
-    // The regression this guards: preferring title matches put "Four stages of
-    // competence" ahead of "Transtheoretical model" for "stages of change", purely
-    // because the word "stages" happened to be in its title.
+    // The regression this guards: preferring title matches put a page ahead of the right
+    // one purely because a word of the query happened to be in its title.
     const { fetcher } = stubFetcher([
       {
-        key: 'Transtheoretical_model',
-        title: 'Transtheoretical model',
-        description: 'Integrative theory of therapy',
-        excerpt:
-          'processes <span class="searchmatch">of</span> <span class="searchmatch">change</span> to guide the individual, composed of <span class="searchmatch">stages</span>',
+        key: 'Yeast',
+        title: 'Yeast',
+        description: 'Eukaryotic, single-celled microorganisms',
+        excerpt: `the <span class="searchmatch">bread</span> <span class="searchmatch">rises</span> as the yeast feeds. ${LONG_ENOUGH}`,
       },
       {
-        key: 'Four_stages_of_competence',
-        title: 'Four stages of competence',
-        description: 'Psychological states when gaining a skill',
-        excerpt:
-          'the four <span class="searchmatch">stages</span> <span class="searchmatch">of</span> competence relates to psychological states',
+        key: 'Bread',
+        title: 'Bread',
+        description: 'Staple food made from dough',
+        excerpt: `the <span class="searchmatch">bread</span> is baked once it <span class="searchmatch">rises</span>. ${LONG_ENOUGH}`,
       },
     ])
-    expect((await lookupTopic('stages of change', { fetcher }))?.title).toBe(
-      'Transtheoretical model',
-    )
+    expect((await lookupTopic('what makes bread rise', { fetcher }))?.title).toBe('Yeast')
   })
 })

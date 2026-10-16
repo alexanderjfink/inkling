@@ -22,7 +22,7 @@ function fakeLlm(overrides: Partial<LLMProvider> = {}): LLMProvider {
 describe('isFetchableUrl', () => {
   test('accepts ordinary public http(s) urls', () => {
     expect(isFetchableUrl('https://example.com/paper.pdf')).toBe(true)
-    expect(isFetchableUrl('http://drawabox.com')).toBe(true)
+    expect(isFetchableUrl('http://example.com')).toBe(true)
   })
 
   test('refuses schemes that are not http(s)', () => {

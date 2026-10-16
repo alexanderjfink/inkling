@@ -58,7 +58,7 @@ describe('project (fold)', () => {
 
   test('snooze, retire and revive move the blip through its lifecycle', () => {
     const id = newId()
-    const base = captured(id, 'try drawabox.com', 0, '2026-01-01T00:00:00Z', 'quest')
+    const base = captured(id, 'try example.com', 0, '2026-01-01T00:00:00Z', 'quest')
 
     const snoozed = project([
       base,

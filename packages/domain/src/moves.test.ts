@@ -336,7 +336,10 @@ describe('move history', () => {
 
 describe('deriveQuery', () => {
   test('uses the title, minus any URL', () => {
-    const blip = makeBlip('reference', 'I would love to learn to draw https://drawabox.com/')
+    const blip = makeBlip(
+      'reference',
+      'I would love to learn to draw https://example.com/drawing-course',
+    )
     const query = deriveQuery(blip)
     expect(query).not.toContain('http')
     expect(query).toContain('learn to draw')
@@ -513,9 +516,8 @@ describe('forgetting what was only offered', () => {
 
 describe('the search phrase the model is asked for', () => {
   test('it is told to name a concept, not a list of products', () => {
-    // "Are.na Cohost social platforms for thinking" is a real phrase that was produced
-    // and found nothing, because an encyclopaedia has no article matching a list of
-    // product names.
+    // A phrase made of product names finds nothing, because an encyclopaedia has no
+    // article matching a list of products. It has to name the general idea instead.
     const blip = makeBlip('idea', 'a social platform for notes')
     const { system } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
     expect(system).toContain('general idea rather than particular products')

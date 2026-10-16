@@ -178,13 +178,14 @@ server resolves it against Wikipedia, which needs no key:
 
 ```
 a move, if you want one
-Find who made stages of change theory, and why
-goal: One sentence: who made it, and what they were trying to fix
+Find who first worked out why the sky is blue, and why
+goal: One sentence: who it was, and what they were trying to explain
 3 min · adapted                        not this one
 ┌──────────────────────────────────────────────────────────┐
-│ Self-destructive behavior — Behaviours that are harmful… │
-│ one passes through on the way to recovery. The stages    │
-│ founded by Prochaska and DiClemente (1982) included…     │
+│ Diffuse sky radiation — Solar radiation reaching the     │
+│ Earth's surface. The blue of the sky comes from Rayleigh │
+│ scattering: the gases in the air scatter short           │
+│ wavelengths far more strongly than long ones.            │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -205,10 +206,10 @@ almost nothing, while showing something unrelated costs your trust in every othe
 suggestion.
 
 It still accepts a page whose title shares nothing with the query, which is the point:
-*"stages of change"* and *Transtheoretical model* have no words in common, and that is the
-right answer. Wikipedia's ranking is followed rather than re-ranked — an earlier attempt
-preferred title matches, which put *Four stages of competence* ahead of it purely because
-the word "stages" was in its title.
+*"why is the sky blue"* and *Diffuse sky radiation* have no words in common, and that is
+the right answer. Wikipedia's ranking is followed rather than re-ranked — an earlier
+attempt preferred title matches, which put a page ahead of it purely because one word of
+the query happened to be in its title.
 
 The division of labour is deliberate. **The model selects and adapts; it does not
 invent.** A reply is only accepted if it picks a move that was actually on the menu,
@@ -391,26 +392,26 @@ renderer can feed a typed Markdown collection later without the formats divergin
 ```yaml
 ---
 type: evergreen
-blip_id: 01M4XNBE96YQQZ8R4TPA1R35ST
-blip_type: idea
-title: "Stages of change theory interventions…"
-created: 2026-10-14
-promoted: 2026-10-14
+blip_id: 01J8ZQ4M7XK2V9BN3TPR6WD5YH
+blip_type: question
+title: "Why does rereading feel like learning?"
+created: 2026-01-14
+promoted: 2026-01-14
 tags:
-  - blip/idea
-  - topic/change
+  - blip/question
+  - topic/memory
 ---
 
-# Stages of change theory interventions, and how they fit spaced repetition
+# Why does rereading feel like learning?
 
 ## Next steps
-- [ ] Send Gena a direct message listing three specific questions about …
-- [ ] Draw a six-row table mapping each stage of change to a card objective.
+- [ ] Find one study comparing rereading against self-testing.
+- [ ] Write the answer as a single sentence you would repeat to someone else.
 
 ## Context
-Topics: change, interventions
+Topics: memory, reading
 Related:
-- [[Ask Gena about stages of change theory]]
+- [[Testing yourself beats rereading]]
 ```
 
 Configuration:

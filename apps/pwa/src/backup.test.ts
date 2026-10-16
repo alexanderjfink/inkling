@@ -60,10 +60,10 @@ describe('renderMarkdownBackup', () => {
         ...meta(1),
         t: 'captured',
         id: 'a',
-        input: { kind: 'url', url: 'https://drawabox.com/' },
+        input: { kind: 'url', url: 'https://example.com/drawing-course' },
         type: 'reference',
         body: 'learn to draw',
-        topics: ['draw', 'drawabox'],
+        topics: ['draw', 'sketching'],
       },
       {
         ...meta(2),
@@ -73,7 +73,7 @@ describe('renderMarkdownBackup', () => {
       },
     ])
     const md = renderMarkdownBackup(blips)
-    expect(md).toContain('<https://drawabox.com/>')
+    expect(md).toContain('<https://example.com/drawing-course>')
     expect(md).toContain('#draw')
     expect(md).toContain('the 50% rule matters')
   })
@@ -230,9 +230,9 @@ describe('renderMarkdownBackup', () => {
         input: { kind: 'text', text: 'an idea' },
         type: 'idea',
       },
-      { ...meta(2), t: 'promoted', id: 'a', notePath: '00 Seedbox/An idea.md' },
+      { ...meta(2), t: 'promoted', id: 'a', notePath: 'Notes/An idea.md' },
     ])
-    expect(renderMarkdownBackup(blips)).toContain('Promoted to: 00 Seedbox/An idea.md')
+    expect(renderMarkdownBackup(blips)).toContain('Promoted to: Notes/An idea.md')
   })
 
   test('an empty log renders a valid, empty document rather than throwing', () => {
@@ -325,7 +325,11 @@ describe('renderMarkdownBackup', () => {
           at: meta(3).at,
           context: {
             guidance: ['check how the rule is phrased'],
-            material: { title: 'Drawabox', url: 'https://drawabox.com/', extract: 'The 50% rule…' },
+            material: {
+              title: 'A Drawing Course',
+              url: 'https://example.com/drawing-course',
+              extract: 'The 50% rule…',
+            },
           },
         },
       },
@@ -335,7 +339,7 @@ describe('renderMarkdownBackup', () => {
     // Blockquoted, because it surrounded the entry rather than being written by hand.
     expect(md).toContain('> *prompted by:* Read one paragraph and keep one sentence')
     expect(md).toContain('> - check how the rule is phrased')
-    expect(md).toContain('> *found:* Drawabox <https://drawabox.com/>')
+    expect(md).toContain('> *found:* A Drawing Course <https://example.com/drawing-course>')
   })
 
   test('an entry with no context gets no blockquote', () => {

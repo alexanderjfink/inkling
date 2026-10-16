@@ -15,9 +15,9 @@ const CANDIDATES = 5
 /**
  * Words that say nothing about what a page is about.
  *
- * The model writes search phrases like "Ursidice Supernormal who made it", so the
+ * The model writes search phrases like "who invented the shipping container", so the
  * question words have to go before anything is compared — otherwise a page that happens
- * to contain "made" looks like a match.
+ * to contain "who" or "made" looks like a match.
  */
 const STOPWORDS = new Set([
   'the',
@@ -140,8 +140,8 @@ function alike(a: string, b: string): boolean {
  * them in the excerpt.
  *
  * This is the useful signal, and it is Wikipedia's own rather than a guess: the excerpt
- * for "stages of change" on *Transtheoretical model* marks `stages` and `change`, even
- * though neither word is in the title or the description.
+ * marks exactly the words that matched, and they need not be in the title or the
+ * description at all.
  */
 function markedWords(html: string): string[] {
   const out: string[] = []
@@ -168,8 +168,8 @@ export function titleMatches(title: string, terms: string[]): boolean {
  *
  * The rule: two matched words, because one is what an unrelated page looks like. The
  * words counted are Wikipedia's own — it marks what it matched in the excerpt — so this
- * still accepts a page whose title shares nothing with the query, which is exactly the
- * case for "stages of change" and *Transtheoretical model*.
+ * still accepts a page whose title shares nothing with the query — the right answer need
+ * not contain any of the words you searched for.
  *
  * Deliberately blunt, because the costs are lopsided: showing nothing costs almost
  * nothing, since a move works without material and the card says so, while showing

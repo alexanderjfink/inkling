@@ -1,7 +1,50 @@
+# Everything personal lives in server/data: the accounts, everyone's Inklings, their
+# images, their model keys, and the path to their vault. It is never in the repository,
+# and never in an image either — see .dockerignore.
+server/data/
+
+# Secrets and credentials, in case any of these ever end up here by accident.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+*.mobileprovision
+credentials.json
+secrets.json
+
+# Android: the SDK path, signing material, and everything Capacitor generates from the
+# built app. The project scaffolding is committed; the output is not.
+apps/pwa/android/local.properties
+apps/pwa/android/app/src/main/assets/public/
+apps/pwa/android/app/src/main/assets/capacitor.config.json
+apps/pwa/android/app/src/main/assets/capacitor.plugins.json
+apps/pwa/android/app/src/main/res/xml/config.xml
+apps/pwa/android/.gradle/
+apps/pwa/android/build/
+apps/pwa/android/app/build/
+apps/pwa/android/capacitor-cordova-android-plugins/
+*.apk
+*.aab
+
+# Dependencies and build output.
 node_modules/
 dist/
+coverage/
+.coverage/
+
+# Editors, OS noise, local notes and logs.
 .DS_Store
+.idea/
+.vscode/
+*.iml
 *.local
 *.log
-.coverage/
-server/data/
+
+# Local tooling that has nothing to do with the project.
+.openchamber/
+.opencode/

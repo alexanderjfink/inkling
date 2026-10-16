@@ -47,11 +47,15 @@ describe('entryContext', () => {
 
   test('material is kept with its link and extract', () => {
     const context = entryContext({
-      material: { title: 'Drawabox', url: 'https://drawabox.com/', extract: 'The 50% rule…' },
+      material: {
+        title: 'A Drawing Course',
+        url: 'https://example.com/drawing-course',
+        extract: 'The 50% rule…',
+      },
     })
     expect(context?.material).toEqual({
-      title: 'Drawabox',
-      url: 'https://drawabox.com/',
+      title: 'A Drawing Course',
+      url: 'https://example.com/drawing-course',
       extract: 'The 50% rule…',
     })
   })
@@ -164,7 +168,11 @@ describe('folding the link back to the move', () => {
           text: 'kept',
           at: meta(2).at,
           context: {
-            material: { title: 'Drawabox', url: 'https://drawabox.com/', extract: 'e' },
+            material: {
+              title: 'A Drawing Course',
+              url: 'https://example.com/drawing-course',
+              extract: 'e',
+            },
             guidance: ['one', 'two'],
           },
         },
@@ -174,7 +182,11 @@ describe('folding the link back to the move', () => {
     const back = wire.split('\n').map((line) => JSON.parse(line) as BlipEvent)
     const [blip] = project(back)
     expect(blip?.entries[0]?.context).toEqual({
-      material: { title: 'Drawabox', url: 'https://drawabox.com/', extract: 'e' },
+      material: {
+        title: 'A Drawing Course',
+        url: 'https://example.com/drawing-course',
+        extract: 'e',
+      },
       guidance: ['one', 'two'],
     })
   })

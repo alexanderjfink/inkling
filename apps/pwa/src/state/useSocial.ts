@@ -176,28 +176,7 @@ export function useSocial({
    * Read from the log rather than from memory, so a question somebody asked survives a
    * reload — which is the whole reason a received ask is written down at all.
    */
-  const asks = useMemo<ReceivedAsk[]>(() => {
-    const answered = new Set(
-      events
-        .filter((event) => event.t === 'friendMoveSent' && event.askId)
-        .map((event) => (event.t === 'friendMoveSent' ? event.askId : '')),
-    )
-    return events
-      .filter((event) => event.t === 'friendAsk' && event.direction === 'in' && event.context)
-      .filter((event) => !answered.has(event.t === 'friendAsk' ? event.messageId : ''))
-      .map((event) => {
-        const ask = event as Extract<BlipEvent, { t: 'friendAsk' }>
-        return {
-          messageId: ask.messageId,
-          userId: ask.userId,
-          username: ask.username,
-          context: ask.context as AskContext,
-          note: ask.note,
-          at: ask.at,
-        }
-      })
-      .sort((a, b) => (a.at < b.at ? 1 : -1))
-  }, [events])
+  const asks = useMemo(() => openAsks(events), [events])
 
   /** Run an action and turn a refusal into words rather than a thrown error. */
   const attempt = useCallback(
@@ -281,6 +260,7 @@ export function useSocial({
           to: to.userId,
           toUsername: to.username,
           moveSpec: move,
+          blipId,
           askId: askId || undefined,
         })
         return { ok: true }
@@ -364,4 +344,45 @@ async function ingest(message: SocialMessage, actions: InklingActions): Promise<
         at: message.at,
       })
   }
+}
+
+/**
+ * Asks from friends that nobody has answered yet, newest first.
+ *
+ * Pure, because the matching is the part that can be wrong and it was: an answer was
+ * recognised only by the ask it named, and only one of the two ways of sending a move knows
+ * that. Answering from the ask in Notifications names it; browsing a friend's Inklings and
+ * suggesting one there does not, so the question stayed in the list.
+ *
+ * Matching by the Inkling as well makes it independent of how you got there — and matching
+ * by who it went to keeps it honest: two friends can be asked about the same Inkling, and
+ * answering one of them is not answering the other.
+ */
+export function openAsks(events: BlipEvent[]): ReceivedAsk[] {
+  const sent = events.filter((event) => event.t === 'friendMoveSent')
+
+  return events
+    .filter(
+      (event): event is Extract<BlipEvent, { t: 'friendAsk' }> =>
+        event.t === 'friendAsk' && event.direction === 'in' && Boolean(event.context),
+    )
+    .filter(
+      (ask) =>
+        !sent.some((move) => {
+          if (move.t !== 'friendMoveSent') return false
+          if (move.askId && move.askId === ask.messageId) return true
+          return (
+            move.to === ask.userId && Boolean(move.blipId) && move.blipId === ask.context?.blipId
+          )
+        }),
+    )
+    .map((ask) => ({
+      messageId: ask.messageId,
+      userId: ask.userId,
+      username: ask.username,
+      context: ask.context as AskContext,
+      note: ask.note,
+      at: ask.at,
+    }))
+    .sort((a, b) => (a.at < b.at ? 1 : -1))
 }

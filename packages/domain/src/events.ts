@@ -467,6 +467,15 @@ export type BlipEventBody =
       to: string
       toUsername: string
       moveSpec: MoveSpec
+      /**
+       * The Inkling it was for.
+       *
+       * Carried so an answer can be matched to an ask without depending on how you got
+       * there: the same move can be sent from the ask in Notifications or from browsing a
+       * friend's Inklings, and only the first of those knows which ask it answers. Without
+       * this, answering from the second left the question sitting in the list.
+       */
+      blipId?: string
       /** The ask it answers, when it answers one rather than being offered unprompted. */
       askId?: string
     }

@@ -520,6 +520,13 @@ above and their note — and you suggest something: a title, a goal, how long it
 optionally something to look up. That is the same shape a move has always had, because a
 friend is making the same kind of thing.
 
+You can also answer by browsing **their Inklings** from the Friends screen, without going via
+the ask. Either way the question clears: an answer is matched both by the ask it names and by
+*who it went to and which Inkling it was for*, because only the first of those routes knows
+which ask it is answering. Matching by the recipient as well is what keeps it honest — two
+friends can be asked about the same Inkling, and answering one of them is not answering the
+other.
+
 ### What arrives
 
 A move from a friend is written into your own log as an event, so it survives the server

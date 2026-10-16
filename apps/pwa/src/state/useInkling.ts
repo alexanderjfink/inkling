@@ -96,6 +96,7 @@ export interface InklingActions {
     to: string
     toUsername: string
     moveSpec: MoveSpec
+    blipId?: string
     askId?: string
   }): Promise<BlipEvent>
   /** A note from a friend, or one sent to one. */

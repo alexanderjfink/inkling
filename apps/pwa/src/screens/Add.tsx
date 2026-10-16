@@ -6,7 +6,7 @@ import {
   type ShareDefault,
 } from '@inkling/domain'
 import { useEffect, useState } from 'react'
-import type { CaptureDraft } from '../capture'
+import { type CaptureDraft, findUrl, isOnlyALink } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { FriendsButton } from '../components/FriendsButton'
 import { ButtonLabel } from '../components/Spinner'
@@ -73,8 +73,18 @@ export function Add({
   /** Friends waiting on something from you, shown on the button. */
   friendsWaiting: number
 }) {
-  const [text, setText] = useState(initial?.text ?? '')
-  const [url, setUrl] = useState(initial?.url ?? '')
+  // A shared link arrives as text and an address, and they both go in the one field: a
+  // shared page reads as its title, then its address, which is exactly how somebody
+  // pasting it would have written it.
+  const [text, setText] = useState(
+    [initial?.text, initial?.url].filter((part) => part?.trim()).join('\n\n'),
+  )
+  /**
+   * Whatever was handed over or pasted in.
+   *
+   * A shared link arrives as text now, with the address in it — the same thing somebody
+   * typing one produces — so there is nothing separate to carry.
+   */
   const [file, setFile] = useState<File | undefined>()
   const [type, setType] = useState<BlipType | 'auto'>('auto')
   const [busy, setBusy] = useState(false)
@@ -88,17 +98,35 @@ export function Add({
     if (initial) onConsumed?.()
   }, [initial, onConsumed])
 
-  const canSubmit = text.trim().length > 0 || url.trim().length > 0 || Boolean(file)
+  const canSubmit = text.trim().length > 0 || Boolean(file)
+
+  /**
+   * Take an image out of a paste or a drop.
+   *
+   * Returns whether there was one, so the caller can leave ordinary text pasting alone.
+   */
+  function takeImage(data: DataTransfer | null): boolean {
+    const image = [...(data?.files ?? [])].find((candidate) => candidate.type.startsWith('image/'))
+    if (!image) return false
+    setFile(image)
+    return true
+  }
 
   async function submit() {
     if (!canSubmit || busy) return
-    const kind: CaptureDraft['kind'] = file ? 'image' : url.trim() ? 'url' : 'text'
+    // The address is found rather than asked for: one field, and a link in it is the link.
+    const url = findUrl(text)
+    const onlyLink = Boolean(url && isOnlyALink(text))
+    const kind: CaptureDraft['kind'] = file ? 'image' : onlyLink ? 'url' : 'text'
     setBusy(true)
     try {
       await onCapture({
         kind,
-        text,
-        url,
+        // A capture that is nothing but a link has no words of its own, so nothing is kept
+        // as text: storing the address there as well would make the address the title, when
+        // the site is the title. The link itself is kept, in the field for links.
+        text: onlyLink ? undefined : text,
+        url: url ?? undefined,
         file,
         type: type === 'auto' ? undefined : type,
         // Decided here, at the moment of writing, rather than by the fold: whether new
@@ -107,7 +135,6 @@ export function Add({
         visibility: socialOn && shareDefault === 'friends' ? 'friends' : undefined,
       })
       setText('')
-      setUrl('')
       setFile(undefined)
       setType('auto')
       setSaved((count) => count + 1)
@@ -192,39 +219,75 @@ export function Add({
         </button>
       ) : null}
 
-      <textarea
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        onKeyDown={(event) => {
-          // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
-          if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-            event.preventDefault()
-            void submit()
-          }
+      {/* One field for everything: words, a link, or a picture pasted or dropped into it.
+          It used to be three — a box for the text, a box for the address, a box for the
+          image — which asked you to decide what you had noticed before you had written it
+          down, and made the common case (writing a sentence) look like paperwork. */}
+      <div
+        onDragOver={(event) => {
+          // Without this the browser refuses the drop and navigates to the image instead,
+          // which is a memorable way to lose a capture.
+          event.preventDefault()
         }}
-        // The cursor is here when the app opens, because that is what you came to do.
-        // Mobile browsers only raise the keyboard for a focus they trust, so on a phone
-        // this may leave the field ready without the keyboard until you tap it.
-        autoFocus
-        placeholder="What did you notice?"
-        rows={6}
-        data-tour="field"
-        className={`${inputClass} resize-none text-lg`}
-      />
+        onDrop={(event) => {
+          if (!takeImage(event.dataTransfer)) return
+          event.preventDefault()
+        }}
+        className="flex flex-col gap-2"
+      >
+        <textarea
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          onPaste={(event) => {
+            // A copied image attaches; copied words paste as words, which may include a
+            // link — that is found when it is kept.
+            takeImage(event.clipboardData)
+          }}
+          onKeyDown={(event) => {
+            // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
+            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+              event.preventDefault()
+              void submit()
+            }
+          }}
+          // The cursor is here when the app opens, because that is what you came to do.
+          // Mobile browsers only raise the keyboard for a focus they trust, so on a phone
+          // this may leave the field ready without the keyboard until you tap it.
+          autoFocus
+          placeholder="What did you notice?"
+          rows={6}
+          data-tour="field"
+          className={`${inputClass} resize-none text-lg`}
+        />
 
-      <input
-        value={url}
-        onChange={(event) => setUrl(event.target.value)}
-        placeholder="https://  (optional)"
-        inputMode="url"
-        autoCapitalize="none"
-        autoCorrect="off"
-        className={`${inputClass} text-sm`}
-      />
+        {file ? (
+          <span className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-2 pl-3 text-xs">
+            <span className="text-ink-soft">🖼</span>
+            <span className="min-w-0 flex-1 truncate">{file.name}</span>
+            <button
+              type="button"
+              onClick={() => setFile(undefined)}
+              className="quiet underline"
+              aria-label="Remove the image"
+            >
+              remove
+            </button>
+          </span>
+        ) : null}
+      </div>
 
-      <div className="flex items-center gap-3">
-        <label className="flex-1 cursor-pointer rounded-2xl border border-dashed border-line bg-surface/60 px-3 py-3 text-center text-sm text-ink-soft">
-          {file ? file.name : 'Add an image'}
+      <p className="text-xs text-ink-faint">
+        a photo, a link, an idea, a question, or a quest — paste one in, or just write
+      </p>
+
+      {/* One row, and everything in it shrinks but the two things you press: the field above
+          takes the room, and this takes what is left. The label in the middle is the part
+          that gives way, so "Keep it" never wraps. */}
+      <div className="mt-auto flex items-center gap-2 pt-2">
+        {/* The only thing left that is not the field: a way in for a picture that cannot be
+            pasted, and a type you can overrule if the guess is wrong. */}
+        <label className="circle h-11 w-11 shrink-0 cursor-pointer text-base" title="Add an image">
+          📎
           <input
             type="file"
             accept="image/*"
@@ -235,7 +298,8 @@ export function Add({
         <select
           value={type}
           onChange={(event) => setType(event.target.value as BlipType | 'auto')}
-          className="rounded-2xl border border-line bg-surface px-3 py-3 text-sm text-ink-soft outline-none"
+          aria-label="Kind of Inkling"
+          className="shrink-0 rounded-2xl border border-line bg-surface px-2 py-2.5 text-xs text-ink-soft outline-none"
         >
           <option value="auto">auto</option>
           {BLIP_TYPES.map((option) => (
@@ -244,33 +308,27 @@ export function Add({
             </option>
           ))}
         </select>
-      </div>
 
-      <div className="mt-auto flex items-center gap-3 pt-2">
         <button
           type="button"
           onClick={() => (speech.listening ? speech.stop() : speech.start())}
           disabled={!speech.supported}
-          className={`circle h-[4.25rem] w-[4.25rem] ${speech.listening ? 'circle--accent' : ''}`}
+          className={`circle h-12 w-12 shrink-0 ${speech.listening ? 'circle--accent' : ''}`}
           title={
             speech.supported ? 'Ramble, and it transcribes as you talk' : (speech.reason ?? '')
           }
         >
-          <span className="text-xl">🎙</span>
+          <span>🎙</span>
         </button>
-        <span className="text-xs text-ink-faint">
-          {!speech.supported
-            ? 'voice unavailable here'
-            : speech.listening
-              ? 'listening — ramble away'
-              : 'or ramble'}
+        <span className="min-w-0 flex-1 truncate text-xs text-ink-faint">
+          {!speech.supported ? 'no voice here' : speech.listening ? 'listening…' : 'or ramble'}
         </span>
 
         <button
           type="button"
           onClick={() => void submit()}
           disabled={!canSubmit || busy}
-          className="ml-auto rounded-full bg-ink px-7 py-4 text-sm font-semibold text-surface disabled:opacity-40"
+          className="shrink-0 rounded-full bg-ink px-5 py-3.5 text-sm font-semibold whitespace-nowrap text-surface disabled:opacity-40"
           data-tour="keep"
         >
           <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>

@@ -295,9 +295,20 @@ the field is gone. It carries a **preview of the first Inkling you would be show
 you can decide whether now is the moment without opening it — and it only appears when
 something is actually waiting, so the screen stays a place to write.
 
-Entry is a text box, an optional link, an optional image, a type (`auto` by default), and
-voice — `⌘↵` / `Ctrl+↵` keeps it. Nothing blocks on the network, so a capture is never
-lost to a bad connection.
+**Entry is one field.** It takes words, a link, or a picture — pasted, dropped, or picked
+with the paperclip — and works out what it was given rather than asking. It used to be three
+boxes: one for the text, one for the address, one for the image. That asked you to decide
+what you had noticed before you had written it down, and made the common case — writing a
+sentence — look like paperwork.
+
+A link in the text is found and kept as the link as well as the words, so a page shared as a
+title and an address reads as both. A capture that is **nothing but** a link is titled by its
+site rather than by the address, and tagged with it: `en.wikipedia.org` rather than
+`https://en.wikipedia.org/wiki/Sourdough`, and `#wikipedia` rather than `#en` — a leading
+two-letter label is a locale, not a name.
+
+Alongside it: a type (`auto` by default, overrulable) and voice. `⌘↵` / `Ctrl+↵` keeps it.
+Nothing blocks on the network, so a capture is never lost to a bad connection.
 
 ### Being shown how it works, and finding out later
 

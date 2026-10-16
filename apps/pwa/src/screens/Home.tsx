@@ -43,7 +43,7 @@ export function Home({
         />
         <h1 className="text-center text-3xl font-semibold tracking-tight">Inkling</h1>
         <p className="mt-1 text-center text-sm text-ink-faint">
-          Help yourself make progress on your inklings.
+          Make Moves on your Inklings.
         </p>
       </div>
 

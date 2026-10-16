@@ -1,6 +1,6 @@
 # Inkling
 
-*Help yourself make progress on your inklings.*
+*Make Moves on your Inklings.*
 
 A local-first, mobile-first app for capturing, resurfacing, growing, and retiring
 "blips of salience" — questions, references, insights, ideas, quests, yearnings —

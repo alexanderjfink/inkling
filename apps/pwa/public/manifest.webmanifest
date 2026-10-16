@@ -1,7 +1,7 @@
 {
   "name": "Inkling",
   "short_name": "Inkling",
-  "description": "Help yourself make progress on your inklings.",
+  "description": "Make Moves on your Inklings.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

@@ -272,6 +272,35 @@ Entry is a text box, an optional link, an optional image, a type (`auto` by defa
 voice — `⌘↵` / `Ctrl+↵` keeps it. Nothing blocks on the network, so a capture is never
 lost to a bad connection.
 
+### Being shown how it works, and finding out later
+
+Someone opening Inkling for the first time gets a five-step **walkthrough** that points at
+the actual controls — the field, the button that keeps it, the Review card, Settings — with
+a ring drawn around the real thing rather than a slideshow describing it. The dimming is
+done by that ring's own shadow, so the highlighted control cannot end up hidden behind the
+thing that is supposed to be dimming it, which is how these overlays usually break.
+
+A step whose control is not on screen — Review only exists once something is waiting — is
+shown as a centred card instead of being dropped, so the walkthrough is the same length for
+everyone.
+
+**It is only offered to an account that has never been used**, and that is decided from two
+sources, because they cover opposite cases. A fresh device looking at an account whose
+Inklings are on the server: they arrive during the first sync, but reach the local
+projection a beat after sync reports itself finished, so counting them locally would still
+say zero. A device that already holds them: its sync adds nothing, so the sync report says
+zero however long the person has been using Inkling. Neither signal is sufficient alone,
+and using only the local one is what greets every established account as brand new on a new
+phone — the case the guard exists for.
+
+It is per account *and* per device, because settings are not synced. That is fine, because
+the other guard is what actually keeps it away from someone who already uses the app.
+
+**Help** is the reference, reachable from `?` on the entry screen and from Settings, and it
+is where the walkthrough lives once you have seen it: *Show me around* replays it, and it is
+written for someone who has been using Inkling for a month and wants to know what a thing
+actually does rather than for someone who has never seen it.
+
 **Review** shows a single Inkling and three actions, and nothing else competes with them:
 
 | | |

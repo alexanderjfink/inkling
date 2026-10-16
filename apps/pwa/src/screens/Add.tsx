@@ -28,6 +28,7 @@ export function Add({
   onReview,
   onAttic,
   onSettings,
+  onHelp,
 }: {
   onCapture: (draft: CaptureDraft) => Promise<unknown>
   /** Content handed over by the OS share sheet. */
@@ -43,6 +44,7 @@ export function Add({
   onReview: () => void
   onAttic: () => void
   onSettings: () => void
+  onHelp: () => void
 }) {
   const [text, setText] = useState(initial?.text ?? '')
   const [url, setUrl] = useState(initial?.url ?? '')
@@ -87,9 +89,18 @@ export function Add({
         </div>
         <button
           type="button"
+          onClick={onHelp}
+          aria-label="Help"
+          className="circle h-10 w-10 text-base"
+        >
+          ?
+        </button>
+        <button
+          type="button"
           onClick={onSettings}
           aria-label="Settings"
           className="circle h-10 w-10 text-lg"
+          data-tour="settings"
         >
           ⚙
         </button>
@@ -101,6 +112,7 @@ export function Add({
           type="button"
           onClick={onReview}
           className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
+          data-tour="review"
         >
           <span className="circle circle--accent h-10 w-10 shrink-0 text-lg leading-none">◷</span>
           <span className="min-w-0 flex-1">
@@ -138,6 +150,7 @@ export function Add({
         autoFocus
         placeholder="What did you notice?"
         rows={6}
+        data-tour="field"
         className={`${inputClass} resize-none text-lg`}
       />
 
@@ -200,6 +213,7 @@ export function Add({
           onClick={() => void submit()}
           disabled={!canSubmit || busy}
           className="ml-auto rounded-full bg-ink px-7 py-4 text-sm font-semibold text-surface disabled:opacity-40"
+          data-tour="keep"
         >
           <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
         </button>

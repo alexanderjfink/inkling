@@ -24,6 +24,33 @@ export function useSync({
 }) {
   const [report, setReport] = useState<SyncReport | null>(null)
   const [syncing, setSyncing] = useState(false)
+  /**
+   * A sync has finished, success or failure.
+   *
+   * Distinct from `report`, which stays null when the server is unreachable: callers that
+   * need to know "is the local store as complete as it is going to get" must not hang on
+   * a server that is simply down.
+   */
+  const [attempted, setAttempted] = useState(false)
+
+  /**
+   * Sync state belongs to the account that was synced, so a switch clears it.
+   *
+   * More than cosmetic: `attempted` left true would claim a sync had already happened for
+   * an account that has never synced, and `report` would carry the previous person's
+   * event counts — which is the difference between offering the walkthrough and not, and
+   * between Settings telling the truth and telling somebody else's.
+   *
+   * Reset during render, not in an effect. An effect runs after this render has been
+   * committed, so whatever reads these would already have read the stale values.
+   */
+  const [syncedAccount, setSyncedAccount] = useState(accountId)
+  if (syncedAccount !== accountId) {
+    setSyncedAccount(accountId)
+    setReport(null)
+    setAttempted(false)
+    setSyncing(false)
+  }
 
   const sync = useCallback(async (): Promise<SyncReport> => {
     const store = storage()
@@ -35,6 +62,7 @@ export function useSync({
       return result
     } finally {
       setSyncing(false)
+      setAttempted(true)
     }
   }, [serverUrl])
 
@@ -76,6 +104,7 @@ export function useSync({
   return {
     report,
     syncing,
+    attempted,
     sync,
     serverUrl,
     loaded: true,

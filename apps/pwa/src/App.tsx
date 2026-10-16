@@ -1,10 +1,12 @@
 import { type Blip, buildDailyFeed } from '@inkling/domain'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Spinner } from './components/Spinner'
+import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
 import { Add } from './screens/Add'
 import { Admin } from './screens/Admin'
 import { AllBlips } from './screens/AllBlips'
+import { Help } from './screens/Help'
 import { Review } from './screens/Review'
 import { Settings } from './screens/Settings'
 import { SignIn } from './screens/SignIn'
@@ -15,10 +17,12 @@ import { useRelated } from './state/useRelated'
 import { useServerConfig } from './state/useServerConfig'
 import { useServerUrl } from './state/useServerUrl'
 import { useSync } from './state/useSync'
+import { useTour } from './state/useTour'
 import { useTheme } from './state/useTheme'
+import { TOUR_KEY, TOUR_STEPS } from './tour'
 
 /** No home screen: the app opens on entry, which is what you came to do. */
-type Screen = 'add' | 'review' | 'all' | 'settings' | 'admin'
+type Screen = 'add' | 'review' | 'all' | 'settings' | 'admin' | 'help'
 
 const TITLES: Record<Screen, string> = {
   add: 'Add an Inkling',
@@ -26,6 +30,7 @@ const TITLES: Record<Screen, string> = {
   all: 'All Inklings',
   settings: 'Settings',
   admin: 'Accounts',
+  help: 'Help',
 }
 
 export default function App() {
@@ -65,6 +70,28 @@ export default function App() {
   const promoteState = usePromote()
   const serverConfig = useServerConfig(server.serverUrl, auth.user?.id ?? null)
   const theme = useTheme()
+
+  const active = blips.filter((blip) => !blip.deleted).length
+  const { open: tourOpen, setOpen: setTourOpen } = useTour({
+    accountId: auth.user?.id ?? null,
+    ready,
+    synced: syncState.attempted,
+    // Two halves, covering opposite cases, and neither is sufficient.
+    //
+    // `addedEvents` is the fresh device: the account's Inklings are on the server and
+    // arrive during the first sync, but they reach the local projection a beat after the
+    // sync reports itself finished — so the count here would still be zero.
+    //
+    // The local count is the device that already holds them: its sync adds nothing, so
+    // `addedEvents` is zero however long the person has been using Inkling.
+    hasHistory: active > 0 || (syncState.report?.addedEvents ?? 0) > 0,
+  })
+
+  /** Finishing or skipping the walkthrough means it does not open by itself again. */
+  const dismissTour = useCallback(() => {
+    setTourOpen(false)
+    void storage().setSetting(TOUR_KEY, 'done')
+  }, [setTourOpen])
 
   const onPromote = useCallback(
     (blip: Blip, relatedBlips: Blip[]) =>
@@ -173,7 +200,7 @@ export default function App() {
           onConsumed={() => setShared(null)}
           waiting={waiting}
           next={upNext}
-          total={blips.filter((blip) => !blip.deleted).length}
+          total={active}
           attic={attic}
           capturedToday={capturedToday}
           serverWarning={
@@ -186,6 +213,7 @@ export default function App() {
           onReview={() => setScreen('review')}
           onAttic={() => setScreen('all')}
           onSettings={() => setScreen('settings')}
+          onHelp={() => setScreen('help')}
         />
       ) : null}
 
@@ -220,6 +248,14 @@ export default function App() {
           }}
         />
       ) : null}
+      {ready && screen === 'help' ? (
+        <Help
+          onStartTour={() => {
+            setScreen('add')
+            setTourOpen(true)
+          }}
+        />
+      ) : null}
       {ready && screen === 'settings' ? (
         <Settings
           syncState={syncState}
@@ -231,8 +267,12 @@ export default function App() {
           onSaveServerUrl={server.save}
           auth={auth}
           onOpenAdmin={() => setScreen('admin')}
+          onOpenHelp={() => setScreen('help')}
         />
       ) : null}
+
+      {/* Last, so it sits over whatever screen it is explaining. */}
+      {tourOpen ? <Tour steps={TOUR_STEPS} onDone={dismissTour} /> : null}
     </div>
   )
 }

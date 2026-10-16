@@ -156,6 +156,7 @@ export function Settings({
   onSaveServerUrl,
   auth,
   onOpenAdmin,
+  onOpenHelp,
 }: {
   syncState: ReturnType<typeof useSync>
   events: BlipEvent[]
@@ -166,6 +167,7 @@ export function Settings({
   onSaveServerUrl: (url: string) => Promise<void>
   auth: Auth
   onOpenAdmin: () => void
+  onOpenHelp: () => void
 }) {
   const { report, syncing, sync } = syncState
   const { config, providers, error, saving, save, loaded, load, status } = serverConfig
@@ -943,6 +945,16 @@ export function Settings({
             </button>
           </>
         ) : null}
+      </Section>
+
+      <Section title="Help">
+        <button
+          type="button"
+          onClick={onOpenHelp}
+          className="self-start rounded-full border border-line px-4 py-2 text-xs text-ink-soft"
+        >
+          What everything does, and how to use it
+        </button>
       </Section>
 
       <Section title="App">

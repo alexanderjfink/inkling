@@ -139,6 +139,16 @@ export interface LookedUp {
  * move losing its links entirely. The phrase is still the model's, so it is still not a
  * URL anybody invented; it is just a search box instead of a page.
  */
+/**
+ * Answers already resolved this session.
+ *
+ * A move's phrases were resolved every time the move was shown, so opening the same Inkling
+ * twice fetched the same two pages twice, and a saved move fetched them on every visit. The
+ * answer cannot change while the app is open, so asking again is pure waste — and it is work
+ * that happens without being asked for, on a card that may only be glanced at.
+ */
+const resolved = new Map<string, LookedUp>()
+
 export async function lookupVia(baseUrl: string, queries: string[]): Promise<LookedUp> {
   const wanted = queries.map((query) => query.trim()).filter((query) => query.length > 0)
   const searched: LookedUp = {
@@ -146,6 +156,10 @@ export async function lookupVia(baseUrl: string, queries: string[]): Promise<Loo
     material: null,
   }
   if (wanted.length === 0) return { links: [], material: null }
+
+  const key = `${baseUrl}|${wanted.join('\u0000')}`
+  const known = resolved.get(key)
+  if (known) return known
 
   try {
     const res = await apiFetch(join(baseUrl, '/lookup'), {
@@ -156,7 +170,12 @@ export async function lookupVia(baseUrl: string, queries: string[]): Promise<Loo
     if (!res.ok) return searched
     const body = (await res.json()) as Partial<LookedUp>
     const links = Array.isArray(body.links) ? body.links : []
-    return { links: links.length > 0 ? links : searched.links, material: body.material ?? null }
+    const found: LookedUp = {
+      links: links.length > 0 ? links : searched.links,
+      material: body.material ?? null,
+    }
+    resolved.set(key, found)
+    return found
   } catch {
     return searched
   }

@@ -44,7 +44,14 @@ export function useSuggestedMove(
    * exactly the suggestion you just asked to be reconsidered.
    */
   revision = 0,
-): { move: MoveSpec | null; loading: boolean; generate: () => void; reroll: () => void } {
+): {
+  move: MoveSpec | null
+  loading: boolean
+  generate: () => void
+  /** Forget the suggestion: somebody is asking a person instead. */
+  discard: () => void
+  reroll: () => void
+} {
   const [move, setMove] = useState<MoveSpec | null>(null)
   const [loading, setLoading] = useState(false)
   /** The Inkling we have been asked for a move on. Empty means nobody has asked. */
@@ -129,11 +136,22 @@ export function useSuggestedMove(
   }, [key, relatedIds, provider, blipId, savedId, wanted])
 
   const generate = useCallback(() => setAsked(blipId), [blipId])
+  /**
+   * Put the card back to the two buttons.
+   *
+   * Asking a friend is the other way of getting a move, so the suggestion the app made is no
+   * longer the thing being answered — leaving it on screen underneath the composer would be
+   * offering two answers to one question.
+   */
+  const discard = useCallback(() => {
+    setAsked('')
+    setMove(null)
+  }, [])
 
   function reroll() {
     if (!move) return
     setAvoid({ blipId, ids: [...avoidIds, move.id] })
   }
 
-  return { move, loading, generate, reroll }
+  return { move, loading, generate, discard, reroll }
 }

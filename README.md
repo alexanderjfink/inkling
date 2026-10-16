@@ -422,7 +422,16 @@ rather than quietly counted as empty.
 | **✓ until Saturday** | put it down; the label is the date it comes back |
 
 **Nothing is generated until you ask.** An Inkling opens with two buttons — **Generate a
-Move** and **Ask a Friend for a Move** — and no spinner. **Both put their next step in the
+Move** and **Ask a Friend for a Move** — and no spinner.
+
+**Asking closes the suggestion.** They are two ways of getting one answer, so the app's move
+goes when you ask a person, and the two buttons come back for whenever the answer arrives.
+Cancelling the ask brings it straight back — it is hidden, not thrown away.
+
+The only work the app does on its own is resolving a shown move's phrases against Wikipedia,
+and that is cached for the session now: it used to refetch the same two pages every time the
+same Inkling was opened, which is the sort of thing that reads as the app going off and doing
+something without being asked. **Both put their next step in the
 same place**: inside the card, above the actions. Asking used to open its composer under the
 two buttons at the bottom of the screen, so the thing you had just started was somewhere
 other than where the thing you might have started instead would have been. It used to start a model call on

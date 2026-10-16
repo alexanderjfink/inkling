@@ -177,11 +177,14 @@ function AskPanel({
   blip,
   social,
   onClose,
+  onAsked,
   onShare,
 }: {
   blip: Blip
   social: SocialState
   onClose: () => void
+  /** It went. Different from closing: the app's own suggestion is no longer the answer. */
+  onAsked?: () => void
   onShare: () => void
 }) {
   const [to, setTo] = useState<string | null>(null)
@@ -204,7 +207,10 @@ function AskPanel({
         note: note.trim() || undefined,
       })
       setProblem(problemText)
-      if (!problemText) onClose()
+      if (!problemText) {
+        if (onAsked) onAsked()
+        else onClose()
+      }
     } finally {
       setSending(false)
     }
@@ -583,6 +589,7 @@ export function Review({
     loading: moveLoading,
     reroll,
     generate: generateMove,
+    discard: discardMove,
   } = useSuggestedMove(
     current,
     currentRelated.map((entry_) => entry_.blip),
@@ -1082,7 +1089,7 @@ export function Review({
 
         <Blocks blip={current} actions={actions} />
 
-        {friendMove ? (
+        {friendMove && !askOpen ? (
           <div className="mt-5 rounded-2xl border border-accent/40 bg-accent-soft/60 p-4">
             <p className="text-[11px] tracking-wide text-accent uppercase">
               a move from {friendMove.fromUsername}
@@ -1127,6 +1134,10 @@ export function Review({
                     blip={current}
                     social={social}
                     onClose={() => setAskOpen(false)}
+                    onAsked={() => {
+                      setAskOpen(false)
+                      discardMove()
+                    }}
                     onShare={() => void actions.share(current.id, 'friends')}
                   />
                 ) : (
@@ -1197,6 +1208,13 @@ export function Review({
               social={social}
               onClose={() => setAskOpen(false)}
               onShare={() => void actions.share(current.id, 'friends')}
+              // Asking a person is the other way of getting a move, so the one the app made
+              // is no longer the thing being answered: it goes, and the two buttons come
+              // back for whenever the answer arrives.
+              onAsked={() => {
+                setAskOpen(false)
+                discardMove()
+              }}
             />
           </div>
         ) : null}
@@ -1313,7 +1331,7 @@ export function Review({
               </button>
             </div>
           </div>
-        ) : move ? (
+        ) : move && !askOpen ? (
           <div
             className={`mt-5 rounded-2xl bg-accent-soft/70 p-4 transition-opacity ${
               moveLoading ? 'opacity-60' : ''

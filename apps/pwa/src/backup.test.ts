@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import type { BlipEvent } from '@inkling/domain'
 import { newBlock, project, withToggledItem } from '@inkling/domain'
-import { daysSince, renderMarkdownBackup } from './backup'
+import { daysSince, rejectionRows, renderMarkdownBackup } from './backup'
 
 /**
  * The escape hatch has to be readable without this app.
@@ -372,5 +372,101 @@ describe('daysSince', () => {
   test('never having backed up is null, not zero', () => {
     // The difference matters: zero would read as "just backed up".
     expect(daysSince(null)).toBeNull()
+  })
+})
+
+describe('suggestions marked bad', () => {
+  const spec = {
+    id: 'idea.prior',
+    title: 'Who has already tried a social, learning-first platform?',
+    why: 'because',
+    timeLimitSec: 240,
+    goal: 'one existing platform, plus what it missed',
+    playbook: 'idea',
+    generatedBy: 'llm' as const,
+    materialQuery: 'Are.na Cohost social platforms for thinking',
+  }
+
+  const context = {
+    blipType: 'idea' as const,
+    blipTitle: 'Social Platform for Inkling',
+    topics: ['social', 'platform'],
+    entries: 2,
+    alreadyOffered: ['idea.variations', 'any.read'],
+    related: ['Better Living Through Algorithms'],
+  }
+
+  function withRejection() {
+    return build([
+      { ...meta(1), t: 'captured', id: 'a', input: { kind: 'text', text: 'social' }, type: 'idea' },
+      { ...meta(2), t: 'moveShown', id: 'a', moveId: 'idea.prior', moveSpec: spec },
+      {
+        ...meta(3),
+        t: 'moveRejected',
+        id: 'a',
+        moveId: 'idea.prior',
+        moveSpec: spec,
+        reason: 'nothing to do with this',
+        context,
+      },
+    ])
+  }
+
+  test('the readable backup says which suggestions were bad, and why', () => {
+    const md = renderMarkdownBackup(withRejection())
+    expect(md).toContain('**Suggestions marked bad**')
+    expect(md).toContain('learning-first platform')
+    expect(md).toContain('nothing to do with this')
+  })
+
+  test('an Inkling with no rejections gets no such heading', () => {
+    const md = renderMarkdownBackup(
+      build([
+        { ...meta(1), t: 'captured', id: 'a', input: { kind: 'text', text: 'x' }, type: 'idea' },
+      ]),
+    )
+    expect(md).not.toContain('Suggestions marked bad')
+  })
+
+  test('the export keeps what the model was working from, not just the verdict', () => {
+    // This is the whole point of the feature. A rejection without its context says
+    // "wrong" and nothing else, and by the time anyone looks the move history holds only
+    // what was offered — not what it was offered for.
+    const rows = rejectionRows(withRejection()) as Array<Record<string, unknown>>
+    expect(rows).toHaveLength(1)
+    const row = rows[0] as {
+      reason: string
+      move: Record<string, unknown>
+      offeredFor: Record<string, unknown>
+    }
+    expect(row.reason).toBe('nothing to do with this')
+    expect(row.move.title).toContain('learning-first')
+    expect(row.move.generatedBy).toBe('llm')
+    expect(row.move.materialQuery).toBe('Are.na Cohost social platforms for thinking')
+    expect(row.offeredFor.blipTitle).toBe('Social Platform for Inkling')
+    expect(row.offeredFor.alreadyOffered).toEqual(['idea.variations', 'any.read'])
+    expect(row.offeredFor.entries).toBe(2)
+  })
+
+  test('nothing marked bad means nothing to export', () => {
+    expect(rejectionRows([])).toHaveLength(0)
+    expect(
+      rejectionRows(
+        build([
+          { ...meta(1), t: 'captured', id: 'a', input: { kind: 'text', text: 'x' }, type: 'idea' },
+        ]),
+      ),
+    ).toHaveLength(0)
+  })
+
+  test('the rows survive a round trip through JSON, as an export must', () => {
+    const rows = rejectionRows(withRejection())
+    const back = JSON.parse(
+      rows
+        .map((row) => JSON.stringify(row))
+        .join('\n')
+        .split('\n')[0]!,
+    )
+    expect(back.offeredFor.topics).toEqual(['social', 'platform'])
   })
 })

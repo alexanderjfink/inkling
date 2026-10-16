@@ -4,6 +4,7 @@ import type {
   DeferralChoice,
   LLMProvider,
   MoveSpec,
+  RejectionContext,
   RelatedBlip,
 } from '@inkling/domain'
 import {
@@ -14,6 +15,7 @@ import {
   deferUntil,
   entryContext,
   rankBlips,
+  REJECTION_REASONS,
   requestGuidance,
   roundQueue,
 } from '@inkling/domain'
@@ -29,7 +31,14 @@ import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
 import { useSuggestedMove } from '../state/useSuggestedMove'
 
-type Decision = 'advanced' | 'deferred' | 'retired' | 'deleted' | 'promoted' | 'revived'
+type Decision =
+  | 'advanced'
+  | 'deferred'
+  | 'retired'
+  | 'deleted'
+  | 'promoted'
+  | 'revived'
+  | 'rejected'
 /** Today's finite feed, or everything you have. */
 type Scope = 'today' | 'all'
 
@@ -178,8 +187,16 @@ function MoveLog({
       <ul className="mt-2 flex flex-col gap-1.5">
         {[...moves].reverse().map((entry) => (
           <li key={`${entry.moveId}-${entry.shownAt}`} className="text-xs text-ink-soft">
-            <span className={entry.outcome === 'done' ? 'text-good' : 'text-ink-faint'}>
-              {entry.outcome === 'done' ? '✓' : '·'}
+            <span
+              className={
+                entry.outcome === 'done'
+                  ? 'text-good'
+                  : entry.outcome === 'rejected'
+                    ? 'text-warn'
+                    : 'text-ink-faint'
+              }
+            >
+              {entry.outcome === 'done' ? '✓' : entry.outcome === 'rejected' ? '✗' : '·'}
             </span>{' '}
             {entry.spec.title}
             <span className="text-ink-faint">
@@ -188,7 +205,9 @@ function MoveLog({
                 ? `done ${formatWhen(entry.doneAt)}`
                 : entry.outcome === 'skipped'
                   ? `put down ${formatWhen(entry.shownAt)}`
-                  : `offered ${formatWhen(entry.shownAt)}`}
+                  : entry.outcome === 'rejected'
+                    ? `marked bad ${formatWhen(entry.shownAt)}`
+                    : `offered ${formatWhen(entry.shownAt)}`}
             </span>
           </li>
         ))}
@@ -252,6 +271,8 @@ export function Review({
   const [draftBody, setDraftBody] = useState('')
   const [draftType, setDraftType] = useState<BlipType>('idea')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  /** Open when the person is saying a suggestion was bad, rather than just unwanted. */
+  const [rejecting, setRejecting] = useState(false)
   /**
    * Bumped when the move history changes underneath the suggestion — forgetting the
    * offers, say — so the card is reconsidered rather than left holding the suggestion
@@ -376,6 +397,40 @@ export function Review({
     setGuidance(null)
     setEditing(false)
     setConfirmingDelete(false)
+    setRejecting(false)
+  }
+
+  /**
+   * Everything the model was working from.
+   *
+   * The point of the whole feature: a rejection without this says "wrong" and nothing
+   * else, and by the time anyone looks at it the move history holds only what was
+   * offered, not what it was offered for.
+   */
+  function rejectionContext(): RejectionContext | null {
+    if (!current) return null
+    return {
+      blipType: current.type,
+      blipTitle: current.title,
+      topics: current.topics,
+      entries: current.entries.length,
+      alreadyOffered: current.moves.map((entry_) => entry_.moveId),
+      related: currentRelated.map((entry_) => entry_.blip.title),
+    }
+  }
+
+  /** Say a suggestion was bad. A reason is welcome but never required. */
+  async function reject(reason?: string) {
+    if (!current || !move) return
+    const context = rejectionContext()
+    if (!context) return
+    setBusy(true)
+    try {
+      await actions.rejectMove(current.id, move, context, reason)
+      settle('rejected')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function saveForLater() {
@@ -486,6 +541,7 @@ export function Review({
     const deferred = counts.filter((value) => value === 'deferred').length
     const retired = counts.filter((value) => value === 'retired').length
     const deleted = counts.filter((value) => value === 'deleted').length
+    const rejected = counts.filter((value) => value === 'rejected').length
     const promoted = counts.filter((value) => value === 'promoted').length
     const revived = counts.filter((value) => value === 'revived').length
 
@@ -496,6 +552,7 @@ export function Review({
           <p className="text-sm text-ink-soft">
             {advanced} advanced · {deferred} put down · {promoted} to notes · {retired} retired
             {deleted > 0 ? ` · ${deleted} deleted` : ''}
+            {rejected > 0 ? ` · ${rejected} marked bad` : ''}
             {revived > 0 ? ` · ${revived} revived` : ''} · nothing lost.
           </p>
         ) : (
@@ -800,7 +857,54 @@ export function Review({
                   {guidanceLoading ? 'thinking…' : 'help me with the next step'}
                 </ButtonLabel>
               </button>
+              {/* A different signal from "not this one", which means "not at the moment".
+                  This one says the suggestion itself was wrong, and it is kept. */}
+              <button type="button" onClick={() => setRejecting(true)} className="quiet underline">
+                this is bad
+              </button>
             </div>
+
+            {rejecting ? (
+              <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line bg-surface/60 p-3">
+                <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+                  what is wrong with it?
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {REJECTION_REASONS.map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void reject(reason)}
+                      className="rounded-full border border-line px-2.5 py-1 text-[11px] text-ink-soft disabled:opacity-50"
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-4 text-xs">
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void reject()}
+                    className="quiet underline disabled:opacity-50"
+                  >
+                    just mark it bad
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRejecting(false)}
+                    className="quiet underline"
+                  >
+                    cancel
+                  </button>
+                </div>
+                <p className="text-[11px] text-ink-faint">
+                  Kept with this Inkling, along with what the move was working from, so the
+                  suggestions can be improved later. It will not be offered again.
+                </p>
+              </div>
+            ) : null}
 
             <Guidance items={guidance} />
           </div>

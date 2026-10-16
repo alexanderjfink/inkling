@@ -6,6 +6,7 @@ import type {
   CaptureInput,
   EntryContext,
   MoveSpec,
+  RejectionContext,
 } from '@inkling/domain'
 import { newId, project, snoozeUntil } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
@@ -55,6 +56,20 @@ export interface InklingActions {
   unpinFromDesktop(id: string): Promise<BlipEvent>
   /** Record that a move was put in front of the user, so it is not repeated blindly. */
   recordMoveShown(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
+  /**
+   * Mark a suggestion as bad, keeping the context it was made in.
+   *
+   * Deliberately not the same as "not this one", which means "not at the moment" and is
+   * not recorded at all. This is the signal that says the algorithm got it wrong, so it
+   * carries what the model was working from — which is the only thing that can make the
+   * next version better.
+   */
+  rejectMove(
+    id: string,
+    moveSpec: MoveSpec,
+    context: RejectionContext,
+    reason?: string,
+  ): Promise<BlipEvent>
   /** Keep this move for later, or let it go. */
   saveMove(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
   unsaveMove(id: string, moveId: string): Promise<BlipEvent>
@@ -204,6 +219,16 @@ export function useInkling(accountId: string | null = null) {
       },
       recordMoveShown(id, moveSpec) {
         return storage().append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
+      },
+      rejectMove(id, moveSpec, context, reason) {
+        return storage().append({
+          t: 'moveRejected',
+          id,
+          moveId: moveSpec.id,
+          moveSpec,
+          reason,
+          context,
+        })
       },
       saveMove(id, moveSpec) {
         return storage().append({ t: 'moveSaved', id, moveId: moveSpec.id, moveSpec })

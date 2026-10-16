@@ -6,6 +6,7 @@ import type {
   CaptureInput,
   Entry,
   MoveSpec,
+  RejectionContext,
 } from './events'
 import { totalOrder } from './events'
 
@@ -24,9 +25,18 @@ export interface MoveHistoryEntry {
   moveId: string
   spec: MoveSpec
   shownAt: string
-  outcome: 'shown' | 'done' | 'skipped'
+  outcome: 'shown' | 'done' | 'skipped' | 'rejected'
   /** When it was completed, if it was. */
   doneAt?: string
+}
+
+/** A suggestion judged bad, with the evidence for why. */
+export interface MoveRejection {
+  moveId: string
+  spec: MoveSpec
+  at: string
+  reason?: string
+  context: RejectionContext
 }
 
 export type BlipStatus = 'active' | 'snoozed' | 'retired' | 'promoted'
@@ -49,6 +59,8 @@ export interface Blip {
   blocks: Block[]
   schedule: ScheduleState
   moves: MoveHistoryEntry[]
+  /** Suggestions judged bad, kept with the context they were made in. */
+  rejections: MoveRejection[]
   /** A move kept deliberately, offered again next time this surfaces. */
   savedMove?: MoveSpec
   export?: { notePath: string; at: string }
@@ -104,6 +116,7 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
         timesSkipped: 0,
       },
       moves: [],
+      rejections: [],
       desktopPinned: false,
     }
     if (event.mediaIds?.length) {
@@ -166,6 +179,29 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       blip.schedule.lastTouched = event.at
       break
     }
+    case 'moveRejected':
+      blip.rejections.push({
+        moveId: event.moveId,
+        spec: event.moveSpec,
+        at: event.at,
+        reason: event.reason,
+        context: event.context,
+      })
+      // And in the history, so it is not offered again — and so the move log shows it as
+      // rejected rather than as something that was merely put in front of you.
+      {
+        const entry = blip.moves.find((move) => move.moveId === event.moveId)
+        if (entry) entry.outcome = 'rejected'
+        else {
+          blip.moves.push({
+            moveId: event.moveId,
+            spec: event.moveSpec,
+            shownAt: event.at,
+            outcome: 'rejected',
+          })
+        }
+      }
+      break
     case 'moveSaved':
       blip.savedMove = event.moveSpec
       break

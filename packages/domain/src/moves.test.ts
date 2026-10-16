@@ -1,5 +1,13 @@
 import { describe, expect, test } from 'bun:test'
-import type { Blip, BlipEvent, BlipEventBody, BlipType, LLMProvider, MoveSpec } from '../src/index'
+import type {
+  Blip,
+  BlipEvent,
+  BlipEventBody,
+  BlipType,
+  LLMProvider,
+  MoveSpec,
+  RejectionContext,
+} from '../src/index'
 import {
   BLIP_TYPES,
   buildGuidancePrompt,
@@ -7,6 +15,7 @@ import {
   candidateTemplates,
   deriveQuery,
   MOVE_LIBRARY,
+  REJECTION_REASONS,
   parseGuidance,
   parseMoveResponse,
   project,
@@ -522,5 +531,116 @@ describe('the search phrase the model is asked for', () => {
     const { system } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
     expect(system).toContain('general idea rather than particular products')
     expect(system).toContain('a list of product names finds nothing')
+  })
+})
+
+describe('marking a suggestion as bad', () => {
+  const meta = (seq: number) => ({
+    deviceId: 'dev-a',
+    seq,
+    at: `2026-03-0${seq}T00:00:00Z`,
+  })
+
+  const spec: MoveSpec = {
+    id: 'idea.prior',
+    title: 'Who has already tried a social, learning-first platform?',
+    why: 'because',
+    timeLimitSec: 240,
+    goal: 'one existing platform, plus what it missed',
+    playbook: 'idea',
+    generatedBy: 'llm',
+  }
+
+  const context: RejectionContext = {
+    blipType: 'idea',
+    blipTitle: 'Social Platform for Inkling',
+    topics: ['social', 'platform'],
+    entries: 2,
+    alreadyOffered: ['idea.variations', 'any.read'],
+    related: ['Better Living Through Algorithms'],
+  }
+
+  const history: BlipEvent[] = [
+    { ...meta(1), t: 'captured', id: 'x', input: { kind: 'text', text: 'social' }, type: 'idea' },
+    { ...meta(2), t: 'moveShown', id: 'x', moveId: 'idea.prior', moveSpec: spec },
+    {
+      ...meta(3),
+      t: 'moveRejected',
+      id: 'x',
+      moveId: 'idea.prior',
+      moveSpec: spec,
+      reason: 'nothing to do with this',
+      context,
+    },
+  ]
+
+  test('the rejection is kept with everything the model was working from', () => {
+    // A rejection on its own says "wrong". The context says wrong about what, which is
+    // the part that can change the algorithm — and the part that is gone by the time
+    // anyone looks, because the move history keeps only what was offered.
+    const [blip] = project(history)
+    expect(blip?.rejections).toHaveLength(1)
+    const rejection = blip?.rejections[0]
+    expect(rejection?.reason).toBe('nothing to do with this')
+    expect(rejection?.spec.title).toContain('learning-first')
+    expect(rejection?.context.blipTitle).toBe('Social Platform for Inkling')
+    expect(rejection?.context.alreadyOffered).toEqual(['idea.variations', 'any.read'])
+    expect(rejection?.context.entries).toBe(2)
+  })
+
+  test('and the move is marked rejected, so it is not offered again', () => {
+    const [blip] = project(history)
+    expect(blip?.moves[0]?.outcome).toBe('rejected')
+    expect(blip?.moves.map((move) => move.moveId)).toEqual(['idea.prior'])
+  })
+
+  test('rejecting something never shown still records it, rather than losing it', () => {
+    const [blip] = project([
+      ...history.slice(0, 1),
+      {
+        ...meta(4),
+        t: 'moveRejected',
+        id: 'x',
+        moveId: 'any.react',
+        moveSpec: { ...spec, id: 'any.react' },
+        context,
+      },
+    ])
+    expect(blip?.moves.map((move) => move.moveId)).toEqual(['any.react'])
+    expect(blip?.moves[0]?.outcome).toBe('rejected')
+  })
+
+  test('a reason is optional — the tap matters more than the taxonomy', () => {
+    const [blip] = project([
+      ...history.slice(0, 1),
+      { ...meta(4), t: 'moveRejected', id: 'x', moveId: 'idea.prior', moveSpec: spec, context },
+    ])
+    expect(blip?.rejections[0]?.reason).toBeUndefined()
+    expect(blip?.rejections).toHaveLength(1)
+  })
+
+  test('forgetting the offers keeps the rejections, because they are evidence', () => {
+    const [blip] = project([...history, { ...meta(5), t: 'movesForgotten', id: 'x' }])
+    expect(blip?.rejections).toHaveLength(1)
+    expect(blip?.moves[0]?.outcome).toBe('rejected')
+  })
+
+  test('a rejected move is still not the same as one put down', () => {
+    const [blip] = project([
+      ...history.slice(0, 2),
+      { ...meta(3), t: 'moveSkipped', id: 'x', moveId: 'idea.prior' },
+    ])
+    expect(blip?.moves[0]?.outcome).toBe('skipped')
+    expect(blip?.rejections).toHaveLength(0)
+  })
+
+  test('the reasons are short enough to tap, and point at different problems', () => {
+    expect(REJECTION_REASONS.length).toBeGreaterThanOrEqual(4)
+    expect(new Set(REJECTION_REASONS).size).toBe(REJECTION_REASONS.length)
+    for (const reason of REJECTION_REASONS as readonly string[]) {
+      expect(reason.length).toBeLessThanOrEqual(30)
+      expect(reason).toBe(reason.trim())
+      expect(reason.endsWith('.')).toBe(false)
+    }
   })
 })

@@ -107,6 +107,15 @@ export function renderMarkdownBackup(blips: Blip[], now = new Date()): string {
       }
     }
 
+    if (blip.rejections.length > 0) {
+      lines.push('', '**Suggestions marked bad**')
+      for (const rejection of blip.rejections) {
+        lines.push(
+          `- ${rejection.spec.title}${rejection.reason ? ` — ${rejection.reason}` : ''} (${rejection.at.slice(0, 10)})`,
+        )
+      }
+    }
+
     if (blip.export?.notePath) lines.push('', `Promoted to: ${blip.export.notePath}`)
   }
 
@@ -146,4 +155,43 @@ function triggerDownload(filename: string, body: string, type: string): void {
   link.click()
   link.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+/**
+ * Every suggestion that was marked bad, as JSONL, with the context it was made in.
+ *
+ * The log already contains these, but the log contains everything — and this data exists
+ * for one job, which is making the next version of the suggestions better. One rejection
+ * per line, flat enough to read and to load.
+ */
+/** The rows that export writes, split out so they can be checked without a browser. */
+export function rejectionRows(blips: Blip[]): unknown[] {
+  return blips.flatMap((blip) =>
+    blip.rejections.map((rejection) => ({
+      at: rejection.at,
+      reason: rejection.reason ?? null,
+      move: {
+        id: rejection.moveId,
+        title: rejection.spec.title,
+        goal: rejection.spec.goal,
+        why: rejection.spec.why,
+        playbook: rejection.spec.playbook,
+        generatedBy: rejection.spec.generatedBy,
+        materialQuery: rejection.spec.materialQuery ?? null,
+        timeLimitSec: rejection.spec.timeLimitSec,
+      },
+      // What the model was working from. This is the part that can change anything.
+      offeredFor: rejection.context,
+    })),
+  )
+}
+
+export function downloadRejections(blips: Blip[]): void {
+  const rows = rejectionRows(blips)
+  if (rows.length === 0) return
+  triggerDownload(
+    `inkling-bad-suggestions-${new Date().toISOString().slice(0, 10)}.jsonl`,
+    `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`,
+    'application/x-ndjson',
+  )
 }

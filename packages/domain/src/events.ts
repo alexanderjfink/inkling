@@ -182,6 +182,44 @@ export interface EventMeta {
   at: ISODate
 }
 
+/**
+ * Why a suggestion was judged bad.
+ *
+ * Short, because this is tapped on a phone. Each one points at a different part of the
+ * algorithm: the first two are selection problems, the next two are adaptation problems,
+ * and the last is phrasing.
+ */
+export const REJECTION_REASONS = [
+  'nothing to do with this',
+  'too vague to act on',
+  'too big for one sitting',
+  'I already know this',
+  'not how I would put it',
+] as const
+
+export type RejectionReason = (typeof REJECTION_REASONS)[number]
+
+/**
+ * Everything the model was working from, kept so a bad suggestion can be understood
+ * later rather than merely counted.
+ *
+ * A rejection on its own says "wrong". The context says wrong *about what*, which is the
+ * part that can change anything — and it is the part that is gone by the time anyone
+ * looks, because the move history only keeps what was offered, not what it was offered
+ * for.
+ */
+export interface RejectionContext {
+  blipType: BlipType
+  blipTitle: string
+  topics: string[]
+  /** How much had accumulated. "Too vague" often means there was too little to go on. */
+  entries: number
+  /** Move ids already offered for this blip — what the model was told to avoid. */
+  alreadyOffered: string[]
+  /** Titles of the related Inklings it was shown. */
+  related: string[]
+}
+
 export type BlipEventBody =
   | {
       t: 'captured'
@@ -201,6 +239,22 @@ export type BlipEventBody =
   | { t: 'moveShown'; id: string; moveId: string; moveSpec: MoveSpec }
   | { t: 'moveDone'; id: string; moveId: string }
   | { t: 'moveSkipped'; id: string; moveId: string }
+  /**
+   * This suggestion was bad, not merely unwanted now.
+   *
+   * A different signal from `moveSkipped`, and the difference is the point: "not this
+   * one" means "not at the moment", while this means "this should not have been offered".
+   * Only the second is evidence about the algorithm, so it is kept with the context the
+   * model was working from.
+   */
+  | {
+      t: 'moveRejected'
+      id: string
+      moveId: string
+      moveSpec: MoveSpec
+      reason?: string
+      context: RejectionContext
+    }
   /** Keep this move for later, rather than losing it when the card moves on. */
   | { t: 'moveSaved'; id: string; moveId: string; moveSpec: MoveSpec }
   | { t: 'moveUnsaved'; id: string; moveId: string }

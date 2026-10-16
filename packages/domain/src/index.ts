@@ -22,6 +22,8 @@ export {
   totalOrder,
 } from './events'
 export type { EntryContext } from './events'
+export { REJECTION_REASONS } from './events'
+export type { RejectionContext, RejectionReason } from './events'
 export { stateDigest } from './digest'
 export { sha256Hex } from './hash'
 export { idTime, newId } from './ids'
@@ -94,7 +96,7 @@ export {
   renderObsidianNote,
   slugify,
 } from './obsidian'
-export type { Blip, BlipStatus, MoveHistoryEntry, ScheduleState } from './project'
+export type { Blip, BlipStatus, MoveHistoryEntry, MoveRejection, ScheduleState } from './project'
 export { liveBlips, project } from './project'
 export type { FeedContext } from './schedule'
 export type { DeferralChoice, SnoozeReason } from './schedule'

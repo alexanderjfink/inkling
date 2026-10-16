@@ -277,6 +277,24 @@ look for, specific to the move and to whatever material was found).
 **moves so far** lists what has been put in front of you and when — behind a tap, so
 the card stays clean. Related Inklings are listed and open on tap.
 
+**"this is bad" is a different signal from "not this one".** *Not this one* means *not at
+the moment* and is not recorded. *This is bad* means the suggestion itself was wrong, and
+it is kept — with a reason if you tap one, and with everything the model was working from:
+the Inkling's type and title, its topics, how much had accumulated, which moves had
+already been offered, and the related Inklings it was shown.
+
+That context is the point. A rejection on its own says "wrong"; the context says wrong
+*about what*, which is the only thing that can change the algorithm — and it is gone by
+the time anyone looks, because the move history holds only what was offered, not what it
+was offered for.
+
+A rejected move is not offered again for that Inkling. **Settings → Backup → Download bad
+suggestions** writes every one of them as JSONL, one per line, ready to read.
+
+*The first rejection collected immediately showed something: the topics extracted for that
+Inkling were "behave", "different", "differently". Those drive relatedness and resurfacing,
+so they are worth fixing on their own evidence.*
+
 Text is **Markdown**: headings, lists, quotes, code, bold, links. It is rendered by a
 small renderer that escapes first and only then applies markup, so a note cannot
 inject anything. **edit** corrects the title and body, and each entry has an **×** to

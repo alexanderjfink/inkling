@@ -4,7 +4,13 @@ import { useEffect, useState } from 'react'
 import { changeOwnPassword } from '../admin'
 import { APP_BUILD } from '../build'
 import type { Auth } from '../state/useAuth'
-import { BACKUP_LAST_KEY, daysSince, downloadBackup, downloadMarkdownBackup } from '../backup'
+import {
+  BACKUP_LAST_KEY,
+  daysSince,
+  downloadBackup,
+  downloadMarkdownBackup,
+  downloadRejections,
+} from '../backup'
 import { ButtonLabel } from '../components/Spinner'
 import {
   NUDGE_KEY,
@@ -379,6 +385,9 @@ export function Settings({
     void loadModels('chat')
     void loadModels('embed')
   }
+
+  /** Suggestions marked bad, which is the data that can improve them. */
+  const badCount = blips.reduce((total, blip) => total + blip.rejections.length, 0)
 
   async function saveVault() {
     if (await save({ vault, folder })) setSaved('notes')
@@ -992,6 +1001,16 @@ export function Settings({
           className={buttonClass}
         >
           Download as Markdown
+        </button>
+        <button
+          type="button"
+          onClick={() => downloadRejections(blips)}
+          disabled={badCount === 0}
+          className={buttonClass}
+        >
+          {badCount === 0
+            ? 'No bad suggestions marked yet'
+            : `Download ${badCount} bad suggestion${badCount === 1 ? '' : 's'}`}
         </button>
       </Section>
 

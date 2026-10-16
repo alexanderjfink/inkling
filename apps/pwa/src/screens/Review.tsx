@@ -12,12 +12,14 @@ import {
   buildDailyFeed,
   buildRound,
   deferUntil,
+  entryContext,
   rankBlips,
   requestGuidance,
   roundQueue,
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Blocks } from '../components/Blocks'
+import { EntryContextPanel } from '../components/EntryContext'
 import { Markdown } from '../components/Markdown'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 import { StoredImage } from '../components/StoredImage'
@@ -378,7 +380,15 @@ export function Review({
     setBusy(true)
     try {
       if (composer.move) {
-        await actions.completeMove(current.id, composer.move, entry)
+        // Keep what surrounded the answer with the answer: the move, the material it
+        // turned up, and whatever "help me with the next step" suggested. None of it
+        // exists anywhere else once this screen moves on.
+        await actions.completeMove(
+          current.id,
+          composer.move,
+          entry,
+          entryContext({ material, guidance }),
+        )
       } else {
         if (entry.trim()) await actions.addNote(current.id, entry.trim())
         await actions.snoozeAfter(current.id, 'engaged', current.schedule.timesEngaged)
@@ -482,6 +492,9 @@ export function Review({
 
   const notes = current.entries.filter((entry_) => entry_.kind === 'note')
   const images = current.entries.filter((entry_) => entry_.kind === 'media')
+  /** The move that prompted an entry, from the one place a move spec lives. */
+  const moveForEntry = (moveId?: string): MoveSpec | undefined =>
+    moveId ? current.moves.find((entry_) => entry_.moveId === moveId)?.spec : undefined
 
   return (
     <div className="flex flex-1 flex-col">
@@ -610,7 +623,10 @@ export function Review({
           <ul className="mt-3 flex flex-col gap-2">
             {notes.map((note) => (
               <li key={note.id} className="flex items-start gap-2">
-                <Markdown text={note.text ?? ''} className="flex-1 text-sm text-ink-soft" />
+                <div className="min-w-0 flex-1">
+                  <Markdown text={note.text ?? ''} className="text-sm text-ink-soft" />
+                  <EntryContextPanel entry={note} move={moveForEntry(note.moveId)} />
+                </div>
                 <button
                   type="button"
                   onClick={() => void actions.removeEntry(current.id, note.id)}

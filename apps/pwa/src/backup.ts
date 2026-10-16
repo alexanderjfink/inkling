@@ -53,7 +53,31 @@ export function renderMarkdownBackup(blips: Blip[], now = new Date()): string {
 
     for (const entry of blip.entries) {
       const text = entry.text ?? entry.url ?? ''
-      if (text.trim()) lines.push('', text.trim())
+      if (!text.trim()) continue
+      lines.push('', text.trim())
+
+      // The context goes in a blockquote: it is what surrounded the entry, not
+      // something the person wrote, and it should read that way in a plain file.
+      const move = entry.moveId
+        ? blip.moves.find((record) => record.moveId === entry.moveId)?.spec
+        : undefined
+      const guidance = entry.context?.guidance ?? []
+      const material = entry.context?.material
+
+      if (move || guidance.length > 0 || material) {
+        lines.push('')
+        if (move) lines.push(`> *prompted by:* ${move.title}`)
+        if (move?.goal) lines.push(`> *goal:* ${move.goal}`)
+        if (guidance.length > 0) {
+          lines.push('>', '> *what to look for:*')
+          for (const item of guidance) lines.push(`> - ${item}`)
+        }
+        if (material) {
+          const link = material.url ? ` <${material.url}>` : ''
+          lines.push('>', `> *found:* ${material.title}${link}`)
+          if (material.extract) lines.push(`>`, `> ${material.extract}`)
+        }
+      }
     }
 
     for (const block of blip.blocks) {

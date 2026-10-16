@@ -48,6 +48,25 @@ export interface BlipContext {
 
 export type EntryKind = 'utterance' | 'note' | 'link' | 'summary' | 'example' | 'media'
 
+/**
+ * What surrounded an entry when it was written.
+ *
+ * A move is a prompt, and the prompt is part of the answer: "the 50% rule matters"
+ * means something different if the move was "read one paragraph and keep one sentence"
+ * than if it was "list three examples".
+ *
+ * The guidance and the material are stored here rather than looked up later because
+ * nothing else in the log has them — they were fetched and shown once, and thrown away.
+ * The move itself is not duplicated: the entry already carries `moveId`, and the move
+ * history is the one place a move spec lives.
+ */
+export interface EntryContext {
+  /** What the move turned up to read, if it turned up anything. */
+  material?: { title: string; url: string; extract: string }
+  /** What "help me with the next step" suggested, if it was asked. */
+  guidance?: string[]
+}
+
 /** Something you added to a blip: the accumulating progress. */
 export interface Entry {
   id: string
@@ -56,6 +75,55 @@ export interface Entry {
   url?: string
   mediaId?: string
   at: ISODate
+  /**
+   * The move that prompted this, copied onto the entry by the fold from the event that
+   * carries it. Without the copy the link is lost the moment the log is projected, and
+   * an entry can never be traced back to what asked for it.
+   */
+  moveId?: string
+  /** Present when a move prompted this entry, and there was something to record. */
+  context?: EntryContext
+}
+
+/** How much of a fetched extract is worth keeping in the log. */
+export const CONTEXT_EXTRACT_LIMIT = 600
+
+/**
+ * Trim an entry's context to something worth storing.
+ *
+ * Returns undefined when there is nothing to say, so an entry written from a move with
+ * no material and no advice does not carry an empty object around forever.
+ */
+export function entryContext(input: {
+  material?: { title: string; url: string; extract: string } | null
+  guidance?: string[] | null
+}): EntryContext | undefined {
+  const context: EntryContext = {}
+
+  const material = input.material
+  if (material?.title || material?.url) {
+    const extract = (material.extract ?? '').trim()
+    context.material = {
+      title: material.title ?? '',
+      url: material.url ?? '',
+      extract:
+        extract.length > CONTEXT_EXTRACT_LIMIT
+          ? `${extract.slice(0, CONTEXT_EXTRACT_LIMIT - 1).trimEnd()}…`
+          : extract,
+    }
+  }
+
+  const guidance = (input.guidance ?? [])
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+  if (guidance.length > 0) context.guidance = guidance
+
+  return Object.keys(context).length > 0 ? context : undefined
+}
+
+/** Whether an entry has anything to expand into. */
+export function hasContext(entry: Entry): boolean {
+  return Boolean(entry.context?.material || entry.context?.guidance?.length)
 }
 
 export type BlockKind = 'checklist' | 'grid' | 'readingProgress' | 'poll'

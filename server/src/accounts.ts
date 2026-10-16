@@ -5,6 +5,7 @@ import {
   type Runtime,
   type ServerConfig,
   buildRuntime,
+  configPath,
   loadConfig,
   mergeConfig,
   saveConfig,
@@ -30,6 +31,9 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
+/** The server's own config. Not `config.json`, which belongs to a person. */
+const SERVER_FILE = 'server.json'
+
 export interface AccountManager {
   storeFor: (userId: string) => FileStore
   accountFor: (user: PublicUser) => Promise<AccountContext>
@@ -43,14 +47,40 @@ export interface AccountManager {
 export async function createAccountManager(dataDir: string): Promise<AccountManager> {
   const userDir = (userId: string) => join(dataDir, 'users', userId)
 
-  let serverConfig: ServerConfig = await loadConfig(dataDir)
+  /**
+   * Lift the server's own settings out of the pre-accounts config, at startup.
+   *
+   * Before accounts there was one config holding both kinds of setting. This cannot wait
+   * for the lazy adoption that happens on the first signed-in request, because the
+   * Android verifier fetches the asset links document with no session at all — so
+   * anything depending on adoption would 404 until somebody happened to sign in.
+   */
+  async function liftServerFields(): Promise<ServerConfig> {
+    const server = await loadConfig(dataDir, SERVER_FILE)
+    if (!(await exists(configPath(dataDir)))) return server
+
+    const legacy = await loadConfig(dataDir)
+    if (legacy.twaPackage === undefined && legacy.twaFingerprint === undefined) return server
+
+    if (!server.twaPackage && legacy.twaPackage) server.twaPackage = legacy.twaPackage
+    if (!server.twaFingerprint && legacy.twaFingerprint)
+      server.twaFingerprint = legacy.twaFingerprint
+
+    delete legacy.twaPackage
+    delete legacy.twaFingerprint
+    await saveConfig(dataDir, legacy)
+    await saveConfig(dataDir, server, SERVER_FILE)
+    return server
+  }
+
+  let serverConfig: ServerConfig = await liftServerFields()
   const adopted: string[] = []
 
   const serverSettings: SettingsBridge = {
     read: async () => ({ config: serverConfig, runtime: buildRuntime(serverConfig) }),
     update: async (patch) => {
       serverConfig = mergeConfig(serverConfig, patch)
-      await saveConfig(dataDir, serverConfig)
+      await saveConfig(dataDir, serverConfig, SERVER_FILE)
       return { config: serverConfig, runtime: buildRuntime(serverConfig), problems: [] }
     },
   }
@@ -61,31 +91,21 @@ export async function createAccountManager(dataDir: string): Promise<AccountMana
    * A *move*, not a copy, which is what makes it safely one-time: the next account to
    * sign in finds nothing left to adopt. Nothing is deleted, and if the move fails the
    * old layout is untouched and still readable.
+   *
+   * There is deliberately no guard beyond "is it there". An earlier version keyed on the
+   * logs directory existing, which stranded a config that had no logs — and a person who
+   * set up their model before capturing anything is a perfectly ordinary person.
    */
   async function adoptLegacyData(dir: string): Promise<void> {
-    // The pre-accounts layout is identified by its logs directory. Without one there is
-    // nothing to adopt — and that guard is load-bearing: adopting writes the server's
-    // own config back to disk, so without it the *second* account would adopt the
-    // server's TWA settings and the first would lose them.
-    if (!(await exists(join(dataDir, 'logs')))) return
-
-    for (const name of ['logs', 'blobs', 'digests']) {
+    let moved = false
+    for (const name of ['logs', 'blobs', 'digests', 'config.json']) {
       const from = join(dataDir, name)
-      if (await exists(from)) await rename(from, join(dir, name))
+      if (await exists(from)) {
+        await rename(from, join(dir, name))
+        moved = true
+      }
     }
-
-    const legacyConfig = join(dataDir, 'config.json')
-    if (await exists(legacyConfig)) {
-      await rename(legacyConfig, join(dir, 'config.json'))
-      // The TWA fields were in that file too, and they are not the person's. Put them
-      // back, or the server forgets its own settings the moment accounts arrive.
-      const server: ServerConfig = {}
-      if (serverConfig.twaPackage) server.twaPackage = serverConfig.twaPackage
-      if (serverConfig.twaFingerprint) server.twaFingerprint = serverConfig.twaFingerprint
-      await saveConfig(dataDir, server)
-    }
-
-    adopted.push(dir)
+    if (moved) adopted.push(dir)
   }
 
   const accounts = new Map<string, { config: ServerConfig; runtime: Runtime }>()

@@ -44,21 +44,34 @@ export interface Runtime {
   vault: VaultConfig
 }
 
-export function configPath(dataDir: string): string {
-  return join(dataDir, 'config.json')
+/**
+ * Where a config lives.
+ *
+ * Two kinds, and they are different files on purpose. A person's config is
+ * `config.json`; the server's own is `server.json`. Keeping the server's out of
+ * `config.json` is what lets "adopt whatever was here before accounts" be a plain
+ * move — the server writes its file back after adopting, and if that file were
+ * `config.json` the *second* account would adopt it.
+ */
+export function configPath(dataDir: string, file = 'config.json'): string {
+  return join(dataDir, file)
 }
 
-export async function loadConfig(dataDir: string): Promise<ServerConfig> {
+export async function loadConfig(dataDir: string, file = 'config.json'): Promise<ServerConfig> {
   try {
-    const parsed = JSON.parse(await readFile(configPath(dataDir), 'utf8')) as unknown
+    const parsed = JSON.parse(await readFile(configPath(dataDir, file), 'utf8')) as unknown
     return typeof parsed === 'object' && parsed !== null ? (parsed as ServerConfig) : {}
   } catch {
     return {}
   }
 }
 
-export async function saveConfig(dataDir: string, config: ServerConfig): Promise<void> {
-  const path = configPath(dataDir)
+export async function saveConfig(
+  dataDir: string,
+  config: ServerConfig,
+  file = 'config.json',
+): Promise<void> {
+  const path = configPath(dataDir, file)
   await mkdir(dirname(path), { recursive: true })
   await writeFile(path, `${JSON.stringify(config, null, 2)}\n`, 'utf8')
 }

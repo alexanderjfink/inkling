@@ -4,6 +4,7 @@ import type {
   BlipType,
   Block,
   CaptureInput,
+  EntryContext,
   MoveSpec,
 } from '@inkling/domain'
 import { newId, project, snoozeUntil } from '@inkling/domain'
@@ -72,7 +73,12 @@ export interface InklingActions {
   storeImage(file: File): Promise<{ hash: string; mime: string }>
   /** Finish a move: keep the result, log the move with its completion time, and
    * stretch the interval. */
-  completeMove(id: string, moveSpec: MoveSpec, text: string): Promise<BlipEvent>
+  completeMove(
+    id: string,
+    moveSpec: MoveSpec,
+    text: string,
+    context?: EntryContext,
+  ): Promise<BlipEvent>
   /** A blip has been written out as a note; the path is where it landed. */
   promote(id: string, notePath: string): Promise<BlipEvent>
   classify(id: string, type: BlipType): Promise<BlipEvent>
@@ -203,7 +209,7 @@ export function useInkling(accountId: string | null = null) {
       editBlip(id, patch) {
         return storage().append({ t: 'edited', id, ...patch })
       },
-      async completeMove(id, moveSpec, text) {
+      async completeMove(id, moveSpec, text, context) {
         const store = storage()
         const before = project(await store.allEvents()).find((blip) => blip.id === id)
         const streak = before?.schedule.timesEngaged ?? 0
@@ -220,7 +226,15 @@ export function useInkling(accountId: string | null = null) {
             t: 'entry',
             id,
             moveId: moveSpec.id,
-            entry: { id: newId(), kind: 'note', text: text.trim(), at: new Date().toISOString() },
+            entry: {
+              id: newId(),
+              kind: 'note',
+              text: text.trim(),
+              at: new Date().toISOString(),
+              // The prompt and the material that surrounded this, kept with it. Nothing
+              // else in the log has them: they were fetched, shown once, and dropped.
+              context,
+            },
           })
         }
         await store.append({ t: 'moveDone', id, moveId: moveSpec.id })

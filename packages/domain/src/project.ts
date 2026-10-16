@@ -126,7 +126,9 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
 
   switch (event.t) {
     case 'entry':
-      blip.entries.push(event.entry)
+      // `moveId` lives on the event, so copy it onto the entry: the projection is what
+      // everything downstream reads, and the link has to survive the fold.
+      blip.entries.push(event.moveId ? { ...event.entry, moveId: event.moveId } : event.entry)
       blip.schedule.lastTouched = event.at
       blip.schedule.heat = clamp01(blip.schedule.heat + 0.1)
       blip.schedule.timesEngaged += 1

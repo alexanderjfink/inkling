@@ -268,6 +268,20 @@ Each is a block, and blocks can be added, changed and removed — so the structu
 follows what the blip becomes rather than the other way round. Images in a grid go
 through the same content-addressed store as captured photos, so they sync too.
 
+**An entry remembers what prompted it.** A move is a prompt, and the prompt is part of
+the answer — "it is stages, not a single switch" means something different if the move
+was *read one summary and keep one sentence* than if it was *collect three examples*.
+Under each entry there is a quiet **context** toggle: your own words stay the first
+thing you read and the only thing at full contrast, and one tap opens the move that
+asked, what *help me with the next step* suggested, and what it found to read. It opens
+on tap rather than on hover because the device this is mostly used on has no pointer.
+
+The material and the guidance are stored **with the entry**, because nothing else in the
+log has them: they were fetched and shown once and then thrown away. The move itself is
+not duplicated — the entry carries its `moveId`, and the move history stays the one place
+a move spec lives. The Markdown backup prints the whole thing as a blockquote, so the
+context reads as surrounding rather than as something you wrote.
+
 **retire** and **delete** are deliberately different words. Retiring means *not now*:
 it goes to the attic, stays searchable, and can come back. Deleting means *not this*:
 it leaves the app. Neither is a hard erase from the log, which is append-only — both

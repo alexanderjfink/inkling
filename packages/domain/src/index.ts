@@ -13,7 +13,15 @@ export type {
   ISODate,
   MoveSpec,
 } from './events'
-export { BLIP_TYPES, eventBlipId, totalOrder } from './events'
+export {
+  BLIP_TYPES,
+  CONTEXT_EXTRACT_LIMIT,
+  entryContext,
+  eventBlipId,
+  hasContext,
+  totalOrder,
+} from './events'
+export type { EntryContext } from './events'
 export { stateDigest } from './digest'
 export { sha256Hex } from './hash'
 export { idTime, newId } from './ids'

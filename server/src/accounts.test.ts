@@ -650,6 +650,42 @@ describe('adopting data from before accounts existed', () => {
     await setupAdmin(handle)
     expect(accounts.adopted()).toEqual([])
   })
+
+  test('a config with no logs is still adopted — model settings before any capture', async () => {
+    // An earlier version keyed adoption on the logs directory existing, which stranded
+    // exactly this: someone who set up their model and had not captured anything yet.
+    await writeFile(join(dir, 'config.json'), JSON.stringify({ model: 'set up first' }))
+    const { handle, accounts } = await harness()
+    const sam = await setupAdmin(handle)
+
+    const config = (await (await handle(api('/config', authed(sam.token)))).json()).config
+    expect(config.model).toBe('set up first')
+    expect(accounts.adopted()).toHaveLength(1)
+  })
+
+  test('the TWA fields are lifted out of the person config into the server one', async () => {
+    await legacyLayout()
+    const { handle } = await harness()
+
+    // Readable with no session at all, before anyone has signed in — which is the whole
+    // reason this cannot wait for the lazy adoption.
+    const early = await handle(new Request('http://localhost/.well-known/assetlinks.json'))
+    expect(early.status).toBe(200)
+
+    const sam = await setupAdmin(handle)
+    // Adoption happens on the first authenticated request: it needs somebody to adopt into.
+    await handle(api('/config', authed(sam.token)))
+
+    const links = await handle(new Request('http://localhost/.well-known/assetlinks.json'))
+    expect(links.status).toBe(200)
+
+    const own = JSON.parse(await readFile(join(dir, 'users', sam.user.id, 'config.json'), 'utf8'))
+    expect(own.model).toBe('old-model')
+    expect(own.twaPackage).toBeUndefined()
+    expect(JSON.parse(await readFile(join(dir, 'server.json'), 'utf8')).twaPackage).toBe(
+      'app.inkling.mobile',
+    )
+  })
 })
 
 describe('a server with no accounts configured', () => {

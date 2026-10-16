@@ -288,6 +288,74 @@ describe('renderMarkdownBackup', () => {
     const md = renderMarkdownBackup(blips)
     expect(md).toContain('not included here')
   })
+
+  test('the context an entry was written in is kept, marked as not your own words', () => {
+    const blips = build([
+      {
+        ...meta(1),
+        t: 'captured',
+        id: 'a',
+        input: { kind: 'text', text: 'learn to draw' },
+        type: 'quest',
+      },
+      {
+        ...meta(2),
+        t: 'moveShown',
+        id: 'a',
+        moveId: 'm1',
+        moveSpec: {
+          id: 'm1',
+          title: 'Read one paragraph and keep one sentence',
+          why: 'so it sticks',
+          timeLimitSec: 300,
+          goal: 'one sentence you would repeat to someone else',
+          playbook: 'reference.deepRead',
+          generatedBy: 'playbook',
+        },
+      },
+      {
+        ...meta(3),
+        t: 'entry',
+        id: 'a',
+        moveId: 'm1',
+        entry: {
+          id: 'e1',
+          kind: 'note',
+          text: 'the 50% rule matters',
+          at: meta(3).at,
+          context: {
+            guidance: ['check how the rule is phrased'],
+            material: { title: 'Drawabox', url: 'https://drawabox.com/', extract: 'The 50% rule…' },
+          },
+        },
+      },
+    ])
+    const md = renderMarkdownBackup(blips)
+    expect(md).toContain('the 50% rule matters')
+    // Blockquoted, because it surrounded the entry rather than being written by hand.
+    expect(md).toContain('> *prompted by:* Read one paragraph and keep one sentence')
+    expect(md).toContain('> - check how the rule is phrased')
+    expect(md).toContain('> *found:* Drawabox <https://drawabox.com/>')
+  })
+
+  test('an entry with no context gets no blockquote', () => {
+    const blips = build([
+      {
+        ...meta(1),
+        t: 'captured',
+        id: 'a',
+        input: { kind: 'text', text: 'a thought' },
+        type: 'idea',
+      },
+      {
+        ...meta(2),
+        t: 'entry',
+        id: 'a',
+        entry: { id: 'e1', kind: 'note', text: 'just this', at: meta(2).at },
+      },
+    ])
+    expect(renderMarkdownBackup(blips)).not.toContain('>')
+  })
 })
 
 describe('daysSince', () => {

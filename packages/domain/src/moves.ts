@@ -395,6 +395,20 @@ function hasUrl(blip: Blip): boolean {
 }
 
 /**
+ * Where a search link goes.
+ *
+ * Here rather than on the server because the app needs it too: when the server cannot be
+ * reached, a move should still send you somewhere rather than losing its links entirely.
+ *
+ * DuckDuckGo because it needs no key, takes the phrase in the query string, and does not
+ * personalise — the same phrase gives the same page to everybody, which is what keeps
+ * this an honest "go and look" rather than an opinion about the person searching.
+ */
+export function searchUrl(phrase: string): string {
+  return `https://duckduckgo.com/?q=${encodeURIComponent(phrase)}`
+}
+
+/**
  * What to look up if the model does not suggest anything better.
  *
  * The title is the blip's own summary of itself, so it is the right thing to search
@@ -512,8 +526,13 @@ export function buildMovePrompt(
     'concrete; if it was too big, make it smaller; if it had nothing to do with this, use',
     "the blip's own words instead of a general angle.",
     'Keep the time limit under 5 minutes.',
+    'Most moves should send them somewhere real to look — one to three short search',
+    'phrases in `lookUp`. Phrases, never URLs: a link that does not exist is worse than',
+    'no link, because it looks like an answer. Name the thing to find, not the question',
+    '("starter MIDI keyboard latency", not "what keyboard should I buy").',
+    'A move that is entirely about looking inward needs no phrases; leave lookUp empty.',
     'Reply with exactly:',
-    '{"id": "<one id from the list>", "title": "...", "why": "...", "goal": "...", "timeLimitSec": 120, "query": "<only if the move looks something up>"}',
+    '{"id": "<one id from the list>", "title": "...", "why": "...", "goal": "...", "timeLimitSec": 120, "lookUp": ["<short search phrase>"]}',
   ]
     .filter(Boolean)
     .join('\n')
@@ -528,11 +547,32 @@ interface RawMove {
   goal?: unknown
   timeLimitSec?: unknown
   steps?: unknown
-  query?: unknown
+  lookUp?: unknown
 }
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : null
+}
+
+/** How many places one move is allowed to send you. More than this is a reading list. */
+export const MAX_LOOK_UPS = 3
+/** Long enough for "best starter MIDI keyboard for a phone app", short enough to be a search. */
+const MAX_PHRASE = 120
+
+/**
+ * A list of search phrases from a model reply.
+ *
+ * Tolerates a bare string, because a model asked for a list of one will sometimes send
+ * the one. Anything longer than a search phrase is dropped rather than trimmed: a whole
+ * sentence in a search box returns nothing useful.
+ */
+function asPhrases(value: unknown): string[] {
+  const items = Array.isArray(value) ? value : typeof value === 'string' ? [value] : []
+  return items
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0 && item.length <= MAX_PHRASE)
+    .slice(0, MAX_LOOK_UPS)
 }
 
 /** Pull the first JSON object out of a model reply, tolerating prose or code fences. */
@@ -588,10 +628,10 @@ export function parseMoveResponse(text: string, candidates: MoveTemplate[]): Mov
     generatedBy: 'llm',
   }
 
-  // Only a move that looks something up gets a query, and only a short one.
+  // Only a move that looks something up gets phrases, and only a few short ones.
   if (template.wantsMaterial) {
-    const query = asString(raw.query)
-    if (query) spec.materialQuery = query.slice(0, 120)
+    const lookUp = asPhrases(raw.lookUp)
+    if (lookUp.length > 0) spec.lookUp = lookUp
   }
 
   return spec
@@ -712,7 +752,7 @@ export async function selectMove(
   const candidates = candidateTemplates(ctx)
   const fallbackTemplate = candidates[0] ?? FALLBACK_TEMPLATE
   const fallback = toMoveSpec(fallbackTemplate)
-  if (fallbackTemplate.wantsMaterial) fallback.materialQuery = deriveQuery(ctx.blip)
+  if (fallbackTemplate.wantsMaterial) fallback.lookUp = [deriveQuery(ctx.blip)]
 
   const provider = options.provider
   if (!provider) return fallback
@@ -727,9 +767,9 @@ export async function selectMove(
 
     // A move that wants material must have a phrase to look up, even if the model
     // forgot one — the title is a perfectly good query.
-    if (spec.materialQuery === undefined) {
+    if (spec.lookUp === undefined) {
       const template = candidates.find((candidate) => candidate.id === spec.id)
-      if (template?.wantsMaterial) spec.materialQuery = deriveQuery(ctx.blip)
+      if (template?.wantsMaterial) spec.lookUp = [deriveQuery(ctx.blip)]
     }
     return spec
   } catch {

@@ -235,25 +235,25 @@ describe('moves that bring something to read', () => {
       id: wants.id,
       title: 'Look up the stages of change',
       goal: 'one thing you did not know',
-      query: 'transtheoretical model stages of change',
+      lookUp: ['transtheoretical model stages of change'],
     })
     const move = await selectMove({ blip }, { provider: fakeProvider({ text }) })
-    expect(move.materialQuery).toBe('transtheoretical model stages of change')
+    expect(move.lookUp).toEqual(['transtheoretical model stages of change'])
   })
 
-  test('a query is ignored for a move that does not look anything up', () => {
+  test('phrases are ignored for a move that does not look anything up', () => {
     const candidates = candidateTemplates({ blip: makeBlip('idea', 'an idea') })
     const plain = candidates.find((template) => !template.wantsMaterial)
     if (!plain) throw new Error('no plain move available')
 
     const spec = parseMoveResponse(
-      JSON.stringify({ id: plain.id, title: 't', goal: 'g', query: 'sneaky' }),
+      JSON.stringify({ id: plain.id, title: 't', goal: 'g', lookUp: ['sneaky'] }),
       candidates,
     )
-    expect(spec?.materialQuery).toBeUndefined()
+    expect(spec?.lookUp).toBeUndefined()
   })
 
-  test('the query falls back to the blip when the model omits one', async () => {
+  test('the phrases fall back to the blip when the model omits them', async () => {
     const blip = makeBlip('question', 'What is the transtheoretical model?')
     const candidates = candidateTemplates({ blip })
     const wants = candidates.find((template) => template.wantsMaterial)
@@ -261,28 +261,81 @@ describe('moves that bring something to read', () => {
 
     const text = JSON.stringify({ id: wants.id, title: 't', goal: 'g' })
     const move = await selectMove({ blip }, { provider: fakeProvider({ text }) })
-    expect(move.materialQuery).toBeTruthy()
-    expect(move.materialQuery).toContain('transtheoretical')
+    expect(move.lookUp?.length).toBe(1)
+    expect(move.lookUp?.[0]).toContain('transtheoretical')
   })
 
-  test('an over-long query is trimmed', () => {
+  test('several places to look are kept, in the order the model gave them', () => {
+    const candidates = candidateTemplates({ blip: makeBlip('quest', 'learn to play keys') })
+    const wants = candidates.find((template) => template.wantsMaterial)
+    if (!wants) throw new Error('no material move available')
+    const spec = parseMoveResponse(
+      JSON.stringify({
+        id: wants.id,
+        title: 't',
+        goal: 'g',
+        lookUp: ['starter MIDI keyboard latency', 'MIDI keyboard'],
+      }),
+      candidates,
+    )
+    expect(spec?.lookUp).toEqual(['starter MIDI keyboard latency', 'MIDI keyboard'])
+  })
+
+  test('a phrase too long to search for is dropped, not truncated', () => {
+    // A whole sentence in a search box returns nothing useful, so it is worse than the
+    // other phrases the model offered.
     const candidates = candidateTemplates({ blip: makeBlip('question', 'a question?') })
     const wants = candidates.find((template) => template.wantsMaterial)
     if (!wants) throw new Error('no material move available')
     const spec = parseMoveResponse(
-      JSON.stringify({ id: wants.id, title: 't', goal: 'g', query: 'x'.repeat(400) }),
+      JSON.stringify({
+        id: wants.id,
+        title: 't',
+        goal: 'g',
+        lookUp: ['x'.repeat(400), 'a real phrase'],
+      }),
       candidates,
     )
-    expect(spec?.materialQuery?.length).toBeLessThanOrEqual(120)
+    expect(spec?.lookUp).toEqual(['a real phrase'])
   })
 
-  test('the prompt tells the model it may supply a query, and never a URL', () => {
+  test('a single phrase sent as a bare string still works', () => {
+    // Asked for a list of one, a model will sometimes send the one.
+    const candidates = candidateTemplates({ blip: makeBlip('question', 'a question?') })
+    const wants = candidates.find((template) => template.wantsMaterial)
+    if (!wants) throw new Error('no material move available')
+    const spec = parseMoveResponse(
+      JSON.stringify({ id: wants.id, title: 't', goal: 'g', lookUp: 'MIDI keyboard' }),
+      candidates,
+    )
+    expect(spec?.lookUp).toEqual(['MIDI keyboard'])
+  })
+
+  test('a move never carries more than three places to look', () => {
+    const candidates = candidateTemplates({ blip: makeBlip('question', 'a question?') })
+    const wants = candidates.find((template) => template.wantsMaterial)
+    if (!wants) throw new Error('no material move available')
+    const spec = parseMoveResponse(
+      JSON.stringify({
+        id: wants.id,
+        title: 't',
+        goal: 'g',
+        lookUp: ['one', 'two', 'three', 'four', 'five'],
+      }),
+      candidates,
+    )
+    expect(spec?.lookUp).toHaveLength(3)
+  })
+
+  test('the prompt asks for phrases, says where links come from, and never a URL', () => {
     const blip = makeBlip('question', 'a question?')
     const { system, prompt } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
     expect(system).toContain('search phrase')
     expect(system).toContain('Never invent a URL')
     expect(prompt).toContain('looks something up: yes')
-    expect(prompt).toContain('"query"')
+    expect(prompt).toContain('"lookUp"')
+    expect(prompt).toContain('Most moves should send them somewhere real to look')
+    expect(prompt).toContain('Phrases, never URLs')
   })
 })
 

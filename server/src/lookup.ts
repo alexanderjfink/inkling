@@ -1,3 +1,5 @@
+import { type MoveLink, searchUrl } from '@inkling/domain'
+
 export interface LookupResult {
   title: string
   url: string
@@ -275,4 +277,51 @@ export async function lookupTopic(
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** How many places one move may send you. More than this stops being a move. */
+export const MAX_LOOK_UPS = 3
+
+export interface LookedUp {
+  links: MoveLink[]
+  /** The first real page found, which is the thing worth reading. */
+  material: LookupResult | null
+}
+
+/**
+ * Turn a move's phrases into links.
+ *
+ * Each phrase is tried against a real source first. When one lands, the link is to a page
+ * somebody else maintains and that was checked to be about the thing. When none does —
+ * "best starter MIDI keyboard" is not an encyclopaedia article, and should not be — the
+ * link is a search, which says "go and look" rather than pretending to have the answer.
+ *
+ * All of them at once rather than in turn: they are independent, and a move that sends
+ * you three places should not take three round trips to appear.
+ */
+export async function resolveLookUps(
+  phrases: string[],
+  options: { fetcher?: typeof fetch; timeoutMs?: number } = {},
+): Promise<LookedUp> {
+  const wanted = phrases
+    .map((phrase) => phrase.trim())
+    .filter((phrase) => phrase.length > 0)
+    .slice(0, MAX_LOOK_UPS)
+
+  const found = await Promise.all(wanted.map((phrase) => lookupTopic(phrase, options)))
+
+  const links: MoveLink[] = []
+  let material: LookupResult | null = null
+
+  wanted.forEach((phrase, index) => {
+    const result = found[index]
+    if (!result) {
+      links.push({ label: phrase, url: searchUrl(phrase), kind: 'search' })
+      return
+    }
+    links.push({ label: result.title, url: result.url, kind: 'reference' })
+    material ??= result
+  })
+
+  return { links, material }
 }

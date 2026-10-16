@@ -11,7 +11,7 @@ import { BUILD } from './build'
 import type { ConfigProblem, Runtime, ServerConfig } from './config'
 import { assetLinks, publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
-import { lookupTopic } from './lookup'
+import { resolveLookUps } from './lookup'
 import type { ModelStatus } from './provider'
 import { PRESETS } from './providerConfig'
 import { notBuiltPage, serveStatic } from './static'
@@ -665,13 +665,20 @@ export function createHandler(
       return json({ error: 'not found' }, 404)
     }
 
-    // Resolve a search phrase to a real page. The model supplies the phrase, never
-    // the URL, so a move can bring something to read without inventing a link.
+    // Resolve a move's search phrases into links. The model supplies phrases, never
+    // URLs, so a move can send someone somewhere real without inventing a link.
+    //
+    // A single `query` is still accepted: it was the shape before moves could carry more
+    // than one, and a client that has not been reloaded yet should keep working.
     if (parts.length === 1 && parts[0] === 'lookup' && request.method === 'POST') {
       const body = await readJson(request)
-      const query = body && typeof body.query === 'string' ? body.query.trim() : ''
-      if (!query) return json({ error: 'query is required' }, 400)
-      return json({ result: await lookupTopic(query) })
+      const queries = Array.isArray(body?.queries)
+        ? body.queries.filter((query): query is string => typeof query === 'string')
+        : typeof body?.query === 'string'
+          ? [body.query]
+          : []
+      if (queries.length === 0) return json({ error: 'queries is required' }, 400)
+      return json(await resolveLookUps(queries))
     }
 
     if (parts.length === 1 && parts[0] === 'fetch' && request.method === 'POST') {

@@ -384,7 +384,7 @@ describe('suggestions marked bad', () => {
     goal: 'one existing platform, plus what it missed',
     playbook: 'idea',
     generatedBy: 'llm' as const,
-    materialQuery: 'Are.na Cohost social platforms for thinking',
+    lookUp: ['Are.na Cohost social platforms for thinking'],
   }
 
   const context = {
@@ -442,7 +442,7 @@ describe('suggestions marked bad', () => {
     expect(row.reason).toBe('nothing to do with this')
     expect(row.move.title).toContain('learning-first')
     expect(row.move.generatedBy).toBe('llm')
-    expect(row.move.materialQuery).toBe('Are.na Cohost social platforms for thinking')
+    expect(row.move.lookUp).toEqual(['Are.na Cohost social platforms for thinking'])
     expect(row.offeredFor.blipTitle).toBe('Social Platform for Inkling')
     expect(row.offeredFor.alreadyOffered).toEqual(['idea.variations', 'any.read'])
     expect(row.offeredFor.entries).toBe(2)

@@ -1,4 +1,4 @@
-import type { LLMProvider, StructuredRequest } from '@inkling/domain'
+import { type LLMProvider, type MoveLink, searchUrl, type StructuredRequest } from '@inkling/domain'
 import { apiFetch } from '../api'
 
 function join(baseUrl: string, path: string): string {
@@ -123,24 +123,42 @@ export interface LookupResult {
   source: string
 }
 
+export interface LookedUp {
+  links: MoveLink[]
+  /** The first real page found, which is the thing worth reading. */
+  material: LookupResult | null
+}
+
 /**
- * Resolve a search phrase to a real page.
+ * Turn a move's phrases into links.
  *
- * The model supplies the phrase, never the URL — a hallucinated link looks like an
- * answer, whereas a search phrase simply finds nothing if it is wrong.
+ * The model supplies phrases, never URLs — a hallucinated link looks like an answer,
+ * whereas a phrase that is wrong simply finds nothing.
+ *
+ * When the server cannot be reached, every phrase becomes a search link rather than the
+ * move losing its links entirely. The phrase is still the model's, so it is still not a
+ * URL anybody invented; it is just a search box instead of a page.
  */
-export async function lookupVia(baseUrl: string, query: string): Promise<LookupResult | null> {
+export async function lookupVia(baseUrl: string, queries: string[]): Promise<LookedUp> {
+  const wanted = queries.map((query) => query.trim()).filter((query) => query.length > 0)
+  const searched: LookedUp = {
+    links: wanted.map((query) => ({ label: query, url: searchUrl(query), kind: 'search' })),
+    material: null,
+  }
+  if (wanted.length === 0) return { links: [], material: null }
+
   try {
     const res = await apiFetch(join(baseUrl, '/lookup'), {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ queries: wanted }),
     })
-    if (!res.ok) return null
-    const body = (await res.json()) as { result: LookupResult | null }
-    return body.result
+    if (!res.ok) return searched
+    const body = (await res.json()) as Partial<LookedUp>
+    const links = Array.isArray(body.links) ? body.links : []
+    return { links: links.length > 0 ? links : searched.links, material: body.material ?? null }
   } catch {
-    return null
+    return searched
   }
 }
 

@@ -155,6 +155,24 @@ export interface Block {
   progress?: { current: number; total: number }
 }
 
+/**
+ * Somewhere to look for this move.
+ *
+ * Never a URL the model wrote. The model supplies a phrase and the server turns it into
+ * one of these — a page it found and checked is about the thing, or a search for the
+ * phrase when no single page is the right answer.
+ */
+export interface MoveLink {
+  /** What to show: a page's title for a reference, the phrase itself for a search. */
+  label: string
+  url: string
+  /**
+   * `reference` was found and checked. `search` is honest about not knowing: it says
+   * "go and look" rather than pretending a page is the answer.
+   */
+  kind: 'reference' | 'search'
+}
+
 /** A scaffolded microtask. The system prompts you; it never does the blip. */
 export interface MoveSpec {
   id: string
@@ -167,12 +185,14 @@ export interface MoveSpec {
   playbook: string
   generatedBy: 'playbook' | 'llm'
   /**
-   * A search phrase worth looking up for this move.
+   * Phrases worth looking up for this move, in the order they are worth looking at.
    *
-   * A phrase rather than a URL on purpose: the model cannot invent a link that does
-   * not exist, and the server resolves this against a real source.
+   * Phrases rather than URLs on purpose: the model cannot invent a link that does not
+   * exist, and a hallucinated URL is worse than no link because it looks like an answer.
+   * The server resolves each one, and the first that lands on a real page also brings
+   * back something to read.
    */
-  materialQuery?: string
+  lookUp?: string[]
 }
 
 /** Carried by every event, and what makes the total order deterministic. */

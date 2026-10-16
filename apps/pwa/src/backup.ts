@@ -180,7 +180,7 @@ export function rejectionRows(blips: Blip[]): unknown[] {
         why: rejection.spec.why,
         playbook: rejection.spec.playbook,
         generatedBy: rejection.spec.generatedBy,
-        materialQuery: rejection.spec.materialQuery ?? null,
+        lookUp: rejection.spec.lookUp ?? null,
         timeLimitSec: rejection.spec.timeLimitSec,
       },
       // What the model was working from. This is the part that can change anything.

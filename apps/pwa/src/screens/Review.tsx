@@ -3,6 +3,7 @@ import type {
   BlipType,
   DeferralChoice,
   LLMProvider,
+  MoveLink,
   MoveSpec,
   RejectionContext,
   RelatedBlip,
@@ -50,17 +51,56 @@ const DEFERRAL_LABEL: Record<DeferralChoice, string> = {
   'next-month': 'a month',
 }
 
-/** Whatever the move turned up to read, or a word about why there is nothing. */
+/**
+ * Where this move sends you.
+ *
+ * The whole list at once, and each one says what it is: a page the server found and
+ * checked, or a search for a phrase. A search link is not a failure — "best starter MIDI
+ * keyboard" is not an encyclopaedia article and should not be — and saying which is which
+ * is the difference between a suggestion and a guess.
+ */
+function LookUps({ links, loading }: { links: MoveLink[]; loading: boolean }) {
+  if (links.length === 0) {
+    if (!loading) return null
+    return (
+      <span className="mt-3 flex items-center gap-2 text-xs text-ink-faint">
+        <Spinner className="h-3 w-3" />
+        finding somewhere to look…
+      </span>
+    )
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-1.5">
+      <p className="text-[11px] tracking-wide text-ink-faint uppercase">where to look</p>
+      {links.map((link) => (
+        <a
+          key={link.url}
+          href={link.url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-baseline gap-2 rounded-xl border border-line bg-surface px-3 py-2 text-xs transition active:scale-[0.99]"
+        >
+          <span className="min-w-0 flex-1 truncate text-accent">
+            {link.kind === 'search' ? `search for “${link.label}”` : link.label}
+          </span>
+          <span className="shrink-0 text-[10px] text-ink-faint">
+            {link.kind === 'search' ? 'search' : 'page'}
+          </span>
+        </a>
+      ))}
+    </div>
+  )
+}
+
+/** Whatever the move turned up to read. Absent entirely when it turned up nothing. */
 function Material({
   loading,
   material,
-  query,
   className = 'mt-3',
 }: {
   loading: boolean
   material: LookupResult | null
-  /** What was searched for, so an empty result is explainable rather than mysterious. */
-  query?: string
   className?: string
 }) {
   return (
@@ -85,18 +125,7 @@ function Material({
           ) : null}
           <p className="mt-1 text-xs leading-relaxed text-ink-soft">{material.extract}</p>
         </>
-      ) : (
-        <span className="text-xs text-ink-faint">
-          {query ? (
-            <>
-              nothing close enough to <span className="text-ink-soft">“{query}”</span> — the move
-              works without it
-            </>
-          ) : (
-            'nothing worth reading turned up — the move works without it'
-          )}
-        </span>
-      )}
+      ) : null}
     </div>
   )
 }
@@ -262,6 +291,7 @@ export function Review({
   const [busy, setBusy] = useState(false)
   const [lastNote, setLastNote] = useState<{ title: string; path: string } | null>(null)
   const [material, setMaterial] = useState<LookupResult | null>(null)
+  const [links, setLinks] = useState<MoveLink[]>([])
   const [materialLoading, setMaterialLoading] = useState(false)
   /** Open when non-null. A move means "doing that move"; null means a free note. */
   const [composer, setComposer] = useState<{ move: MoveSpec | null } | null>(null)
@@ -370,26 +400,32 @@ export function Review({
     }
   }, [current, move, moveLoading, actions])
 
-  // If the move brings something to read, go and get it.
-  const materialQuery = move?.materialQuery ?? ''
+  // Where this move sends you. Resolved together, because they are independent and a
+  // move that sends you three places should not appear one link at a time.
+  const lookUp = move?.lookUp ?? []
+  const lookUpKey = lookUp.join('\u0000')
   useEffect(() => {
-    if (!materialQuery) {
+    if (lookUp.length === 0) {
+      setLinks([])
       setMaterial(null)
       setMaterialLoading(false)
       return
     }
     let cancelled = false
+    setLinks([])
     setMaterial(null)
     setMaterialLoading(true)
-    void lookupVia(serverUrl, materialQuery).then((result) => {
+    void lookupVia(serverUrl, lookUp).then((found) => {
       if (cancelled) return
-      setMaterial(result)
+      setLinks(found.links)
+      setMaterial(found.material)
       setMaterialLoading(false)
     })
     return () => {
       cancelled = true
     }
-  }, [materialQuery, serverUrl])
+    // Keyed on the phrases themselves: `lookUp` is a fresh array every render.
+  }, [lookUpKey, serverUrl])
 
   function settle(decision: Decision) {
     if (!current) return
@@ -770,13 +806,8 @@ export function Review({
             ) : null}
             {/* What the move turned up, and anything the app suggested, stay here
                 while you write — that is the whole point of having asked. */}
-            {composer.move && move?.materialQuery ? (
-              <Material
-                loading={materialLoading}
-                material={material}
-                query={move?.materialQuery}
-                className=""
-              />
+            {composer.move && material ? (
+              <Material loading={materialLoading} material={material} className="" />
             ) : null}
             <textarea
               value={entry}
@@ -833,9 +864,8 @@ export function Review({
               <p className="mt-1 text-[11px] text-good">saved — this is the move you kept</p>
             ) : null}
 
-            {move.materialQuery ? (
-              <Material loading={materialLoading} material={material} query={move.materialQuery} />
-            ) : null}
+            <LookUps links={links} loading={materialLoading} />
+            {material ? <Material loading={materialLoading} material={material} /> : null}
 
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <button

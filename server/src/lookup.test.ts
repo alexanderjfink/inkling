@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { lookupTopic, queryTerms } from './lookup'
+import { lookupTopic, queryTerms, resolveLookUps } from './lookup'
 
 const LONG_ENOUGH =
   'that the stages of change are analogues of other models, and that interventions differ by stage'
@@ -297,5 +297,105 @@ describe('a page that merely mentions the phrase', () => {
       },
     ])
     expect((await lookupTopic('what makes bread rise', { fetcher }))?.title).toBe('Yeast')
+  })
+})
+
+describe('resolveLookUps', () => {
+  /**
+   * A fetcher whose answer depends on the phrase, so a mixed batch can be tested.
+   *
+   * Matched on the whole `q=` value rather than a substring: "best starter MIDI keyboard"
+   * contains "MIDI keyboard", so a substring match would answer the first phrase with the
+   * second phrase's page and the test would pass for the wrong reason.
+   */
+  function perQuery(map: Record<string, unknown[]>) {
+    const fetcher = (async (input: string | URL | Request) => {
+      const asked = new URL(String(input)).searchParams.get('q') ?? ''
+      return Response.json({ pages: map[asked] ?? [] })
+    }) as unknown as typeof fetch
+    return fetcher
+  }
+
+  const PAGE = [
+    {
+      key: 'MIDI_keyboard',
+      title: 'MIDI keyboard',
+      description: 'Musical keyboard that sends MIDI',
+      excerpt:
+        'A <span class="searchmatch">MIDI</span> <span class="searchmatch">keyboard</span> is a piano-style keyboard that sends MIDI data to a computer or phone',
+    },
+  ]
+
+  test('a phrase that lands on a page becomes a link to that page', async () => {
+    const { links, material } = await resolveLookUps(['MIDI keyboard'], {
+      fetcher: perQuery({ 'MIDI keyboard': PAGE }),
+    })
+    expect(links).toEqual([
+      {
+        label: 'MIDI keyboard',
+        url: 'https://en.wikipedia.org/wiki/MIDI_keyboard',
+        kind: 'reference',
+      },
+    ])
+    expect(material?.title).toBe('MIDI keyboard')
+    expect(material?.extract).toContain('sends MIDI data')
+  })
+
+  test('a phrase that lands on nothing becomes a search, not nothing at all', async () => {
+    // "best starter MIDI keyboard" is not an encyclopaedia article and should not be.
+    // The move still sends you somewhere; it just says which kind of somewhere.
+    const { links, material } = await resolveLookUps(['best starter MIDI keyboard'], {
+      fetcher: perQuery({}),
+    })
+    expect(links).toEqual([
+      {
+        label: 'best starter MIDI keyboard',
+        url: 'https://duckduckgo.com/?q=best%20starter%20MIDI%20keyboard',
+        kind: 'search',
+      },
+    ])
+    expect(material).toBeNull()
+  })
+
+  test('a mixed batch keeps the order, and each link says what it is', async () => {
+    const { links, material } = await resolveLookUps(
+      ['best starter MIDI keyboard', 'MIDI keyboard', 'latency'],
+      { fetcher: perQuery({ 'MIDI keyboard': PAGE }) },
+    )
+    expect(links.map((link) => link.kind)).toEqual(['search', 'reference', 'search'])
+    expect(links[1]?.url).toBe('https://en.wikipedia.org/wiki/MIDI_keyboard')
+    expect(material?.title).toBe('MIDI keyboard')
+  })
+
+  test('the first page found is the one worth reading', async () => {
+    const other = [
+      {
+        key: 'Latency_(audio)',
+        title: 'Latency (audio)',
+        description: 'Delay in audio systems',
+        excerpt:
+          'audio <span class="searchmatch">latency</span> is the delay between an input and the sound it produces being heard',
+      },
+    ]
+    const { links, material } = await resolveLookUps(['MIDI keyboard', 'latency'], {
+      fetcher: perQuery({ 'MIDI keyboard': PAGE, latency: other }),
+    })
+    expect(links).toHaveLength(2)
+    expect(material?.title).toBe('MIDI keyboard')
+  })
+
+  test('blank phrases are dropped, and no more than three are kept', async () => {
+    const { links } = await resolveLookUps(['', '  ', 'one', 'two', 'three', 'four'], {
+      fetcher: perQuery({}),
+    })
+    expect(links.map((link) => link.label)).toEqual(['one', 'two', 'three'])
+  })
+
+  test('an unreachable source still produces search links rather than losing them', async () => {
+    const broken = (async () => {
+      throw new Error('offline')
+    }) as unknown as typeof fetch
+    const { links } = await resolveLookUps(['MIDI keyboard'], { fetcher: broken })
+    expect(links[0]?.kind).toBe('search')
   })
 })

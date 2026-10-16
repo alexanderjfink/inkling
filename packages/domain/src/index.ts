@@ -11,6 +11,7 @@ export type {
   EntryKind,
   EventMeta,
   ISODate,
+  MoveLink,
   MoveSpec,
 } from './events'
 export {
@@ -71,6 +72,7 @@ export {
   parseGuidance,
   parseMoveResponse,
   requestGuidance,
+  searchUrl,
   selectMove,
   toMoveSpec,
 } from './moves'

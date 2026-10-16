@@ -296,7 +296,9 @@ you can decide whether now is the moment without opening it — and it only appe
 something is actually waiting, so the screen stays a place to write.
 
 **Entry is one field.** It takes words, a link, or a picture — pasted, dropped, or picked
-with the paperclip — and works out what it was given rather than asking. It used to be three
+with the paperclip — and works out what it was given rather than asking. **Structure goes in
+the same box**: choose a checklist and a chip appears under what you are writing, marked *on
+keep*, because it is part of what you are writing rather than a setting about it. It used to be three
 boxes: one for the text, one for the address, one for the image. That asked you to decide
 what you had noticed before you had written it down, and made the common case — writing a
 sentence — look like paperwork.
@@ -428,10 +430,17 @@ Move** and **Ask a Friend for a Move** — and no spinner.
 goes when you ask a person, and the two buttons come back for whenever the answer arrives.
 Cancelling the ask brings it straight back — it is hidden, not thrown away.
 
+**And a move you asked for is remembered, not regenerated.** Coming back to an Inkling asked
+about earlier used to produce a *different* move: the request was keyed the same way, but the
+first reply had been recorded as shown by then, so the model was told to avoid what it had
+just offered. Reviewing through a list, that reads as a generation happening on its own every
+time you reach a card you had already asked about. Both the move and the fact that you asked
+are remembered for the session; a re-roll or a rejection still asks for something new,
+because that is what those are for.
+
 The only work the app does on its own is resolving a shown move's phrases against Wikipedia,
-and that is cached for the session now: it used to refetch the same two pages every time the
-same Inkling was opened, which is the sort of thing that reads as the app going off and doing
-something without being asked. **Both put their next step in the
+and that is cached for the session too: it used to refetch the same two pages every time the
+same Inkling was opened. **Both put their next step in the
 same place**: inside the card, above the actions. Asking used to open its composer under the
 two buttons at the bottom of the screen, so the thing you had just started was somewhere
 other than where the thing you might have started instead would have been. It used to start a model call on

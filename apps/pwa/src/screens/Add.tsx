@@ -16,9 +16,6 @@ import { ButtonLabel } from '../components/Spinner'
 import type { ReceivedAsk } from '../state/useSocial'
 import { useSpeech } from '../state/useSpeech'
 
-const inputClass =
-  'w-full rounded-2xl border border-line bg-surface p-4 text-ink outline-none focus:border-accent'
-
 /**
  * The screen the app opens on.
  *
@@ -251,45 +248,71 @@ export function Add({
         }}
         className="flex flex-col gap-2"
       >
-        <textarea
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-          onPaste={(event) => {
-            // A copied image attaches; copied words paste as words, which may include a
-            // link — that is found when it is kept.
-            takeImage(event.clipboardData)
-          }}
-          onKeyDown={(event) => {
-            // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
-            if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-              event.preventDefault()
-              void submit()
-            }
-          }}
-          // The cursor is here when the app opens, because that is what you came to do.
-          // Mobile browsers only raise the keyboard for a focus they trust, so on a phone
-          // this may leave the field ready without the keyboard until you tap it.
-          autoFocus
-          placeholder="What did you notice?"
-          rows={6}
-          data-tour="field"
-          className={`${inputClass} resize-none text-lg`}
-        />
+        {/* One box, holding the words and the structure chosen for them. A chip under the
+            field is attached to nothing in particular; a chip inside the box is part of what
+            you are writing, which is what it is. */}
+        <div className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent">
+          <textarea
+            value={text}
+            onChange={(event) => setText(event.target.value)}
+            onPaste={(event) => {
+              // A copied image attaches; copied words paste as words, which may include a
+              // link — that is found when it is kept.
+              takeImage(event.clipboardData)
+            }}
+            onKeyDown={(event) => {
+              // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
+              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault()
+                void submit()
+              }
+            }}
+            // The cursor is here when the app opens, because that is what you came to do.
+            // Mobile browsers only raise the keyboard for a focus they trust, so on a phone
+            // this may leave the field ready without the keyboard until you tap it.
+            autoFocus
+            placeholder="What did you notice?"
+            rows={6}
+            data-tour="field"
+            className="w-full resize-none bg-transparent text-lg text-ink outline-none"
+          />
 
-        {file ? (
-          <span className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-2 pl-3 text-xs">
-            <span className="text-ink-soft">🖼</span>
-            <span className="min-w-0 flex-1 truncate">{file.name}</span>
-            <button
-              type="button"
-              onClick={() => setFile(undefined)}
-              className="quiet underline"
-              aria-label="Remove the image"
-            >
-              remove
-            </button>
-          </span>
-        ) : null}
+          {file ? (
+            <span className="flex items-center gap-3 rounded-xl border border-line bg-surface/60 p-2 pl-3 text-xs">
+              <span className="text-ink-soft">🖼</span>
+              <span className="min-w-0 flex-1 truncate">{file.name}</span>
+              <button
+                type="button"
+                onClick={() => setFile(undefined)}
+                className="quiet underline"
+                aria-label="Remove the image"
+              >
+                remove
+              </button>
+            </span>
+          ) : null}
+
+          {blocks.length > 0 ? (
+            <ul className="flex flex-wrap gap-1.5">
+              {blocks.map((kind) => (
+                <li key={kind}>
+                  <span className="flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1.5 text-[11px]">
+                    {blockKindInfo(kind)?.label ?? kind}
+                    <span className="text-ink-faint">on keep</span>
+                    <button
+                      type="button"
+                      onClick={() => setBlocks((list) => list.filter((entry) => entry !== kind))}
+                      aria-label={`Remove the ${kind}`}
+                      className="quiet leading-none"
+                    >
+                      ×
+                    </button>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       </div>
 
       <p className="text-xs text-ink-faint">
@@ -298,38 +321,12 @@ export function Add({
 
       {/* Stacked, not beside the hint: side by side, the picker squeezed the sentence into
           one word a line, which is how it looked broken while it was working. */}
-      {blocks.length > 0 ? (
-        <ul className="flex flex-wrap gap-1.5">
-          {blocks.map((kind) => (
-            <li key={kind}>
-              <span className="flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1.5 text-[11px]">
-                {blockKindInfo(kind)?.label ?? kind}
-                <button
-                  type="button"
-                  onClick={() => setBlocks((list) => list.filter((entry) => entry !== kind))}
-                  aria-label={`Remove the ${kind}`}
-                  className="quiet leading-none"
-                >
-                  ×
-                </button>
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
       <div className="self-start">
         <BlockPicker
           count={blocks.length}
           onAdd={async (kind) => setBlocks((list) => [...list, kind])}
         />
       </div>
-
-      {blocks.length > 0 ? (
-        <p className="text-[11px] text-ink-faint">
-          {blocks.length === 1 ? 'it' : 'they'} will be added when you keep this
-        </p>
-      ) : null}
 
       {/* One row, and everything in it shrinks but the two things you press: the field above
           takes the room, and this takes what is left. The label in the middle is the part

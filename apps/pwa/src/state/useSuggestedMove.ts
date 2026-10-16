@@ -11,14 +11,44 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  */
 const pending = new Map<string, Promise<MoveSpec>>()
 
+/**
+ * Moves already chosen, by the request that chose them.
+ *
+ * Without this, coming back to an Inkling asked for a *new* move: the fetch was keyed the
+ * same way, but the reply had been recorded as shown by then, so the model was told to avoid
+ * what it had just offered and produced something else. Reviewing in a list, that reads as a
+ * generation happening on its own every time you reach a card you had already asked about.
+ *
+ * Keyed on the request, so a re-roll or a rejection — which change the key — still asks for
+ * something new. That is what those are for.
+ */
+const chosen = new Map<string, MoveSpec>()
+
+/**
+ * Inklings a move has been asked for, for as long as the app is open.
+ *
+ * Not component state, because the Review screen unmounts when you go to the list and back —
+ * so a card you had asked about opened to the two buttons again, as if you never had. That is
+ * the same complaint as a generation happening unbidden, seen from the other side.
+ */
+const askedFor = new Set<string>()
+
 function requestMove(
   key: string,
   context: Parameters<typeof selectMove>[0],
   options: SelectMoveOptions,
 ): Promise<MoveSpec> {
+  const remembered = chosen.get(key)
+  if (remembered) return Promise.resolve(remembered)
+
   const existing = pending.get(key)
   if (existing) return existing
-  const promise = selectMove(context, options).finally(() => pending.delete(key))
+  const promise = selectMove(context, options)
+    .then((spec) => {
+      chosen.set(key, spec)
+      return spec
+    })
+    .finally(() => pending.delete(key))
   pending.set(key, promise)
   return promise
 }
@@ -54,7 +84,11 @@ export function useSuggestedMove(
 } {
   const [move, setMove] = useState<MoveSpec | null>(null)
   const [loading, setLoading] = useState(false)
-  /** The Inkling we have been asked for a move on. Empty means nobody has asked. */
+  /**
+   * The Inkling we have been asked for a move on. Empty means nobody has asked.
+   *
+   * Seeded from what has been asked for this session, so coming back to a card remembers.
+   */
   const [asked, setAsked] = useState('')
   // Re-rolls are remembered per blip, so moving on does not carry them over.
   const [avoid, setAvoid] = useState<{ blipId: string; ids: string[] }>({ blipId: '', ids: [] })
@@ -135,7 +169,16 @@ export function useSuggestedMove(
     // `related` is covered by relatedIds; `avoidIds` and `wanted` by key; the blip by blipId.
   }, [key, relatedIds, provider, blipId, savedId, wanted])
 
-  const generate = useCallback(() => setAsked(blipId), [blipId])
+  // Seeded rather than initialised: the blip is not known on the first render, and the
+  // answer is remembered across the screen being torn down and rebuilt.
+  useEffect(() => {
+    if (blipId && askedFor.has(blipId)) setAsked(blipId)
+  }, [blipId])
+
+  const generate = useCallback(() => {
+    askedFor.add(blipId)
+    setAsked(blipId)
+  }, [blipId])
   /**
    * Put the card back to the two buttons.
    *
@@ -144,9 +187,10 @@ export function useSuggestedMove(
    * offering two answers to one question.
    */
   const discard = useCallback(() => {
+    askedFor.delete(blipId)
     setAsked('')
     setMove(null)
-  }, [])
+  }, [blipId])
 
   function reroll() {
     if (!move) return

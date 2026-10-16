@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   BLOCK_KINDS,
+  blockKindInfo,
   blockSummary,
   checklistCounts,
   newBlock,
@@ -240,5 +241,31 @@ describe('blocks — folding', () => {
     const forwards = project(events)
     const backwards = project([...events].reverse())
     expect(forwards[0]?.blocks[0]?.title).toBe(backwards[0]?.blocks[0]?.title)
+  })
+})
+
+describe('what counts as structure', () => {
+  test('a checklist and a grid, which are shapes for what you already have', () => {
+    // Parts to tick off, and variations side by side. Both arrange something; neither is
+    // about one specific thing.
+    const offered = BLOCK_KINDS.filter((info) => info.structure).map((info) => info.kind)
+    expect(offered).toEqual(['checklist', 'grid'])
+  })
+
+  test('reading progress and a poll are about one thing, so they are not', () => {
+    // How far through a page you are, and which of these you prefer. Neither is a shape
+    // anybody reaches for mid-sentence, which is when this is offered.
+    const notOffered = BLOCK_KINDS.filter((info) => !info.structure).map((info) => info.kind)
+    expect(notOffered).toEqual(['readingProgress', 'poll'])
+  })
+
+  test('they still render, and an Inkling that already has one keeps it', () => {
+    // Hidden from the picker is not the same as removed: the kinds, their labels and their
+    // behaviour are all still here.
+    for (const kind of ['readingProgress', 'poll'] as const) {
+      const info = blockKindInfo(kind)
+      expect(info?.label).toBeTruthy()
+      expect(info?.itemNoun).toBeTruthy()
+    }
   })
 })

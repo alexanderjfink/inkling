@@ -63,7 +63,7 @@ export function BlockPicker({
     <div className="flex flex-col gap-2">
       {picking ? (
         <ul className="flex flex-col gap-1">
-          {BLOCK_KINDS.map((info) => (
+          {BLOCK_KINDS.filter((info) => info.structure).map((info) => (
             <li key={info.kind}>
               <button
                 type="button"

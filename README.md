@@ -439,7 +439,16 @@ with the move you liked) and **help me with the next step** (a short list of wha
 look for, specific to the move and to whatever material was found).
 
 **Structure is added where you are writing**, not on the card you are reading: a button in
-the field that starts an Inkling and in the field that adds to one. It used to be a section on
+the field that starts an Inkling and in the field that adds to one.
+
+Two kinds are offered, because two of them are *shapes* — a checklist is parts to tick off, a
+grid is variations side by side, and both arrange something you already have. Reading progress
+and a poll are each about one specific thing and neither is a shape anybody reaches for
+mid-sentence. They still render, and an Inkling that already has one keeps it.
+
+Choosing one before capturing shows a chip while you write — *"Checklist ×"*, and *"it will be
+added when you keep this"*. It used to record the choice and show nothing, so a working button
+looked like a broken one. It used to be a section on
 every card, with an underline and a line explaining what structure could be, on cards that had
 none — which is a thing you do while thinking about what this is becoming, not something you
 do to a card. The blocks themselves still live on the card, because that is where you tick

@@ -19,6 +19,16 @@ export interface BlockKindInfo {
   hint: string
   /** The word for one row, so the UI can say "add a chapter" rather than "add item". */
   itemNoun: string
+  /**
+   * Whether this is a shape for something you already have.
+   *
+   * A checklist is parts to tick off; a grid is variations side by side. Both are ways of
+   * arranging what you have, which is what structure means. Reading progress and a poll are
+   * each about one specific thing — how far through a page you are, which of these you
+   * prefer — and neither is a shape anybody reaches for mid-sentence. They still render, and
+   * an Inkling that already has one keeps it.
+   */
+  structure: boolean
 }
 
 export const BLOCK_KINDS: BlockKindInfo[] = [
@@ -27,24 +37,28 @@ export const BLOCK_KINDS: BlockKindInfo[] = [
     label: 'Checklist',
     hint: 'Break it into parts and tick them off',
     itemNoun: 'step',
+    structure: true,
   },
   {
     kind: 'readingProgress',
     label: 'Reading progress',
     hint: 'How far through this you are',
     itemNoun: 'section',
+    structure: false,
   },
   {
     kind: 'poll',
     label: 'Poll',
     hint: 'Options you are choosing between',
     itemNoun: 'option',
+    structure: false,
   },
   {
     kind: 'grid',
     label: 'Grid',
     hint: 'Images side by side — variations, examples',
     itemNoun: 'image',
+    structure: true,
   },
 ]
 

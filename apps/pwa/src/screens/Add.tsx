@@ -1,6 +1,7 @@
 import {
   BLIP_TYPES,
   type BlockKind,
+  blockKindInfo,
   type Blip,
   type BlipType,
   type FeedbackContext,
@@ -96,9 +97,10 @@ export function Add({
    * Structure chosen before there is anything to attach it to.
    *
    * A block belongs to an Inkling, and while you are writing one there is not one yet — so
-   * this is the intention, applied the moment the Inkling exists.
+   * these are the intention, applied the moment the Inkling exists. Shown while you write,
+   * because a choice with no visible effect is a choice the app did not receive.
    */
-  const [block, setBlock] = useState<BlockKind | null>(null)
+  const [blocks, setBlocks] = useState<BlockKind[]>([])
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(0)
 
@@ -146,11 +148,11 @@ export function Add({
         // re-share things written under a different one.
         visibility: socialOn && shareDefault === 'friends' ? 'friends' : undefined,
       })
-      if (block) await onAddBlock(captured.id, block)
+      for (const kind of blocks) await onAddBlock(captured.id, kind)
       setText('')
       setFile(undefined)
       setType('auto')
-      setBlock(null)
+      setBlocks([])
       setSaved((count) => count + 1)
     } finally {
       setBusy(false)
@@ -290,12 +292,44 @@ export function Add({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <p className="min-w-0 flex-1 text-xs text-ink-faint">
-          a photo, a link, an idea, a question, or a quest — paste one in, or just write
-        </p>
-        <BlockPicker count={block ? 1 : 0} onAdd={async (kind) => setBlock(kind)} />
+      <p className="text-xs text-ink-faint">
+        a photo, a link, an idea, a question, or a quest — paste one in, or just write
+      </p>
+
+      {/* Stacked, not beside the hint: side by side, the picker squeezed the sentence into
+          one word a line, which is how it looked broken while it was working. */}
+      {blocks.length > 0 ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {blocks.map((kind) => (
+            <li key={kind}>
+              <span className="flex items-center gap-2 rounded-full border border-line bg-surface/60 px-3 py-1.5 text-[11px]">
+                {blockKindInfo(kind)?.label ?? kind}
+                <button
+                  type="button"
+                  onClick={() => setBlocks((list) => list.filter((entry) => entry !== kind))}
+                  aria-label={`Remove the ${kind}`}
+                  className="quiet leading-none"
+                >
+                  ×
+                </button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <div className="self-start">
+        <BlockPicker
+          count={blocks.length}
+          onAdd={async (kind) => setBlocks((list) => [...list, kind])}
+        />
       </div>
+
+      {blocks.length > 0 ? (
+        <p className="text-[11px] text-ink-faint">
+          {blocks.length === 1 ? 'it' : 'they'} will be added when you keep this
+        </p>
+      ) : null}
 
       {/* One row, and everything in it shrinks but the two things you press: the field above
           takes the room, and this takes what is left. The label in the middle is the part

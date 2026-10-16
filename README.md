@@ -252,13 +252,25 @@ playbook".
 
 ## The interface
 
-Three screens, and two of them are the only things you do.
+**The app opens on entry.** Not a menu, and not a dashboard: the assumption is that you
+opened it because you noticed something, so the cursor is in the field and you can start
+typing. There is no home screen — a screen whose only job is to ask which of two screens
+you wanted is a screen you have to get past.
 
 ```
-Home ─┬─ Add an Inkling   a photo, a link, an idea, a question, or a quest (⌘↵ / Ctrl+↵ to keep it)
-      ├─ Review          one Inkling at a time, full screen
-      └─ ⚙ Settings      theme, sync, model, notes, reminders, backup, storage
+Add an Inkling ─┬─ ◷ Review · N waiting   the other thing you might have come to do
+                ├─ ⚙ Settings            theme, sync, model, notes, reminders, backup, storage
+                └─ all N Inklings        everything, and the attic
 ```
+
+**Review sits above the field, not below it**, because with the keyboard up anything under
+the field is gone. It carries a **preview of the first Inkling you would be shown**, so
+you can decide whether now is the moment without opening it — and it only appears when
+something is actually waiting, so the screen stays a place to write.
+
+Entry is a text box, an optional link, an optional image, a type (`auto` by default), and
+voice — `⌘↵` / `Ctrl+↵` keeps it. Nothing blocks on the network, so a capture is never
+lost to a bad connection.
 
 **Review** shows a single Inkling and three actions, and nothing else competes with them:
 

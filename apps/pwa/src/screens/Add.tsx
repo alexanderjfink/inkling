@@ -1,4 +1,4 @@
-import { BLIP_TYPES, type BlipType } from '@inkling/domain'
+import { BLIP_TYPES, type Blip, type BlipType } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import type { CaptureDraft } from '../capture'
 import { ButtonLabel } from '../components/Spinner'
@@ -7,17 +7,42 @@ import { useSpeech } from '../state/useSpeech'
 const inputClass =
   'w-full rounded-2xl border border-line bg-surface p-4 text-ink outline-none focus:border-accent'
 
+/**
+ * The screen the app opens on.
+ *
+ * Not a menu: the assumption is that you opened it because you noticed something, so the
+ * cursor is in the field and you can start typing. Review is the other thing you might
+ * have come to do, so it sits above the field — where the keyboard cannot cover it — with
+ * a preview of what is waiting, rather than being a destination you have to remember.
+ */
 export function Add({
   onCapture,
   initial,
   onConsumed,
-  onDone,
+  waiting,
+  next,
+  total,
+  attic,
+  capturedToday,
+  serverWarning,
+  onReview,
+  onAttic,
+  onSettings,
 }: {
   onCapture: (draft: CaptureDraft) => Promise<unknown>
   /** Content handed over by the OS share sheet. */
   initial?: { text?: string; url?: string } | null
   onConsumed?: () => void
-  onDone: () => void
+  waiting: number
+  /** The first Inkling up for review, shown as the preview. */
+  next?: Blip | null
+  total: number
+  attic: number
+  capturedToday: number
+  serverWarning: string | null
+  onReview: () => void
+  onAttic: () => void
+  onSettings: () => void
 }) {
   const [text, setText] = useState(initial?.text ?? '')
   const [url, setUrl] = useState(initial?.url ?? '')
@@ -54,6 +79,49 @@ export function Add({
 
   return (
     <div className="flex flex-1 flex-col gap-3">
+      <div className="mb-1 flex items-center gap-3">
+        <img src="/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 rounded-xl" />
+        <div className="min-w-0 flex-1">
+          <p className="text-base leading-tight font-semibold">Inkling</p>
+          <p className="text-[11px] text-ink-faint">Make Moves on your Inklings</p>
+        </div>
+        <button
+          type="button"
+          onClick={onSettings}
+          aria-label="Settings"
+          className="circle h-10 w-10 text-lg"
+        >
+          ⚙
+        </button>
+      </div>
+
+      {/* Above the field on purpose: with the keyboard up, anything below it is gone. */}
+      {waiting > 0 ? (
+        <button
+          type="button"
+          onClick={onReview}
+          className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
+        >
+          <span className="circle circle--accent h-10 w-10 shrink-0 text-lg leading-none">◷</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">Review · {waiting} waiting</span>
+            {next ? (
+              <span className="block truncate text-xs text-ink-soft">{next.title}</span>
+            ) : null}
+          </span>
+        </button>
+      ) : null}
+
+      {serverWarning ? (
+        <button
+          type="button"
+          onClick={onSettings}
+          className="rounded-2xl border border-line bg-surface/70 p-3 text-left text-xs text-warn"
+        >
+          ⚠ {serverWarning} — tap to fix
+        </button>
+      ) : null}
+
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -64,6 +132,10 @@ export function Add({
             void submit()
           }
         }}
+        // The cursor is here when the app opens, because that is what you came to do.
+        // Mobile browsers only raise the keyboard for a focus they trust, so on a phone
+        // this may leave the field ready without the keyboard until you tap it.
+        autoFocus
         placeholder="What did you notice?"
         rows={6}
         className={`${inputClass} resize-none text-lg`}
@@ -125,11 +197,11 @@ export function Add({
 
         <button
           type="button"
-          onClick={() => (saved > 0 ? onDone() : submit())}
+          onClick={() => void submit()}
           disabled={!canSubmit || busy}
           className="ml-auto rounded-full bg-ink px-7 py-4 text-sm font-semibold text-surface disabled:opacity-40"
         >
-          <ButtonLabel busy={busy}>{saved > 0 ? 'Done' : busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
+          <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
         </button>
       </div>
 
@@ -137,11 +209,28 @@ export function Add({
         <p className="text-xs text-ink-faint">{speech.reason}</p>
       ) : null}
       {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
+
       <p className="text-center text-xs text-ink-faint">
         Written to this device instantly — never blocked on the network.
         {saved > 0 ? ` ${saved} captured.` : ''}
         <span className="hidden sm:inline"> ⌘↵ or Ctrl+↵ to keep it.</span>
       </p>
+
+      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+        {capturedToday > 0 ? (
+          <span className="text-ink-faint">{capturedToday} captured today — all saved</span>
+        ) : null}
+        <button
+          type="button"
+          onClick={onAttic}
+          disabled={total === 0}
+          className="quiet underline disabled:no-underline disabled:opacity-50"
+        >
+          {total === 0
+            ? 'no Inklings yet'
+            : `all ${total} Inkling${total === 1 ? '' : 's'}${attic > 0 ? ` · ${attic} in the attic` : ''}`}
+        </button>
+      </div>
     </div>
   )
 }

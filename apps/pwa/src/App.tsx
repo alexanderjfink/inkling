@@ -5,7 +5,6 @@ import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent 
 import { Add } from './screens/Add'
 import { Admin } from './screens/Admin'
 import { AllBlips } from './screens/AllBlips'
-import { Home } from './screens/Home'
 import { Review } from './screens/Review'
 import { Settings } from './screens/Settings'
 import { SignIn } from './screens/SignIn'
@@ -18,10 +17,10 @@ import { useServerUrl } from './state/useServerUrl'
 import { useSync } from './state/useSync'
 import { useTheme } from './state/useTheme'
 
-type Screen = 'home' | 'add' | 'review' | 'all' | 'settings' | 'admin'
+/** No home screen: the app opens on entry, which is what you came to do. */
+type Screen = 'add' | 'review' | 'all' | 'settings' | 'admin'
 
 const TITLES: Record<Screen, string> = {
-  home: 'Inkling',
   add: 'Add an Inkling',
   review: 'Review',
   all: 'All Inklings',
@@ -33,7 +32,7 @@ export default function App() {
   // Content handed over by the OS share sheet. Read once, at mount.
   const incoming = useMemo(() => readSharedContent(), [])
   const [shared, setShared] = useState(incoming)
-  const [screen, setScreen] = useState<Screen>(incoming ? 'add' : 'home')
+  const [screen, setScreen] = useState<Screen>('add')
   /** A blip chosen from the list, to open straight away in Review. */
   const [focusId, setFocusId] = useState<string | null>(null)
 
@@ -101,7 +100,10 @@ export default function App() {
     })()
   }, [ready, blips])
 
-  const waiting = useMemo(() => buildDailyFeed(blips, { now: new Date() }).length, [blips])
+  const feed = useMemo(() => buildDailyFeed(blips, { now: new Date() }), [blips])
+  const waiting = feed.length
+  /** What the Review card previews: the one you would actually be shown first. */
+  const upNext = feed[0] ?? null
   const attic = blips.filter(
     (blip) => !blip.deleted && (blip.status === 'retired' || blip.status === 'promoted'),
   ).length
@@ -139,11 +141,12 @@ export default function App() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-xl flex-col p-4">
-      {screen !== 'home' ? (
+      {/* The entry screen carries its own header, because it is where you start. */}
+      {screen !== 'add' ? (
         <header className="mb-4 flex items-center gap-3">
           <button
             type="button"
-            onClick={() => setScreen('home')}
+            onClick={() => setScreen('add')}
             aria-label="Back"
             className="circle h-10 w-10 text-lg"
           >
@@ -159,9 +162,17 @@ export default function App() {
         </div>
       ) : null}
 
-      {ready && screen === 'home' ? (
-        <Home
+      {ready && screen === 'admin' && auth.user ? (
+        <Admin serverUrl={server.serverUrl} me={auth.user} />
+      ) : null}
+
+      {ready && screen === 'add' ? (
+        <Add
+          onCapture={actions.capture}
+          initial={shared}
+          onConsumed={() => setShared(null)}
           waiting={waiting}
+          next={upNext}
           total={blips.filter((blip) => !blip.deleted).length}
           attic={attic}
           capturedToday={capturedToday}
@@ -172,23 +183,9 @@ export default function App() {
               ? null
               : 'the server is not reachable, so sync and the model are off'
           }
-          onAdd={() => setScreen('add')}
           onReview={() => setScreen('review')}
           onAttic={() => setScreen('all')}
           onSettings={() => setScreen('settings')}
-        />
-      ) : null}
-
-      {ready && screen === 'admin' && auth.user ? (
-        <Admin serverUrl={server.serverUrl} me={auth.user} />
-      ) : null}
-
-      {ready && screen === 'add' ? (
-        <Add
-          onCapture={actions.capture}
-          initial={shared}
-          onConsumed={() => setShared(null)}
-          onDone={() => setScreen('home')}
         />
       ) : null}
 
@@ -203,7 +200,7 @@ export default function App() {
           promotingId={promoteState.busyId}
           onExit={() => {
             setFocusId(null)
-            setScreen('home')
+            setScreen('add')
           }}
           onBrowse={() => setScreen('all')}
           onOpenBlip={(id) => setFocusId(id)}

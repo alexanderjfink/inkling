@@ -1,6 +1,6 @@
 import type { Blip, LLMProvider, MoveSpec, SelectMoveOptions } from '@inkling/domain'
 import { selectMove } from '@inkling/domain'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 /**
  * In-flight requests, shared across mounts.
@@ -23,7 +23,17 @@ function requestMove(
   return promise
 }
 
-/** The move to put in front of you for this blip, re-rolled on request. */
+/**
+ * The move to put in front of you, when you ask for one.
+ *
+ * **Nothing is generated until somebody asks.** It used to fetch on open, so every Inkling
+ * you looked at cost a model call — including the many you were only glancing at, and
+ * including every Inkling you had already decided to ask a friend about. Two costs, and only
+ * one of them is money: the call takes seconds, and seconds of a spinner on a card you were
+ * about to put down is the interface feeling slow for no reason.
+ *
+ * A move you saved is still shown without asking, because you already asked for it once.
+ */
 export function useSuggestedMove(
   blip: Blip | undefined,
   related: Blip[],
@@ -34,9 +44,11 @@ export function useSuggestedMove(
    * exactly the suggestion you just asked to be reconsidered.
    */
   revision = 0,
-): { move: MoveSpec | null; loading: boolean; reroll: () => void } {
+): { move: MoveSpec | null; loading: boolean; generate: () => void; reroll: () => void } {
   const [move, setMove] = useState<MoveSpec | null>(null)
   const [loading, setLoading] = useState(false)
+  /** The Inkling we have been asked for a move on. Empty means nobody has asked. */
+  const [asked, setAsked] = useState('')
   // Re-rolls are remembered per blip, so moving on does not carry them over.
   const [avoid, setAvoid] = useState<{ blipId: string; ids: string[] }>({ blipId: '', ids: [] })
 
@@ -52,6 +64,8 @@ export function useSuggestedMove(
    * been told what was just refused — which is the whole point of refusing it.
    */
   const rejections = blip?.rejections.length ?? 0
+  /** Whether this Inkling is one a move has been asked for. */
+  const wanted = asked === blipId && blipId !== ''
   const key = blip ? `${blipId}:${avoidIds.join(',')}:${revision}:${rejections}` : ''
 
   /**
@@ -83,9 +97,17 @@ export function useSuggestedMove(
       return
     }
 
-    // A move you saved deliberately is the one to show — no need to ask again.
+    // A move you saved deliberately is the one to show — no need to ask again, and no
+    // need to have been asked either.
     if (target.savedMove) {
       setMove(target.savedMove)
+      setLoading(false)
+      return
+    }
+
+    // Nobody has asked. This is the whole point: opening a card costs nothing.
+    if (!wanted) {
+      setMove(null)
       setLoading(false)
       return
     }
@@ -103,13 +125,15 @@ export function useSuggestedMove(
     return () => {
       cancelled = true
     }
-    // `related` is covered by relatedIds; `avoidIds` by key; the blip by blipId.
-  }, [key, relatedIds, provider, blipId, savedId])
+    // `related` is covered by relatedIds; `avoidIds` and `wanted` by key; the blip by blipId.
+  }, [key, relatedIds, provider, blipId, savedId, wanted])
+
+  const generate = useCallback(() => setAsked(blipId), [blipId])
 
   function reroll() {
     if (!move) return
     setAvoid({ blipId, ids: [...avoidIds, move.id] })
   }
 
-  return { move, loading, reroll }
+  return { move, loading, generate, reroll }
 }

@@ -193,6 +193,31 @@ export function rankBlips(blips: Blip[], ctx: FeedContext): Blip[] {
     .map((entry) => entry.blip)
 }
 
+/** How far ahead "near future" looks. */
+export const NEAR_DAYS = 7
+
+/**
+ * What is coming back soon.
+ *
+ * Not due now — that is today's — but with a floor inside the next week. The difference
+ * between "later this week" and "someday" is the difference between a review session and a
+ * wish list, and it was previously only visible by reading every card's date.
+ */
+export function buildNearFeed(
+  blips: readonly Blip[],
+  options: { now?: Date; days?: number } = {},
+): Blip[] {
+  const now = options.now ?? new Date()
+  const horizon = now.getTime() + (options.days ?? NEAR_DAYS) * DAY_MS
+  return rankBlips([...blips], { now }).filter((blip) => {
+    if (isDue(blip, now)) return false
+    const earliest = blip.schedule.nextEarliest
+    if (!earliest) return false
+    const at = Date.parse(earliest)
+    return !Number.isNaN(at) && at <= horizon
+  })
+}
+
 export type SnoozeReason = 'engaged' | 'skipped' | 'shown'
 
 /** How long "not now" means, when you do not want to think about it. */

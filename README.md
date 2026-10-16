@@ -339,7 +339,13 @@ phone — the case the guard exists for.
 It is per account *and* per device, because settings are not synced. That is fine, because
 the other guard is what actually keeps it away from someone who already uses the app.
 
-**Help** is the reference, reachable from `?` on the entry screen and from Settings, and it
+**Help** opens with **an example of each kind of thing you could put in** — a real Inkling and
+a real playbook move for each of the six types — because the hardest part of starting is not
+knowing what belongs in here, and "a question, a quest, a yearning" on its own does not answer
+that. Every move shown is one the app can actually offer, so the promise is not about a
+hypothetical.
+
+It is the reference, reachable from `?` on the entry screen and from Settings, and it
 is where the walkthrough lives once you have seen it: *Show me around* replays it, and it is
 written for someone who has been using Inkling for a month and wants to know what a thing
 actually does rather than for someone who has never seen it.
@@ -415,7 +421,15 @@ rather than quietly counted as empty.
 | **＋ Make a Move** | write something down, free-form, with a link or a picture if there is one |
 | **✓ until Saturday** | put it down; the label is the date it comes back |
 
-A suggested **move** sits above them with a **Do this** button: it opens the same
+**Nothing is generated until you ask.** An Inkling opens with two buttons — **Generate a
+Move** and **Ask a Friend for a Move** — and no spinner. It used to start a model call on
+open, so every card you glanced at cost a call and a few seconds of waiting, including the
+ones you were about to put down and the ones you were going to ask a friend about anyway.
+Two costs, and only one of them is money.
+
+A move you **saved** still appears without asking, because you already asked for it once.
+
+Once there is a suggestion, it sits above the three actions with a **Do this** button: it opens the same
 composer, bound to that move, and records the move as done when you keep the result.
 Under it: **save for later** (keeps that move and puts the Inkling down, so it returns
 with the move you liked) and **help me with the next step** (a short list of what to
@@ -433,6 +447,17 @@ actually collect — a photograph of what they meant, a page they found — had 
 the first capture. Now they take a link or a picture the same way the first capture does, and
 the card shows everything written down in the order it was written rather than in two lists
 where a picture and the sentence about it could end up apart.
+
+The three windows at the top are **Today**, **Near Future** and **All**: what is due now, what
+is coming back inside the week, and everything. *Near Future* is the one worth having — the
+difference between "later this week" and "someday" is the difference between a review session
+and a wish list, and it used to be visible only by reading each card's date. *All* used to sit
+in that middle slot, which is not a thing anybody looks for at a glance.
+
+The **tomorrow / a week / a month** buttons are gone from under the card. Nobody could say what
+they were for: three buttons that did the same thing, differing only in a date the app is
+better at choosing than you are. The ✓ says the date it picked, and that is the choice —
+retiring covers "not for a long time".
 
 **moves so far** lists what has been put in front of you and when — behind a tap, so
 the card stays clean. Related Inklings are listed and open on tap.

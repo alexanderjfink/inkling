@@ -128,11 +128,13 @@ export type { FeedContext } from './schedule'
 export type { DeferralChoice, SnoozeReason } from './schedule'
 export {
   buildDailyFeed,
+  buildNearFeed,
   buildRound,
   DEFERRAL_CHOICES,
   DEFAULT_FEED_SIZE,
   deferUntil,
   isDue,
+  NEAR_DAYS,
   rankBlips,
   roundQueue,
   scoreBlip,

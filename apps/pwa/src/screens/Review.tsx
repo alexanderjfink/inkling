@@ -11,9 +11,9 @@ import type {
 } from '@inkling/domain'
 import {
   BLIP_TYPES,
-  DEFERRAL_CHOICES,
   askContextFor,
   buildDailyFeed,
+  buildNearFeed,
   buildRound,
   deferUntil,
   entryContext,
@@ -51,15 +51,9 @@ type Decision =
   | 'revived'
   | 'rejected'
 /** Today's finite feed, or everything you have. */
-type Scope = 'today' | 'all'
+type Scope = 'today' | 'near' | 'all'
 
 const DEFAULT_DEFERRAL: DeferralChoice = 'few-days'
-const DEFERRAL_LABEL: Record<DeferralChoice, string> = {
-  tomorrow: 'tomorrow',
-  'few-days': 'a few days',
-  'next-week': 'a week',
-  'next-month': 'a month',
-}
 
 /**
  * Where this move sends you.
@@ -531,9 +525,11 @@ export function Review({
   // A picked Inkling may not be due today, so focus starts in "all".
   const [scope, setScope] = useState<Scope>(focusId ? 'all' : 'today')
 
-  const today = useMemo(() => buildDailyFeed(blips, { now: new Date() }), [blips])
-  const everything = useMemo(() => rankBlips(blips, { now: new Date() }), [blips])
-  const candidates = scope === 'today' ? today : everything
+  const now = useMemo(() => new Date(), [blips])
+  const today = useMemo(() => buildDailyFeed(blips, { now }), [blips, now])
+  const near = useMemo(() => buildNearFeed(blips, { now }), [blips, now])
+  const everything = useMemo(() => rankBlips(blips, { now }), [blips, now])
+  const candidates = scope === 'today' ? today : scope === 'near' ? near : everything
   const byId = useMemo(() => new Map(blips.map((blip) => [blip.id, blip])), [blips])
 
   const focus = focusId ? blips.find((blip) => blip.id === focusId) : undefined
@@ -549,6 +545,12 @@ export function Review({
     setComposer(null)
     setLastNote(null)
   }, [scope])
+
+  const SCOPES: Array<{ id: Scope; label: string; count: number }> = [
+    { id: 'today', label: 'Today', count: today.length },
+    { id: 'near', label: 'Near Future', count: near.length },
+    { id: 'all', label: 'All', count: everything.length },
+  ]
 
   const lastFocus = useRef(focusKey)
   useEffect(() => {
@@ -580,6 +582,7 @@ export function Review({
     move,
     loading: moveLoading,
     reroll,
+    generate: generateMove,
   } = useSuggestedMove(
     current,
     currentRelated.map((entry_) => entry_.blip),
@@ -891,18 +894,22 @@ export function Review({
   return (
     <div className="flex flex-1 flex-col">
       <div className="mb-3 flex items-center gap-2">
-        {(['today', 'all'] as const).map((option) => (
+        {/* Three windows on the same list: what is due now, what is coming back inside the
+            week, and everything. "All" used to mean "everything active", which is not a
+            thing anybody is looking for at a glance — the useful middle is what is near. */}
+        {SCOPES.map((option) => (
           <button
-            key={option}
+            key={option.id}
             type="button"
-            onClick={() => setScope(option)}
+            onClick={() => setScope(option.id)}
             className={`rounded-full px-3 py-1 text-xs transition ${
-              scope === option
+              scope === option.id
                 ? 'bg-ink font-medium text-surface'
                 : 'border border-line text-ink-soft'
             }`}
           >
-            {option === 'today' ? `Today · ${today.length}` : `All · ${everything.length}`}
+            {option.label}
+            {option.count > 0 ? ` · ${option.count}` : ''}
           </button>
         ))}
         <button type="button" onClick={onBrowse} className="quiet text-xs underline">
@@ -1461,12 +1468,7 @@ export function Review({
 
             <Guidance items={guidance} />
           </div>
-        ) : (
-          <p className="mt-5 flex items-center gap-2 text-xs text-ink-faint">
-            <Spinner className="h-3.5 w-3.5" />
-            choosing a move…
-          </p>
-        )}
+        ) : null}
 
         <MoveLog
           moves={current.moves}
@@ -1539,16 +1541,10 @@ export function Review({
       </div>
 
       <div className="mt-3 flex justify-center gap-4 text-xs">
-        {DEFERRAL_CHOICES.filter((choice) => choice !== DEFAULT_DEFERRAL).map((choice) => (
-          <button
-            key={choice}
-            type="button"
-            onClick={() => void defer(choice)}
-            className="quiet underline"
-          >
-            {DEFERRAL_LABEL[choice]}
-          </button>
-        ))}
+        {/* "tomorrow / a week / a month" used to sit here, and nobody could say what they
+            were for: three buttons that all did the same thing, differing only in a date
+            the app is better at choosing than you are. The ✓ above says the date it picked,
+            and that is the choice. Retiring covers "not for a long time". */}
       </div>
 
       {current.demo ? (
@@ -1559,10 +1555,31 @@ export function Review({
         </div>
       ) : null}
 
-      {/* Only when there is no suggestion to react to: with one, the ask lives in the move
-          card itself, which is where the question occurs to you. */}
-      {socialOn && !current.demo && !friendMove && !move ? (
-        <div className="mt-3 flex flex-col items-center gap-2">
+      {/* Nothing is generated until you ask for one, so this is what an Inkling opens to:
+          two ways to get a move, and no spinner. It used to start a model call on open —
+          every card you glanced at cost a call and a few seconds of waiting, including the
+          ones you were about to put down. */}
+      {!composer && !friendMove && !move && !moveLoading ? (
+        <div className="mt-5 flex flex-col items-center gap-3">
+          <div className="flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={generateMove}
+              className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-surface"
+            >
+              Generate a Move
+            </button>
+            {socialOn && !current.demo ? (
+              <button
+                type="button"
+                onClick={() => setAskOpen((open) => !open)}
+                className="rounded-full border border-accent/50 px-5 py-3 text-sm font-medium text-accent"
+              >
+                Ask a Friend for a Move
+              </button>
+            ) : null}
+          </div>
+
           {askOpen ? (
             <AskPanel
               blip={current}
@@ -1570,15 +1587,7 @@ export function Review({
               onClose={() => setAskOpen(false)}
               onShare={() => void actions.share(current.id, 'friends')}
             />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setAskOpen(true)}
-              className="rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
-            >
-              ask a friend for a move
-            </button>
-          )}
+          ) : null}
 
           {current.friendAsks.length > 0 ? (
             <p className="text-[11px] text-ink-faint">
@@ -1589,6 +1598,13 @@ export function Review({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {!composer && !friendMove && !move && moveLoading ? (
+        <p className="mt-5 flex items-center justify-center gap-2 text-xs text-ink-faint">
+          <Spinner className="h-3.5 w-3.5" />
+          thinking of something…
+        </p>
       ) : null}
 
       {/* Here as well as on the entry screen, because this is where a suggestion is

@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Blip, BlipEvent, BlipEventBody, BlipType } from '../src/index'
 import {
   buildDailyFeed,
+  buildNearFeed,
   buildRound,
   deferUntil,
   isDue,
@@ -370,5 +371,42 @@ describe('a move from a friend', () => {
     ])
     const ranked = rankBlips([only(older.events), withMove], { now: NOW })
     expect(ranked[0]?.id).toBe(asked.id)
+  })
+})
+
+describe('what is coming back soon', () => {
+  test('is what is snoozed inside the window, and not what is due now', () => {
+    // The middle window: not today, but not someday either. It sits between the daily feed
+    // and everything, and it is the one you actually want to look at.
+    const due = blipFrom('due now', '2026-02-28T12:00:00Z')
+    const soon = blipFrom('back on Thursday', '2026-02-20T12:00:00Z')
+    const far = blipFrom('back next year', '2026-02-20T12:00:00Z')
+
+    const snoozedSoon = only([
+      ...soon.events,
+      ev({ t: 'snoozed', id: soon.id, until: '2026-03-03T12:00:00Z' }, 1, '2026-02-25T12:00:00Z'),
+    ])
+    const snoozedFar = only([
+      ...far.events,
+      ev({ t: 'snoozed', id: far.id, until: '2026-09-01T12:00:00Z' }, 1, '2026-02-25T12:00:00Z'),
+    ])
+
+    const near = buildNearFeed([only(due.events), snoozedSoon, snoozedFar], { now: NOW })
+    expect(near.map((blip) => blip.title)).toEqual(['back on Thursday'])
+  })
+
+  test('a retired Inkling is not coming back soon, because it is not coming back', () => {
+    const { id, events } = blipFrom('put away', '2026-02-20T12:00:00Z')
+    const retired = only([
+      ...events,
+      ev({ t: 'snoozed', id, until: '2026-03-02T12:00:00Z' }, 1, '2026-02-25T12:00:00Z'),
+      ev({ t: 'retired', id }, 2, '2026-02-26T12:00:00Z'),
+    ])
+    expect(buildNearFeed([retired], { now: NOW })).toEqual([])
+  })
+
+  test('an Inkling with no floor at all is not near — it is due', () => {
+    const { events } = blipFrom('never put down', '2026-02-28T12:00:00Z')
+    expect(buildNearFeed([only(events)], { now: NOW })).toEqual([])
   })
 })

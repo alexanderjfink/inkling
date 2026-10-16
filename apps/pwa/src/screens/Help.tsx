@@ -9,6 +9,45 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   )
 }
 
+/**
+ * One example of each kind, taken from the playbook rather than written for this page.
+ *
+ * The move shown for each is a real one the app can offer, so the promise here is not a
+ * promise about a hypothetical.
+ */
+const KINDS: Array<{ type: string; input: string; move: string }> = [
+  {
+    type: 'question',
+    input: 'Why does the sky go orange at sunset but not at noon?',
+    move: 'Answer it in one sentence, as if you had to',
+  },
+  {
+    type: 'reference',
+    input: 'https://en.wikipedia.org/wiki/Sourdough',
+    move: 'Read one paragraph and keep one sentence',
+  },
+  {
+    type: 'insight',
+    input: 'I do my best thinking on the walk, not at the desk',
+    move: 'State it as a claim you could defend',
+  },
+  {
+    type: 'idea',
+    input: 'A tiny app that only does one thing',
+    move: 'What is the smallest test?',
+  },
+  {
+    type: 'quest',
+    input: 'Learn to play a few chords on the keyboard I bought',
+    move: 'What is the first 30 minutes?',
+  },
+  {
+    type: 'yearning',
+    input: 'I want to be someone who draws',
+    move: 'Name the smallest version of this',
+  },
+]
+
 /** A term and what it does, in the order you meet them on a card. */
 function Row({ term, children }: { term: string; children: ReactNode }) {
   return (
@@ -41,6 +80,29 @@ export function Help({ onStartTour }: { onStartTour: () => void }) {
           </span>
         </span>
       </button>
+
+      {/* At the top, and as examples rather than as a list of labels: the hardest part of
+          starting is not knowing what belongs in here, and "a question, a quest, a yearning"
+          on its own does not answer that. Every example below is a real playbook move, so
+          what it promises is what actually comes back. */}
+      <Section title="What you could put in">
+        <p>Six kinds of thing, and what the app does with each:</p>
+        <ul className="flex flex-col gap-2">
+          {KINDS.map((kind) => (
+            <li key={kind.type} className="rounded-xl border border-line bg-surface/60 p-3">
+              <p className="text-[11px] tracking-wide text-ink-faint uppercase">{kind.type}</p>
+              <p className="mt-1 text-sm">{kind.input}</p>
+              <p className="mt-1.5 text-xs text-ink-faint">
+                a move like: <span className="text-ink-soft">{kind.move}</span>
+              </p>
+            </li>
+          ))}
+        </ul>
+        <p>
+          You do not have to decide which one it is. Write it in your own words and the type is
+          guessed, and you can change it afterwards.
+        </p>
+      </Section>
 
       <Section title="What Inkling is for">
         <p>

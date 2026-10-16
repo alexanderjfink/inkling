@@ -610,55 +610,74 @@ no way back in short of editing files by hand.
 
 ## Running it somewhere always on
 
-Everything that makes two devices agree already lives on the server: the append-only
-log, the content-addressed blobs, and your model settings. None of that needs a second
-*device* to be awake — it needs the **server** to be awake. So the whole answer to "how
-do I use this on my phone and my laptop for real" is: run the server on something
+Everything that makes two devices agree already lives on the server: the accounts, the
+append-only logs, the content-addressed blobs, and the model settings. None of that needs
+a second *device* to be awake — it needs the **server** to be awake. So the whole answer
+to "how do I use this on my phone and my laptop for real" is: run the server on something
 always on, and open its address on both.
 
-There is a `Dockerfile` and a `docker-compose.yml` for exactly that:
+There is a `Dockerfile` and a `docker-compose.yml` for exactly that. The whole thing, in
+order:
 
 ```bash
+# 1. Get the code onto the always-on machine, and put your data where the container
+#    will find it. This is the same directory the dev server uses, so if you are
+#    moving an existing setup, copy it rather than starting empty.
+git clone <your-repo> inkling && cd inkling
+mkdir -p server/data
+rsync -a --delete ~/path/to/old/inkling/server/data/ server/data/
+
+# 2. Build and start. The container serves the app and the API on one origin.
 docker compose up -d --build
-```
 
-Then reach it from the phone and the laptop at the same address. Because the server
-serves the built app itself, there is **nothing to configure on either device**: `/api`
-is relative, so the app you loaded is already talking to the server you got it from.
-Settings, keys and Inklings are simply there, on both.
-
-The compose file binds to `127.0.0.1` and expects Tailscale in front:
-
-```bash
+# 3. Give it a real certificate, so the phone can install it and so image capture
+#    works (the browser only exposes crypto.subtle in a secure context).
 tailscale serve --bg 8787
 ```
 
-That gives a real certificate, which is also what makes the app installable and usable
-offline.
+Then open the `https://<machine>.<tailnet>.ts.net` address Tailscale prints, on both
+devices, and sign in. Because the server serves the built app itself, there is **nothing
+to configure on either device**: `/api` is relative, so the app you loaded is already
+talking to the server you got it from. Accounts, keys and Inklings are simply there, on
+both.
+
+**The data is a plain directory**, `server/data`, bind-mounted into the container. That
+is deliberate: seeding the server is an ordinary `rsync`, backing it up is a copy of a
+folder you can see, and nothing needs `docker cp`. Point it elsewhere with
+`INKLING_DATA_DIR` if the repo is not where you want the data to live.
+
+```bash
+INKLING_DATA_DIR=/volume1/inkling docker compose up -d
+```
+
+**To update:** `git pull && docker compose up -d --build`. Your data is untouched, since
+it lives outside the image.
+
+**To check it is up:** `curl -s localhost:8787/api/health`. The container also has a
+healthcheck, so `docker compose ps` shows whether it is healthy.
 
 ### Two things to know
 
-**Accounts.** The server has them: the first one you create is the admin, and the admin
-page adds, removes and re-passeswords everyone else. Each account gets its own Inklings,
-its own model settings and its own vault, in `data/users/<id>/`. Set
-`INKLING_ADMIN_USER` and `INKLING_ADMIN_PASSWORD` to create the first one without
-clicking through setup, or leave them out and do it in the app.
-
-Sessions are bearer tokens, not cookies — the Android build is served from the device
-while the server is elsewhere, where a cookie would be a third-party cookie and dropped.
-The token lives in `localStorage`, so script on the page can read it. Fine for a
-self-hosted tool on your own network; worth knowing before you put it anywhere else.
-
-**The vault has to move too.** "Promote to note" writes into your Obsidian vault, and the
-server is what does the writing. Point the mount at the folder your notes already sync to:
+**The vault has to move too, or promotion stops working.** "Promote to note" writes into
+your Obsidian vault, and on a remote server the vault is the server that does the writing.
+`~/Documents/Notebook` on your laptop does not exist on the NAS, so the mount is the whole
+fix:
 
 ```yaml
     volumes:
-      - /volume1/Notebook:/vault
+      - /volume1/Notebook:/vault      # the folder your notes already sync to
 ```
 
-and set the vault to `/vault` in Settings. Each account sets its own. Without it,
-everything works except promotion, which says plainly that it could not write.
+then set the vault to `/vault` in Settings, per account. If you use Syncthing already,
+point it at the same folder and the notes land back on your laptop as usual.
+
+Leave it out and **everything still works except promotion** — the app says plainly that
+it could not write, rather than failing quietly. That is a reasonable way to start.
+
+**Accounts are described in their own section**, including the one window worth knowing
+about: on a server with no accounts yet, the first person to reach it becomes the admin.
+Set `INKLING_ADMIN_USER` and `INKLING_ADMIN_PASSWORD` to close that window, or create the
+account before the port is reachable.
 
 ### Why not put the data in mdbase instead
 

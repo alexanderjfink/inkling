@@ -11,6 +11,9 @@ dist
 # Your log, your blobs, and your API keys. Never in an image.
 server/data
 
+# The Android project is generated and is not needed to build or run the server.
+apps/pwa/android
+
 *.log
 .DS_Store
 .coverage

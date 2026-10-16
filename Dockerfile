@@ -4,8 +4,9 @@
 # makes `/api` correct on every device with no per-device setup: open the address,
 # and the app you are looking at is talking to the server you got it from.
 #
-# Everything stateful lives in /data — the log, the content-addressed blobs, and the
-# model settings. Mount the Obsidian vault at /vault and promotion works too.
+# Everything stateful lives in /data: the accounts, and then per account their logs,
+# content-addressed blobs and settings. Mount the Obsidian vault at /vault and
+# promotion works too.
 
 # --- build --------------------------------------------------------------------
 FROM oven/bun:1 AS build

@@ -50,6 +50,18 @@ export interface Overview {
   feedback: FeedbackReport[]
   /** Events per day, so a flat line is visible as a flat line. */
   activity: Array<{ day: string; events: number; captures: number }>
+  /** The social half: whether it is being used, and whether it is being used evenly. */
+  social: {
+    /** Accepted friendships, counted once each rather than once per end. */
+    friendships: number
+    /** Requests nobody has answered yet. */
+    pending: number
+    asks: number
+    moves: number
+    notes: number
+    /** Asks nobody has answered with a move. */
+    unanswered: number
+  }
   devices: number
   /** Accounts whose logs could not be read, so a wrong number is not mistaken for a fact. */
   unreadable: string[]

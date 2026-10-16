@@ -1,3 +1,4 @@
+import type { ShareDefault } from '@inkling/domain'
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../api'
 import { needsServerUrl } from '../native'
@@ -20,6 +21,10 @@ export interface PublicConfig {
   twaFingerprint: string | null
   apiKeySet: boolean
   embedApiKeySet: boolean
+  /** On unless this account has turned it off. */
+  socialEnabled: boolean
+  /** Whether new Inklings start shared with friends. */
+  shareDefault: ShareDefault
 }
 
 export interface ProviderOption {
@@ -35,7 +40,14 @@ export interface ProviderOption {
   note: string | null
 }
 
-export type ConfigPatch = Record<string, string | number | null>
+/**
+ * A settings change.
+ *
+ * Booleans are allowed as well as strings and numbers: the social toggle is a boolean, and
+ * sending it as "false" would be a string that `mergeConfig` would happily store and that
+ * nothing would ever compare equal to `false`.
+ */
+export type ConfigPatch = Record<string, string | number | boolean | null>
 
 function join(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/+$/, '')}${path}`

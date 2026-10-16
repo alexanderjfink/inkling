@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { BlipEvent, BlipEventBody, BlipType } from '../src/index'
-import { DEMO_MOVE, liveBlips, newId, project } from '../src/index'
+import { DEMO_MOVE, liveBlips, newId, project, unansweredFriendMove } from '../src/index'
 
 const DEVICE = 'deviceA'
 
@@ -195,5 +195,116 @@ describe('the example Inkling', () => {
     expect(DEMO_MOVE.generatedBy).toBe('playbook')
     expect(DEMO_MOVE.lookUp?.length).toBeGreaterThan(1)
     expect(DEMO_MOVE.timeLimitSec).toBeLessThanOrEqual(300)
+  })
+})
+
+describe('help from a friend', () => {
+  const MOVE = {
+    id: 'friend.one',
+    title: 'Try it with the cheapest keyboard you can borrow',
+    why: 'because the point is the chords, not the gear',
+    timeLimitSec: 300,
+    goal: 'one chord, played twice',
+    playbook: 'friend',
+    generatedBy: 'friend' as const,
+  }
+
+  const received = (id: string, messageId: string, at: string, seq = 1) =>
+    ev(
+      { t: 'friendMove', id, messageId, from: 'u-sam', fromUsername: 'sam', moveSpec: MOVE },
+      seq,
+      at,
+    )
+
+  test('a move from a friend is kept on the Inkling, with who sent it', () => {
+    const id = newId()
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      received(id, 'm1', '2026-01-02T00:00:00Z'),
+    ])
+    expect(blip?.friendMoves).toHaveLength(1)
+    expect(blip?.friendMoves[0]?.fromUsername).toBe('sam')
+    expect(blip?.friendMoves[0]?.spec.title).toContain('cheapest keyboard')
+  })
+
+  test('the same message arriving twice is one move from one friend', () => {
+    // Two devices both receive it, and both append an event. A card that says it twice is
+    // a card that looks broken.
+    const id = newId()
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      received(id, 'm1', '2026-01-02T00:00:00Z', 1),
+      received(id, 'm1', '2026-01-02T00:00:01Z', 2),
+    ])
+    expect(blip?.friendMoves).toHaveLength(1)
+  })
+
+  test('it is unanswered until something is written against it', () => {
+    const id = newId()
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      received(id, 'm1', '2026-01-02T00:00:00Z'),
+    ])
+    expect(unansweredFriendMove(blip!)).toBeDefined()
+
+    const [answered] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      received(id, 'm1', '2026-01-02T00:00:00Z'),
+      ev(
+        {
+          t: 'entry',
+          id,
+          entry: { id: 'e1', kind: 'note', text: 'tried it', at: '2026-01-03T00:00:00Z' },
+        },
+        2,
+        '2026-01-03T00:00:00Z',
+      ),
+    ])
+    expect(unansweredFriendMove(answered!)).toBeUndefined()
+  })
+
+  test('an Inkling is private unless it was written shared', () => {
+    // Absent means private, which is what everything written before this was.
+    const [blip] = project([captured(newId(), 'something', 0, '2026-01-01T00:00:00Z')])
+    expect(blip?.visibility).toBe('private')
+  })
+
+  test('sharing is per Inkling, and can be taken back', () => {
+    const id = newId()
+    const [shared] = project([
+      ev(
+        {
+          t: 'captured',
+          id,
+          input: { kind: 'text', text: 'x' },
+          type: 'idea',
+          visibility: 'friends',
+        },
+        0,
+        '2026-01-01T00:00:00Z',
+      ),
+      ev({ t: 'shared', id, visibility: 'private' }, 1, '2026-01-01T01:00:00Z'),
+    ])
+    expect(shared?.visibility).toBe('private')
+  })
+
+  test('a note from a friend is kept once, and remembers which way it went', () => {
+    const id = newId()
+    const note = {
+      id: 'n1',
+      direction: 'in' as const,
+      kind: 'kudos' as const,
+      username: 'sam',
+      moveTitle: 'Try it with the cheapest keyboard',
+      text: 'this one was good',
+      at: '2026-01-03T00:00:00Z',
+    }
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      ev({ t: 'friendNote', id, note }, 1, '2026-01-03T00:00:00Z'),
+      ev({ t: 'friendNote', id, note }, 2, '2026-01-03T00:00:01Z'),
+    ])
+    expect(blip?.friendNotes).toHaveLength(1)
+    expect(blip?.friendNotes[0]?.direction).toBe('in')
   })
 })

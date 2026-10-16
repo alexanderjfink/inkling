@@ -1,4 +1,4 @@
-import { type Blip, buildDailyFeed } from '@inkling/domain'
+import { type AskContext, type Blip, type Friend, buildDailyFeed } from '@inkling/domain'
 import { APP_BUILD } from './build'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FeedbackEnv } from './components/Feedback'
@@ -8,7 +8,9 @@ import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent 
 import { Add } from './screens/Add'
 import { Admin } from './screens/Admin'
 import { AllBlips } from './screens/AllBlips'
+import { Friends } from './screens/Friends'
 import { Help } from './screens/Help'
+import { Notifications } from './screens/Notifications'
 import { Review } from './screens/Review'
 import { Settings } from './screens/Settings'
 import { SignIn } from './screens/SignIn'
@@ -18,21 +20,24 @@ import { usePromote } from './state/usePromote'
 import { useRelated } from './state/useRelated'
 import { useServerConfig } from './state/useServerConfig'
 import { useServerUrl } from './state/useServerUrl'
+import { useSocial } from './state/useSocial'
 import { useSync } from './state/useSync'
 import { useTour } from './state/useTour'
 import { useTheme } from './state/useTheme'
 import { TOUR_KEY, TOUR_STEPS } from './tour'
 
 /** No home screen: the app opens on entry, which is what you came to do. */
-type Screen = 'add' | 'review' | 'all' | 'settings' | 'admin' | 'help'
+type Screen = 'add' | 'review' | 'all' | 'settings' | 'admin' | 'help' | 'friends' | 'notifications'
 
 const TITLES: Record<Screen, string> = {
   add: 'Add an Inkling',
   review: 'Review',
   all: 'All Inklings',
   settings: 'Settings',
-  admin: 'Accounts',
+  admin: 'Admin',
   help: 'Help',
+  friends: 'Friends',
+  notifications: 'Notifications',
 }
 
 export default function App() {
@@ -72,6 +77,21 @@ export default function App() {
   const promoteState = usePromote()
   const serverConfig = useServerConfig(server.serverUrl, auth.user?.id ?? null)
   const theme = useTheme()
+
+  /**
+   * Social is on unless the account has turned it off, and the server says the same thing
+   * independently — so a stale app cannot keep asking for something the server refuses.
+   */
+  const socialOn = serverConfig.config?.socialEnabled !== false
+  const social = useSocial({
+    serverUrl: server.serverUrl,
+    accountId: auth.user?.id ?? null,
+    enabled: socialOn,
+    actions,
+    events,
+  })
+  /** A friend's shared Inkling chosen from the friends screen, to suggest on unprompted. */
+  const [picked, setPicked] = useState<{ friend: Friend; context: AskContext } | null>(null)
 
   const active = blips.filter((blip) => !blip.deleted).length
   const { open: tourOpen, setOpen: setTourOpen } = useTour({
@@ -254,6 +274,11 @@ export default function App() {
           onHelp={() => setScreen('help')}
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
+          socialOn={socialOn}
+          shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
+          asking={social.asks}
+          onFriends={() => setScreen('friends')}
+          onNotifications={() => setScreen('notifications')}
         />
       ) : null}
 
@@ -276,6 +301,8 @@ export default function App() {
           serverUrl={syncState.serverUrl}
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
+          social={social}
+          socialOn={socialOn}
         />
       ) : null}
 
@@ -290,6 +317,31 @@ export default function App() {
           }}
         />
       ) : null}
+      {ready && screen === 'friends' ? (
+        <Friends
+          social={social}
+          onSeeInklings={(friend, inklings) => {
+            const first = inklings[0]
+            if (!first) {
+              setPicked(null)
+              setScreen('notifications')
+              return
+            }
+            setPicked({ friend, context: first })
+            setScreen('notifications')
+          }}
+        />
+      ) : null}
+
+      {ready && screen === 'notifications' ? (
+        <Notifications
+          social={social}
+          picked={picked}
+          onClearPicked={() => setPicked(null)}
+          onOpenFriends={() => setScreen('friends')}
+        />
+      ) : null}
+
       {ready && screen === 'help' ? (
         <Help
           onStartTour={() => {
@@ -312,6 +364,8 @@ export default function App() {
           onOpenHelp={() => setScreen('help')}
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
+          social={social}
+          onOpenFriends={() => setScreen('friends')}
         />
       ) : null}
 

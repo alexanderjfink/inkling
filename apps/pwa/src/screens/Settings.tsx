@@ -1,9 +1,10 @@
-import type { Blip, BlipEvent, FeedbackContext } from '@inkling/domain'
+import type { Blip, BlipEvent, FeedbackContext, ShareDefault } from '@inkling/domain'
 import { validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import { changeOwnPassword } from '../admin'
 import { APP_BUILD } from '../build'
 import type { Auth } from '../state/useAuth'
+import type { SocialState } from '../state/useSocial'
 import {
   BACKUP_LAST_KEY,
   daysSince,
@@ -158,6 +159,8 @@ export function Settings({
   auth,
   onOpenAdmin,
   onOpenHelp,
+  social,
+  onOpenFriends,
   feedbackEnv,
   onFeedback,
 }: {
@@ -171,6 +174,8 @@ export function Settings({
   auth: Auth
   onOpenAdmin: () => void
   onOpenHelp: () => void
+  social: SocialState
+  onOpenFriends: () => void
   feedbackEnv: FeedbackEnv
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
 }) {
@@ -295,6 +300,8 @@ export function Settings({
   const [twaPackage, setTwaPackage] = useState('')
   const [twaFingerprint, setTwaFingerprint] = useState('')
   const [folder, setFolder] = useState('')
+  const [socialEnabled, setSocialEnabled] = useState(true)
+  const [shareDefault, setShareDefault] = useState<ShareDefault>('friends')
 
   useEffect(() => {
     if (!config) return
@@ -307,6 +314,8 @@ export function Settings({
     setEmbedBaseUrl(config.embedBaseUrl ?? '')
     setVault(config.vault)
     setFolder(config.folder)
+    setSocialEnabled(config.socialEnabled)
+    setShareDefault(config.shareDefault)
     setTwaPackage(config.twaPackage ?? '')
     setTwaFingerprint(config.twaFingerprint ?? '')
   }, [config])
@@ -395,6 +404,10 @@ export function Settings({
 
   /** Suggestions marked bad, which is the data that can improve them. */
   const badCount = blips.reduce((total, blip) => total + blip.rejections.length, 0)
+
+  async function saveSocial() {
+    if (await save({ socialEnabled, shareDefault })) setSaved('social')
+  }
 
   async function saveVault() {
     if (await save({ vault, folder })) setSaved('notes')
@@ -950,6 +963,83 @@ export function Settings({
             </button>
           </>
         ) : null}
+      </Section>
+
+      <Section title="Friends">
+        <p className="text-xs text-ink-faint">
+          Let a friend suggest a move when you are stuck, and suggest one for them. On by default,
+          because the app is about making moves and a friend is often better at seeing the first one
+          than a model is.
+        </p>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSocialEnabled((on) => !on)
+          }}
+          className={`self-start rounded-full px-4 py-2 text-xs font-medium ${
+            socialEnabled ? 'bg-accent text-surface' : 'border border-line text-ink-soft'
+          }`}
+        >
+          {socialEnabled ? 'Social features are on' : 'Social features are off'}
+        </button>
+
+        {socialEnabled ? (
+          <>
+            <p className="mt-1 text-xs text-ink-soft">New Inklings start…</p>
+            <div className="flex flex-wrap gap-1.5">
+              {(['friends', 'private'] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setShareDefault(option)}
+                  className={`rounded-full px-3 py-1.5 text-[11px] ${
+                    shareDefault === option
+                      ? 'bg-accent text-surface'
+                      : 'border border-line text-ink-soft'
+                  }`}
+                >
+                  {option === 'friends' ? 'shared with friends' : 'private'}
+                </button>
+              ))}
+            </div>
+            <p className="text-[11px] text-ink-faint">
+              Every Inkling keeps its own switch, on its card, whichever this is — this only decides
+              what they start as.
+            </p>
+            <button
+              type="button"
+              onClick={onOpenFriends}
+              className="self-start rounded-full border border-line px-4 py-2 text-xs text-ink-soft"
+            >
+              Friends — add one, or see who asked
+            </button>
+            {social.asks.length > 0 ? (
+              <p className="text-[11px] text-accent">
+                {social.asks.length} friend{social.asks.length === 1 ? '' : 's'} waiting on a move
+                from you
+              </p>
+            ) : null}
+          </>
+        ) : (
+          <p className="text-[11px] text-ink-faint">
+            Nothing is sent or received, and the friends screen is closed. Existing friendships are
+            kept, so turning it back on restores them.
+          </p>
+        )}
+
+        {social.error ? <p className="text-xs text-warn">{social.error}</p> : null}
+
+        <button
+          type="button"
+          onClick={() => void saveSocial()}
+          disabled={saving}
+          className={primaryButtonClass}
+        >
+          <ButtonLabel busy={saving}>
+            {saving ? 'Saving…' : saved === 'social' ? 'Saved' : 'Save social settings'}
+          </ButtonLabel>
+        </button>
       </Section>
 
       <Section title="Feedback">

@@ -126,9 +126,11 @@ export function Admin({ serverUrl, me }: { serverUrl: string; me: PublicUser }) 
         onRefresh={() => void loadOverview()}
       />
 
+      <p className="text-[11px] tracking-wide text-ink-faint uppercase">accounts</p>
       <p className="text-xs text-ink-soft">
         Everyone here has their own Inklings, their own model settings and their own vault. Nothing
-        is shared between accounts.
+        is shared between accounts — not even between friends, who only ever see what has been
+        shared with them, one Inkling at a time.
       </p>
 
       {error ? (

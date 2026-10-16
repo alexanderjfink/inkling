@@ -4,6 +4,7 @@ import { Auth } from './auth'
 import { buildRuntime } from './config'
 import { createHandler } from './handler'
 import { PRESETS } from './providerConfig'
+import { FileSocialStore } from './social'
 import { vaultStatus } from './vault'
 
 const port = Number(process.env.PORT ?? 8787)
@@ -16,6 +17,7 @@ const servingApp = existsSync(new URL('../../apps/pwa/dist/index.html', import.m
 
 const auth = new Auth(dataDir)
 const accounts = await createAccountManager(dataDir)
+const social = new FileSocialStore(dataDir)
 
 // Docker-friendly: create the first account without clicking through setup, for a
 // server whose volume is already provisioned.
@@ -63,6 +65,7 @@ const server = Bun.serve({
     auth,
     accountFor: accounts.accountFor,
     serverSettings: accounts.serverSettings,
+    social,
   }),
 })
 
@@ -84,6 +87,7 @@ console.log(
   `  presets: ${PRESETS.map((preset) => preset.id).join(', ')} — set one in the app's Settings`,
 )
 console.log('  the app works without a model; moves come from the playbook')
+console.log('  social: friends and moves from them, on by default — per account in Settings')
 
 const adopted = accounts.adopted()
 if (adopted.length > 0) {

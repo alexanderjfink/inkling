@@ -12,6 +12,7 @@ import type {
 import {
   BLIP_TYPES,
   DEFERRAL_CHOICES,
+  askContextFor,
   buildDailyFeed,
   buildRound,
   deferUntil,
@@ -20,6 +21,7 @@ import {
   REJECTION_REASONS,
   requestGuidance,
   roundQueue,
+  unansweredFriendMove,
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Blocks } from '../components/Blocks'
@@ -32,6 +34,7 @@ import { formatDeferral, formatWhen } from '../format'
 import { type LookupResult, lookupVia } from '../llm/proxy'
 import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
+import type { SocialState } from '../state/useSocial'
 import { useSuggestedMove } from '../state/useSuggestedMove'
 
 type Decision =
@@ -91,6 +94,70 @@ function LookUps({ links, loading }: { links: MoveLink[]; loading: boolean }) {
           </span>
         </a>
       ))}
+    </div>
+  )
+}
+
+/**
+ * A note to a friend: thanks for a move, or telling them it worked.
+ *
+ * One line and a send button, because a note that takes as long to write as the move did
+ * is a note nobody sends.
+ */
+function Note({
+  kind,
+  username,
+  moveTitle,
+  busy,
+  onCancel,
+  onSend,
+  problem,
+}: {
+  kind: 'kudos' | 'thanks'
+  username: string
+  moveTitle: string
+  busy: boolean
+  onCancel: () => void
+  onSend: (text: string) => Promise<void>
+  problem: string | null
+}) {
+  const [text, setText] = useState('')
+  const [sending, setSending] = useState(false)
+
+  return (
+    <div className="mt-3 flex flex-col gap-2">
+      <p className="text-[11px] text-ink-faint">
+        {kind === 'kudos'
+          ? `tell ${username} the move worked`
+          : `thank ${username} for “${moveTitle}”`}
+      </p>
+      <input
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' && text.trim()) void onSend(text.trim())
+        }}
+        autoFocus
+        placeholder={kind === 'kudos' ? 'it worked, because…' : 'thank you —'}
+        className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
+      />
+      {problem ? <p className="text-xs text-warn">{problem}</p> : null}
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onCancel} className="quiet text-xs underline">
+          cancel
+        </button>
+        <button
+          type="button"
+          disabled={!text.trim() || busy || sending}
+          onClick={() => {
+            setSending(true)
+            void onSend(text.trim()).finally(() => setSending(false))
+          }}
+          className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
+        >
+          <ButtonLabel busy={sending}>{sending ? 'Sending…' : 'Send'}</ButtonLabel>
+        </button>
+      </div>
     </div>
   )
 }
@@ -275,6 +342,8 @@ export function Review({
   serverUrl,
   feedbackEnv,
   onFeedback,
+  social,
+  socialOn,
 }: {
   blips: Blip[]
   actions: InklingActions
@@ -291,6 +360,8 @@ export function Review({
   serverUrl: string
   feedbackEnv: FeedbackEnv
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
+  social: SocialState
+  socialOn: boolean
 }) {
   const [session, setSession] = useState<string[] | null>(null)
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
@@ -298,6 +369,12 @@ export function Review({
   const [lastNote, setLastNote] = useState<{ title: string; path: string } | null>(null)
   const [material, setMaterial] = useState<LookupResult | null>(null)
   const [links, setLinks] = useState<MoveLink[]>([])
+  const [noting, setNoting] = useState<'kudos' | 'thanks' | null>(null)
+  const [noteProblem, setNoteProblem] = useState<string | null>(null)
+  /** Which friend the ask composer is open for, or '' for none. */
+  const [asking, setAsking] = useState<string | null>(null)
+  const [askNote, setAskNote] = useState('')
+  const [askProblem, setAskProblem] = useState<string | null>(null)
   const [materialLoading, setMaterialLoading] = useState(false)
   /** Open when non-null. A move means "doing that move"; null means a free note. */
   const [composer, setComposer] = useState<{ move: MoveSpec | null } | null>(null)
@@ -406,9 +483,19 @@ export function Review({
     }
   }, [current, move, moveLoading, actions])
 
+  /**
+   * The move to put in front of them.
+   *
+   * A friend's move comes first while it is unanswered: somebody spent a moment on this on
+   * their behalf, and burying it under the app's own suggestion would be answering the
+   * wrong question. Once something is written against it, the suggestion returns.
+   */
+  const friendMove = current ? unansweredFriendMove(current) : undefined
+  const shownMove = composer?.move ?? friendMove?.spec ?? move
+
   // Where this move sends you. Resolved together, because they are independent and a
   // move that sends you three places should not appear one link at a time.
-  const lookUp = move?.lookUp ?? []
+  const lookUp = shownMove?.lookUp ?? []
   const lookUpKey = lookUp.join('\u0000')
   useEffect(() => {
     if (lookUp.length === 0) {
@@ -444,6 +531,11 @@ export function Review({
     setRejecting(false)
     setRejectionReason(null)
     setRejectionNote('')
+    setNoting(null)
+    setNoteProblem(null)
+    setAsking(null)
+    setAskNote('')
+    setAskProblem(null)
   }
 
   /**
@@ -692,6 +784,33 @@ export function Review({
               example
             </span>
           ) : null}
+          {/* Per Inkling, and always changeable. What you noticed on Tuesday is not the
+              same as what you noticed on Friday, and one setting for both is a setting
+              nobody can answer honestly. */}
+          {socialOn ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void actions.share(
+                  current.id,
+                  current.visibility === 'friends' ? 'private' : 'friends',
+                )
+              }
+              title={
+                current.visibility === 'friends'
+                  ? 'A friend you ask will see this. Tap to keep it private.'
+                  : 'Nobody can be shown this. Tap to share it with friends.'
+              }
+              className={`rounded-full border px-2 py-0.5 disabled:opacity-50 ${
+                current.visibility === 'friends'
+                  ? 'border-accent/50 text-accent'
+                  : 'border-line text-ink-faint'
+              }`}
+            >
+              {current.visibility === 'friends' ? 'friends' : 'private'}
+            </button>
+          ) : null}
           {current.schedule.timesSkipped > 0 ? (
             <span className="text-ink-faint">put down {current.schedule.timesSkipped}×</span>
           ) : null}
@@ -808,6 +927,89 @@ export function Review({
 
         <Blocks blip={current} actions={actions} />
 
+        {friendMove ? (
+          <div className="mt-5 rounded-2xl border border-accent/40 bg-accent-soft/60 p-4">
+            <p className="text-[11px] tracking-wide text-accent uppercase">
+              a move from {friendMove.fromUsername}
+            </p>
+            <p className="mt-1 text-sm font-medium">{friendMove.spec.title}</p>
+            <p className="mt-1 text-xs text-ink-soft">goal: {friendMove.spec.goal}</p>
+            {friendMove.note ? (
+              <p className="mt-2 text-xs text-accent italic">“{friendMove.note}”</p>
+            ) : null}
+
+            {!composer ? <LookUps links={links} loading={materialLoading} /> : null}
+            {!composer && material ? (
+              <Material loading={materialLoading} material={material} />
+            ) : null}
+
+            {!composer ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setComposer({ move: friendMove.spec })}
+                  className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface"
+                >
+                  Do this
+                </button>
+                <span className="text-xs text-ink-faint">
+                  {Math.max(1, Math.round(friendMove.spec.timeLimitSec / 60))} min · from a friend
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setNoting('thanks')}
+                  className="quiet text-xs underline"
+                >
+                  say thank you
+                </button>
+              </div>
+            ) : null}
+
+            {noting && !composer ? (
+              <Note
+                kind={noting}
+                username={friendMove.fromUsername}
+                moveTitle={friendMove.spec.title}
+                busy={busy}
+                onCancel={() => setNoting(null)}
+                onSend={async (text) => {
+                  const friend = social.friends.find(
+                    (candidate) => candidate.userId === friendMove.from,
+                  )
+                  if (!friend) {
+                    setNoteProblem('they are no longer a friend')
+                    return
+                  }
+                  const problemText = await social.note({
+                    to: friend,
+                    blipId: current.id,
+                    kind: noting,
+                    moveTitle: noting === 'kudos' ? friendMove.spec.title : undefined,
+                    text,
+                  })
+                  setNoteProblem(problemText)
+                  if (!problemText) setNoting(null)
+                }}
+                problem={noteProblem}
+              />
+            ) : null}
+
+            {current.friendNotes.length > 0 ? (
+              <ul className="mt-3 flex flex-col gap-1">
+                {current.friendNotes.map((note) => (
+                  <li key={note.id} className="text-[11px] text-ink-soft">
+                    <span className="text-ink-faint">
+                      {note.direction === 'in' ? note.username : `you → ${note.username}`}
+                      {note.kind === 'kudos' ? ' · kudos' : ' · thanks'}:{' '}
+                    </span>
+                    {note.text}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
         {composer ? (
           <div className="mt-5 flex flex-col gap-3">
             {composer.move ? (
@@ -817,6 +1019,9 @@ export function Review({
             ) : null}
             {/* What the move turned up, and anything the app suggested, stay here
                 while you write — that is the whole point of having asked. */}
+            {composer.move && links.length > 0 ? (
+              <LookUps links={links} loading={materialLoading} />
+            ) : null}
             {composer.move && material ? (
               <Material loading={materialLoading} material={material} className="" />
             ) : null}
@@ -1075,6 +1280,130 @@ export function Review({
           <button type="button" onClick={() => void remove()} className="quiet text-xs underline">
             that was an example — remove it
           </button>
+        </div>
+      ) : null}
+
+      {/* Asking a person rather than the model. Under the card rather than inside it,
+          because it is what you do when the suggestion above was not it. */}
+      {socialOn && !current.demo ? (
+        <div className="mt-3 flex flex-col items-center gap-2">
+          {asking === null ? (
+            <button
+              type="button"
+              onClick={() => {
+                setAsking('')
+                setAskNote('')
+                setAskProblem(null)
+              }}
+              className="quiet text-xs underline"
+            >
+              ask a friend for a move
+            </button>
+          ) : (
+            <div className="flex w-full flex-col gap-2 rounded-2xl border border-line bg-surface/60 p-3">
+              <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+                ask a friend for a move
+              </p>
+
+              {current.visibility !== 'friends' ? (
+                <p className="text-xs text-ink-soft">
+                  This one is private, so nobody can be shown it. Make it{' '}
+                  <button
+                    type="button"
+                    onClick={() => void actions.share(current.id, 'friends')}
+                    className="underline"
+                  >
+                    shared with friends
+                  </button>{' '}
+                  first — asking somebody is showing them.
+                </p>
+              ) : social.friends.filter((friend) => friend.status === 'accepted').length === 0 ? (
+                <p className="text-xs text-ink-soft">
+                  You have not added anyone yet. Friends are added by username, and they have to say
+                  yes.
+                </p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-1.5">
+                    {social.friends
+                      .filter((friend) => friend.status === 'accepted')
+                      .map((friend) => (
+                        <button
+                          key={friend.userId}
+                          type="button"
+                          onClick={() => setAsking(friend.userId)}
+                          className={`rounded-full px-3 py-1.5 text-[11px] ${
+                            asking === friend.userId
+                              ? 'bg-accent text-surface'
+                              : 'border border-line text-ink-soft'
+                          }`}
+                        >
+                          {friend.username}
+                        </button>
+                      ))}
+                  </div>
+                  <input
+                    value={askNote}
+                    onChange={(event) => setAskNote(event.target.value)}
+                    placeholder="anything you want to say about it (optional)"
+                    className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
+                  />
+                  {askProblem ? <p className="text-xs text-warn">{askProblem}</p> : null}
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setAsking(null)}
+                      className="quiet text-xs underline"
+                    >
+                      cancel
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!asking || busy}
+                      onClick={() =>
+                        void (async () => {
+                          const friend = social.friends.find(
+                            (candidate) => candidate.userId === asking,
+                          )
+                          if (!friend) return
+                          setBusy(true)
+                          try {
+                            const problemText = await social.ask({
+                              to: friend,
+                              context: askContextFor(current),
+                              note: askNote.trim() || undefined,
+                            })
+                            setAskProblem(problemText)
+                            if (!problemText) setAsking(null)
+                          } finally {
+                            setBusy(false)
+                          }
+                        })()
+                      }
+                      className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
+                    >
+                      <ButtonLabel busy={busy}>
+                        {busy
+                          ? 'Asking…'
+                          : asking
+                            ? `Ask ${social.friends.find((f) => f.userId === asking)?.username ?? 'them'}`
+                            : 'Ask'}
+                      </ButtonLabel>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {current.friendAsks.length > 0 ? (
+            <p className="text-[11px] text-ink-faint">
+              asked{' '}
+              {current.friendAsks
+                .map((ask) => `${ask.toUsername} ${formatWhen(ask.at, new Date())}`)
+                .join(', ')}
+            </p>
+          ) : null}
         </div>
       ) : null}
 

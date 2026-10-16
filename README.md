@@ -475,6 +475,70 @@ Home carries one small trust line: **"3 captured today — all saved."** A captu
 vanished silently is the failure this app exists to avoid, so the count is visible
 rather than assumed.
 
+## Friends, and moves from them
+
+The app's suggestions come from a playbook and a model. A friend is often better at seeing
+the first move than either — they know you, and they know what you have already tried. So
+the third source of a move is a person.
+
+**It is on by default**, and the whole of it can be switched off in Settings. Each route on
+the server is refused outright when it is: there is no safe half of this to leave on, since
+every one of them either reads somebody else's attention or writes to it. Friendships are
+kept when it is off, so turning it back on restores them.
+
+### Adding one
+
+By username, and **asked rather than assumed** — typing somebody's name must not be enough
+to be shown what they have been noticing. They see the request the next time they open
+Inkling, and nothing of yours is visible until they accept. Removing one takes away both
+directions at once.
+
+### Asking
+
+Under any Inkling's card: *ask a friend for a move*, with whatever you want to say about
+being stuck. The friend gets the Inkling's title, what it is, its topics, what has already
+been written against it, and **what has already been suggested** — so they can think of
+something the app did not, rather than repeating it.
+
+Asking somebody is showing them, so an Inkling that is private cannot be asked about. The
+server enforces that as well as the button: *private means private* has to be true of what
+the server will pass on, not only of what a button will let you press.
+
+### Answering
+
+Everything a friend asked for lands in **Notifications** — their Inkling, with the context
+above and their note — and you suggest something: a title, a goal, how long it takes, and
+optionally something to look up. That is the same shape a move has always had, because a
+friend is making the same kind of thing.
+
+### What arrives
+
+A move from a friend is written into your own log as an event, so it survives the server
+going away and reaches your other devices like anything else. On the card it says **a move
+from Sam**, carries their note, and its links are resolved like any other move's.
+
+**It comes first until you have done something with it.** Not merely higher in the round:
+it is due even if the Inkling has been put down for a month, because letting it sit behind
+a deferral would be letting the scheduling quietly ignore the only part of this that
+involves anybody else. The moment an entry is written against it, the boost stops and it
+becomes an ordinary Inkling again.
+
+### Saying something back
+
+*Say thank you* on a friend's move, and *kudos* once it has worked. One line each, because
+a note that takes as long to write as the move did is a note nobody sends.
+
+### Who can see what
+
+Per Inkling, on its card: **private** or **friends**. What you noticed on Tuesday is not the
+same as what you noticed on Friday, and one setting for both is a setting nobody can answer
+honestly.
+
+Settings decides what new Inklings *start* as — shared with friends, or private — and that
+is decided when the Inkling is written rather than by the fold, because a preference applied
+later would silently re-share things written under a different one. Everything written
+before this existed is private.
+
 ## Related blips
 
 Every blip is shown alongside the blips it relates to, with the reason stated —
@@ -746,6 +810,27 @@ context, so everything works without a certificate.
 
 Note: each origin (scheme + host + port) gets its own local datastore, so blips
 captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5173`.
+
+## Admin
+
+**Settings → Manage accounts** opens the admin screen, which is in two parts.
+
+**How it is going** is read from everybody's logs on demand rather than from a running
+tally, because the logs are the only thing guaranteed to be there and a counter beside them
+would be a second source of truth free to disagree with the first. Accounts, devices,
+Inklings by state, moves by outcome, events per day, and the social half: friendships, asks
+sent, how many are still unanswered, moves from friends, notes between them. Then the two
+lists worth a person's time — everything **marked bad** with its reason and note, and
+everything **said about the app** with the screen and move it came from.
+
+Two numbers to watch. **Abandoned** counts the Inklings that keep coming back and never get
+written against, which is what a suggestion that does not fit looks like from the outside;
+retiring is a decision and a good outcome, so it is not counted. And **unanswered asks**,
+because a question nobody answered is somebody who asked for help and did not get it.
+
+**Accounts** is the second part: adding people, changing passwords, roles, removal. It used
+to be the whole screen, which was confusing — most of what an admin wants to know is not
+about accounts.
 
 ## Accounts
 

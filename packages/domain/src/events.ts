@@ -183,7 +183,14 @@ export interface MoveSpec {
   steps?: string[]
   successCriteria?: string
   playbook: string
-  generatedBy: 'playbook' | 'llm'
+  /**
+   * Where the move came from.
+   *
+   * `friend` is the third source, and the card says so: a move somebody thought of for you
+   * is a different thing from one a playbook or a model produced, and saying which is the
+   * difference between a suggestion and a gift.
+   */
+  generatedBy: 'playbook' | 'llm' | 'friend'
   /**
    * Phrases worth looking up for this move, in the order they are worth looking at.
    *
@@ -228,6 +235,55 @@ export interface FeedbackContext {
   userAgent: string
   /** How much is in the log — the first question about anything. */
   counts: { inklings: number; events: number; today: number }
+}
+
+/**
+ * Who may be shown an Inkling.
+ *
+ * `private` is the default for anything the person has not chosen to share, and the choice
+ * is per Inkling rather than per account: what you noticed on Tuesday is not the same as
+ * what you noticed on Friday, and one setting for both is a setting nobody can answer
+ * honestly.
+ */
+export type Visibility = 'private' | 'friends'
+
+/**
+ * A note from or to a friend: encouragement, kudos on a move, or thanks for one.
+ *
+ * One event rather than four, because they are the same thing in different directions —
+ * and the direction is what the card needs to decide whether to show a person a thing
+ * somebody said about them, or a thing they said.
+ */
+export interface FriendNote {
+  id: string
+  direction: 'in' | 'out'
+  kind: 'kudos' | 'thanks'
+  /** The other person's username, as it was when the note was written. */
+  username: string
+  /** What the note was about, when it was about a move. */
+  moveTitle?: string
+  text: string
+  at: ISODate
+}
+
+/**
+ * What a friend is shown when asked about an Inkling.
+ *
+ * Enough to suggest something specific, and no more. The title, what it is, what has been
+ * written against it, and what has already been suggested — so a friend's move can build
+ * on the last one instead of repeating it. Not the media, not the schedule, not the
+ * history: none of that helps anybody think of something to do.
+ */
+export interface AskContext {
+  blipId: string
+  type: BlipType
+  title: string
+  body?: string
+  topics: string[]
+  /** What has been written against it, oldest first. Capped. */
+  entries: string[]
+  /** Moves already put in front of them, so a friend does not offer the same one. */
+  offered: string[]
 }
 
 /** Carried by every event, and what makes the total order deterministic. */
@@ -294,6 +350,15 @@ export type BlipEventBody =
        * the app that does not exist.
        */
       demo?: boolean
+      /**
+       * Who may see it, decided when it is written.
+       *
+       * On the capture rather than left to the fold, because the fold does not know the
+       * setting and should not: whether new Inklings start shared is a preference, and a
+       * preference applied later would silently re-share things written under a different
+       * one. Absent means private, which is what every Inkling written before this was.
+       */
+      visibility?: Visibility
     }
   | { t: 'entry'; id: string; entry: Entry; moveId?: string }
   | { t: 'blockAdded'; id: string; block: Block }
@@ -355,6 +420,65 @@ export type BlipEventBody =
    * that syncs and is never rewritten, but it is not about an Inkling.
    */
   | { t: 'feedback'; id: string; text: string; context: FeedbackContext }
+  /** Who may see this Inkling. Private unless the person has said otherwise. */
+  | { t: 'shared'; id: string; visibility: Visibility }
+  /**
+   * A move a friend thought of, for this Inkling.
+   *
+   * The event is what makes it real: the server only carried the message, and this is the
+   * recipient deciding to keep it. So it survives the server going away, and it syncs to
+   * their other devices like anything else.
+   */
+  | {
+      t: 'friendMove'
+      id: string
+      messageId: string
+      from: string
+      fromUsername: string
+      moveSpec: MoveSpec
+      note?: string
+    }
+  /**
+   * Asking a friend for help, or being asked.
+   *
+   * One event in both directions, like `friendNote`, because they are the same thing seen
+   * from two ends. An ask you *sent* carries your Inkling's id, so it lands on the card as
+   * "you asked Sam on Tuesday". An ask you *received* carries a fresh id and is ignored by
+   * the fold — the Inkling in question is not yours — and is read back from the log by the
+   * screen that answers it. It has to be in the log rather than only in memory, or a
+   * question somebody asked you would disappear on the next reload.
+   */
+  | {
+      t: 'friendAsk'
+      id: string
+      messageId: string
+      direction: 'in' | 'out'
+      userId: string
+      username: string
+      /** What they are asking about, when it is their Inkling rather than yours. */
+      context?: AskContext
+      note?: string
+    }
+  /** A record of having suggested a move for somebody else's Inkling. */
+  | {
+      t: 'friendMoveSent'
+      id: string
+      messageId: string
+      to: string
+      toUsername: string
+      moveSpec: MoveSpec
+      /** The ask it answers, when it answers one rather than being offered unprompted. */
+      askId?: string
+    }
+  /**
+   * A note from a friend, or one sent to one.
+   *
+   * A note you *sent* carries a fresh id, because the Inkling it is about belongs to the
+   * person you sent it to — you do not have it, so there is nothing for the fold to attach
+   * it to. A note you *received* carries the id of your own Inkling, so it lands on the
+   * card where the move it is cheering on was made.
+   */
+  | { t: 'friendNote'; id: string; note: FriendNote }
 
 export type BlipEvent = BlipEventBody & EventMeta
 

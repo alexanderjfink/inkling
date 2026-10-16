@@ -76,7 +76,7 @@ export function Dashboard({
     )
   }
 
-  const { users, inklings, moves, badMoves, feedback, activity, devices } = overview
+  const { users, inklings, moves, badMoves, feedback, activity, devices, social } = overview
   const peak = Math.max(1, ...activity.map((day) => day.events))
 
   return (
@@ -142,6 +142,25 @@ export function Dashboard({
           value={moves.done}
           note={`${share(moves.done, moves.offered)} of everything offered`}
         />
+      </div>
+
+      <div className="flex flex-col gap-1.5 rounded-2xl border border-line bg-surface/60 p-3">
+        <Stat
+          label="friendships"
+          value={social.friendships}
+          note={social.pending > 0 ? `${social.pending} request waiting` : undefined}
+        />
+        <Stat
+          label="asks sent"
+          value={social.asks}
+          note={social.unanswered > 0 ? `${social.unanswered} still unanswered` : 'all answered'}
+        />
+        <Stat label="moves from friends" value={social.moves} />
+        <Stat label="notes between them" value={social.notes} />
+        <p className="mt-1 text-[11px] text-ink-faint">
+          The unanswered number is the one worth watching: a question nobody answered is somebody
+          who asked for help and did not get it.
+        </p>
       </div>
 
       <div className="flex flex-col gap-1.5">

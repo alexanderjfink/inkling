@@ -1,4 +1,4 @@
-import type { LLMProvider } from '@inkling/domain'
+import type { LLMProvider, ShareDefault } from '@inkling/domain'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { type ModelStatus, createProvider, modelStatus } from './provider'
@@ -42,6 +42,22 @@ export interface ServerConfig {
    */
   twaPackage?: string
   twaFingerprint?: string
+  /**
+   * Whether the social half of the app is on: friends, asking one for a move, notes.
+   *
+   * On unless it has been turned off, which is what "enabled by default" has to mean for
+   * a setting that already existed before it did. Stored as the negative so that an
+   * account that has never touched it is not written to.
+   */
+  socialEnabled?: boolean
+  /**
+   * Whether new Inklings start shared with friends.
+   *
+   * Defaults to shared, because the feature is about helping each other and an app where
+   * every new thing is invisible until you remember to share it is an app where nobody
+   * shares anything. Per Inkling overrides it, and turning social off makes it moot.
+   */
+  shareDefault?: ShareDefault
   /** Accepted on write; never returned. */
   apiKey?: string
   embedApiKey?: string
@@ -142,6 +158,8 @@ export function publicConfig(config: ServerConfig, runtime: Runtime) {
     twaFingerprint: config.twaFingerprint ?? null,
     apiKeySet: Boolean(config.apiKey),
     embedApiKeySet: Boolean(config.embedApiKey),
+    socialEnabled: config.socialEnabled !== false,
+    shareDefault: config.shareDefault ?? 'friends',
   }
 }
 
@@ -190,6 +208,14 @@ export function validateConfig(patch: ServerConfig): ConfigProblem[] {
   const check = (field: string, value: unknown, label: string) => {
     if (value === undefined || value === '') return
     if (typeof value !== 'string') problems.push({ field, message: `${label} must be text` })
+  }
+
+  if (
+    patch.shareDefault !== undefined &&
+    patch.shareDefault !== 'friends' &&
+    patch.shareDefault !== 'private'
+  ) {
+    problems.push({ field: 'shareDefault', message: 'sharing must be friends or private' })
   }
 
   check('provider', patch.provider, 'provider')
@@ -292,6 +318,8 @@ export function mergeConfig(current: ServerConfig, patch: ServerConfig): ServerC
       key === 'embedBaseUrl' ||
       key === 'twaPackage' ||
       key === 'twaFingerprint' ||
+      key === 'socialEnabled' ||
+      key === 'shareDefault' ||
       key === 'embedSimilarity'
     ) {
       Object.assign(next, { [key]: value })

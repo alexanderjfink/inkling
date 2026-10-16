@@ -1,4 +1,4 @@
-import type { BlipType, CaptureInput } from '@inkling/domain'
+import type { BlipType, CaptureInput, Visibility } from '@inkling/domain'
 
 export interface CaptureDraft {
   kind: 'text' | 'url' | 'image'
@@ -6,6 +6,13 @@ export interface CaptureDraft {
   url?: string
   file?: File
   type?: BlipType
+  /**
+   * Who may see it, decided here rather than by the fold.
+   *
+   * Whether new Inklings start shared is a preference, and a preference applied later
+   * would silently re-share things written under a different one.
+   */
+  visibility?: Visibility
 }
 
 /** Best-effort blip type when the user doesn't pick one. */

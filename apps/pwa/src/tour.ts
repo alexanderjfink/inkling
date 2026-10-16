@@ -49,9 +49,19 @@ export const TOUR_STEPS: TourStep[] = [
     body: 'When something is ready to return it waits here — one at a time, and never more than you could get through in a sitting. You can put it down again, add to it, or let it go for good.',
   },
   {
+    anchor: 'friends',
+    radius: 999,
+    title: 'A friend can suggest a move too',
+    body: 'Add somebody by their username — they have to say yes, and nothing of yours is visible until they do. Then when a suggestion is not it, you can ask them for one. Their move arrives on the Inkling with their name on it, and comes first until you have done something with it.',
+  },
+  {
+    title: 'And you can help them',
+    body: 'When a friend asks you, their Inkling turns up in Notifications — with what they have written about it and what has already been suggested, so you can think of something they have not. You send it, and it lands on their card. You can say thank you back, or tell them it worked.',
+  },
+  {
     anchor: 'settings',
     radius: 999,
     title: 'Everything else lives here',
-    body: 'Theme, sync, the model, your notes, backups. And Help — where this walkthrough is waiting whenever you want it again.',
+    body: 'Theme, sync, the model, your notes, backups, and the switch for the social half if you would rather not have it. And Help — where this walkthrough is waiting whenever you want it again.',
   },
 ]

@@ -5,8 +5,11 @@ import type {
   Block,
   CaptureInput,
   Entry,
+  FriendNote,
+  ISODate,
   MoveSpec,
   RejectionContext,
+  Visibility,
 } from './events'
 import { totalOrder } from './events'
 
@@ -42,6 +45,39 @@ export interface MoveRejection {
 
 export type BlipStatus = 'active' | 'snoozed' | 'retired' | 'promoted'
 
+/** A move a friend suggested for this Inkling. */
+export interface FriendMoveEntry {
+  messageId: string
+  from: string
+  fromUsername: string
+  spec: MoveSpec
+  note?: string
+  at: ISODate
+}
+
+/** Having asked a friend for help with this Inkling. */
+export interface FriendAskEntry {
+  messageId: string
+  to: string
+  toUsername: string
+  at: ISODate
+}
+
+/**
+ * The newest friend move that nothing has been written against yet.
+ *
+ * What makes it pop: somebody spent a moment on your behalf, and it should be in front of
+ * you until you have said something back — then it becomes an ordinary Inkling again
+ * rather than pinning itself to the top of the stack forever.
+ */
+export function unansweredFriendMove(blip: Blip): FriendMoveEntry | undefined {
+  const latest = blip.friendMoves[blip.friendMoves.length - 1]
+  if (!latest) return undefined
+  const lastEntry = blip.entries[blip.entries.length - 1]
+  if (lastEntry && lastEntry.at > latest.at) return undefined
+  return latest
+}
+
 /** The folded, read-only projection of a blip. Never written directly. */
 export interface Blip {
   id: string
@@ -64,6 +100,14 @@ export interface Blip {
   rejections: MoveRejection[]
   /** Written by the app as an example, so the card can say so and offer to take it away. */
   demo?: boolean
+  /** Who may be shown this. Private unless the person said otherwise. */
+  visibility: Visibility
+  /** Moves a friend thought of, newest last. */
+  friendMoves: FriendMoveEntry[]
+  /** Who has been asked for help with this, so the card can say so. */
+  friendAsks: FriendAskEntry[]
+  /** Notes from and to friends about this Inkling. */
+  friendNotes: FriendNote[]
   /** A move kept deliberately, offered again next time this surfaces. */
   savedMove?: MoveSpec
   export?: { notePath: string; at: string }
@@ -107,6 +151,10 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       input: event.input,
       context: event.context,
       demo: event.demo,
+      visibility: event.visibility ?? 'private',
+      friendMoves: [],
+      friendAsks: [],
+      friendNotes: [],
       topics: [...(event.topics ?? [])],
       links: [],
       entries: [],
@@ -273,6 +321,49 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       break
     case 'classified':
       blip.type = event.type
+      break
+    case 'shared':
+      blip.visibility = event.visibility
+      break
+    case 'friendMove':
+      // Keyed on the message, not on the arrival: the same message reaching two devices
+      // is one move from one friend, and a card that says it twice is a card that looks
+      // broken.
+      if (!blip.friendMoves.some((move) => move.messageId === event.messageId)) {
+        blip.friendMoves.push({
+          messageId: event.messageId,
+          from: event.from,
+          fromUsername: event.fromUsername,
+          spec: event.moveSpec,
+          note: event.note,
+          at: event.at,
+        })
+      }
+      break
+    case 'friendAsk':
+      // Only the ones you sent land on a card: an ask you received is about somebody
+      // else's Inkling and has a fresh id, so the fold has already passed over it.
+      if (
+        event.direction === 'out' &&
+        !blip.friendAsks.some((ask) => ask.messageId === event.messageId)
+      ) {
+        blip.friendAsks.push({
+          messageId: event.messageId,
+          to: event.userId,
+          toUsername: event.username,
+          at: event.at,
+        })
+      }
+      break
+    case 'friendNote':
+      // Only the ones received: a note you sent is about somebody else's Inkling and
+      // carries a fresh id, so the fold has already passed over it.
+      if (
+        event.note.direction === 'in' &&
+        !blip.friendNotes.some((note) => note.id === event.note.id)
+      ) {
+        blip.friendNotes.push(event.note)
+      }
       break
   }
 }

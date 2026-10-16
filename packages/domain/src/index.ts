@@ -22,7 +22,7 @@ export {
   hasContext,
   totalOrder,
 } from './events'
-export type { EntryContext, FeedbackContext } from './events'
+export type { AskContext, EntryContext, FeedbackContext, FriendNote, Visibility } from './events'
 export { REJECTION_REASONS } from './events'
 export type { RejectionContext, RejectionReason } from './events'
 export { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE } from './demo'
@@ -89,6 +89,20 @@ export {
   topRelated,
 } from './related'
 export type { BadMove, FeedbackReport, Overview } from './overview'
+export type {
+  Friend,
+  FriendStatus,
+  ShareDefault,
+  SocialMessage,
+  SocialMessageKind,
+} from './social'
+export {
+  ASK_ENTRIES_MAX,
+  FRIEND_MOVE_MAX_SEC,
+  NOTE_MAX,
+  askContextFor,
+  isSocialMessageKind,
+} from './social'
 export type { NextStepsDraft, NoteOptions } from './obsidian'
 export {
   buildNextStepsPrompt,
@@ -100,8 +114,16 @@ export {
   renderObsidianNote,
   slugify,
 } from './obsidian'
-export type { Blip, BlipStatus, MoveHistoryEntry, MoveRejection, ScheduleState } from './project'
-export { liveBlips, project } from './project'
+export type {
+  Blip,
+  BlipStatus,
+  FriendAskEntry,
+  FriendMoveEntry,
+  MoveHistoryEntry,
+  MoveRejection,
+  ScheduleState,
+} from './project'
+export { liveBlips, project, unansweredFriendMove } from './project'
 export type { FeedContext } from './schedule'
 export type { DeferralChoice, SnoozeReason } from './schedule'
 export {

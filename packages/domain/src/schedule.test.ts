@@ -269,3 +269,106 @@ describe('buildRound and roundQueue', () => {
     expect(roundQueue(null, list, byId, new Set())).toHaveLength(2)
   })
 })
+
+describe('a move from a friend', () => {
+  const MOVE = {
+    id: 'friend.one',
+    title: 'Try the cheapest keyboard you can borrow',
+    why: 'because',
+    timeLimitSec: 300,
+    goal: 'one chord, played twice',
+    playbook: 'friend',
+    generatedBy: 'friend' as const,
+  }
+
+  test('is due even when the Inkling has been put down for a month', () => {
+    // Somebody thought about this on your behalf. Letting it sit behind a deferral would
+    // let the scheduling quietly ignore the only part of this that involves anyone else.
+    const { id, events } = blipFrom('learn a few chords', '2026-02-01T12:00:00Z')
+    const snoozed = [
+      ...events,
+      ev({ t: 'snoozed', id, until: '2026-04-01T12:00:00Z' }, 1, '2026-02-02T12:00:00Z'),
+    ]
+    expect(isDue(only(snoozed), NOW)).toBe(false)
+
+    const withMove = [
+      ...snoozed,
+      ev(
+        { t: 'friendMove', id, messageId: 'm1', from: 'u', fromUsername: 'sam', moveSpec: MOVE },
+        2,
+        '2026-02-03T12:00:00Z',
+      ),
+    ]
+    expect(isDue(only(withMove), NOW)).toBe(true)
+  })
+
+  test('leads the round, and stops leading once something is written against it', () => {
+    const plain = blipFrom('learn a few chords', '2026-02-01T12:00:00Z')
+    const withMove = only([
+      ...plain.events,
+      ev(
+        {
+          t: 'friendMove',
+          id: plain.id,
+          messageId: 'm1',
+          from: 'u',
+          fromUsername: 'sam',
+          moveSpec: MOVE,
+        },
+        1,
+        '2026-02-02T12:00:00Z',
+      ),
+    ])
+    const before = scoreBlip(withMove, { now: NOW })
+
+    const answered = only([
+      ...plain.events,
+      ev(
+        {
+          t: 'friendMove',
+          id: plain.id,
+          messageId: 'm1',
+          from: 'u',
+          fromUsername: 'sam',
+          moveSpec: MOVE,
+        },
+        1,
+        '2026-02-02T12:00:00Z',
+      ),
+      ev(
+        {
+          t: 'entry',
+          id: plain.id,
+          entry: { id: 'e1', kind: 'note', text: 'tried it', at: '2026-02-03T12:00:00Z' },
+        },
+        2,
+        '2026-02-03T12:00:00Z',
+      ),
+    ])
+    const after = scoreBlip(answered, { now: NOW })
+
+    expect(before - after).toBeGreaterThan(5)
+  })
+
+  test('a friend move outranks a stale Inkling with more heat', () => {
+    const older = blipFrom('been here a while', '2026-01-01T12:00:00Z')
+    const asked = blipFrom('learn a few chords', '2026-02-28T12:00:00Z')
+    const withMove = only([
+      ...asked.events,
+      ev(
+        {
+          t: 'friendMove',
+          id: asked.id,
+          messageId: 'm1',
+          from: 'u',
+          fromUsername: 'sam',
+          moveSpec: MOVE,
+        },
+        1,
+        '2026-02-28T13:00:00Z',
+      ),
+    ])
+    const ranked = rankBlips([only(older.events), withMove], { now: NOW })
+    expect(ranked[0]?.id).toBe(asked.id)
+  })
+})

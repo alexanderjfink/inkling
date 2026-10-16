@@ -4,9 +4,12 @@ import type {
   BlipType,
   Block,
   CaptureInput,
+  AskContext,
   EntryContext,
   FeedbackContext,
+  FriendNote,
   MoveSpec,
+  Visibility,
   RejectionContext,
 } from '@inkling/domain'
 import { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE, newId, project, snoozeUntil } from '@inkling/domain'
@@ -60,6 +63,43 @@ export interface InklingActions {
    * cannot be lost by a failed request.
    */
   giveFeedback(text: string, context: FeedbackContext): Promise<BlipEvent>
+  /** Change who may see this Inkling. Private is the default and can always be returned to. */
+  share(id: string, visibility: Visibility): Promise<BlipEvent>
+  /**
+   * Keep a move a friend thought of.
+   *
+   * The message only carried it; this is the recipient deciding to keep it, which is what
+   * makes it survive the server going away and reach their other devices.
+   */
+  receiveFriendMove(input: {
+    id: string
+    messageId: string
+    from: string
+    fromUsername: string
+    moveSpec: MoveSpec
+    note?: string
+  }): Promise<BlipEvent>
+  /** A record of having asked, so the card can say who was asked. */
+  recordAsk(input: {
+    id: string
+    messageId: string
+    direction: 'in' | 'out'
+    userId: string
+    username: string
+    context?: AskContext
+    note?: string
+  }): Promise<BlipEvent>
+  /** A record of having suggested a move for somebody else's Inkling. */
+  recordMoveSent(input: {
+    id: string
+    messageId: string
+    to: string
+    toUsername: string
+    moveSpec: MoveSpec
+    askId?: string
+  }): Promise<BlipEvent>
+  /** A note from a friend, or one sent to one. */
+  addFriendNote(id: string, note: FriendNote): Promise<BlipEvent>
   addNote(id: string, text: string): Promise<BlipEvent>
   snooze(id: string, until?: string, triggers?: string[]): Promise<BlipEvent>
   snoozeAfter(id: string, reason: SnoozeReason, streak?: number): Promise<BlipEvent>
@@ -185,6 +225,7 @@ export function useInkling(accountId: string | null = null) {
           body,
           topics: extractTopics(body ?? '', input.url),
           mediaIds: mediaId ? [mediaId] : undefined,
+          visibility: draft.visibility,
         }
         return store.append(emitted)
       },
@@ -209,6 +250,29 @@ export function useInkling(accountId: string | null = null) {
           moveId: DEMO_MOVE.id,
           moveSpec: DEMO_MOVE,
         })
+      },
+      share(id, visibility) {
+        return storage().append({ t: 'shared', id, visibility })
+      },
+      receiveFriendMove(input) {
+        return storage().append({
+          t: 'friendMove',
+          id: input.id,
+          messageId: input.messageId,
+          from: input.from,
+          fromUsername: input.fromUsername,
+          moveSpec: input.moveSpec,
+          note: input.note,
+        })
+      },
+      recordAsk(input) {
+        return storage().append({ t: 'friendAsk', ...input })
+      },
+      recordMoveSent(input) {
+        return storage().append({ t: 'friendMoveSent', ...input })
+      },
+      addFriendNote(id, note) {
+        return storage().append({ t: 'friendNote', id, note })
       },
       giveFeedback(text, context) {
         // A fresh id rather than a blip's: the fold ignores events for ids it has not

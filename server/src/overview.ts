@@ -7,6 +7,7 @@ import {
   project,
 } from '@inkling/domain'
 import type { Store } from './store'
+import { type FriendEvent, foldFriendships } from './social'
 
 /**
  * What the server can say about how the app is actually being used.
@@ -43,7 +44,10 @@ export interface AccountSource {
   store: Store
 }
 
-export async function buildOverview(sources: AccountSource[]): Promise<Overview> {
+export async function buildOverview(
+  sources: AccountSource[],
+  friendships: FriendEvent[] = [],
+): Promise<Overview> {
   const now = new Date()
   const overview: Overview = {
     generatedAt: now.toISOString(),
@@ -63,8 +67,16 @@ export async function buildOverview(sources: AccountSource[]): Promise<Overview>
     badMoves: [],
     feedback: [],
     activity: [],
+    social: { friendships: 0, pending: 0, asks: 0, moves: 0, notes: 0, unanswered: 0 },
     devices: 0,
     unreadable: [],
+  }
+
+  // Friendships are not in anybody's log — they are between two people, and the server is
+  // the only place that knows about both ends. So they are handed in rather than read.
+  for (const event of foldFriendships(friendships).values()) {
+    if (event.t === 'accepted') overview.social.friendships += 1
+    if (event.t === 'requested') overview.social.pending += 1
   }
 
   const byDay = new Map<string, { events: number; captures: number }>()
@@ -169,6 +181,17 @@ function tallyEvents(
     counts.events += 1
     if (event.t === 'captured') counts.captures += 1
     byDay.set(day, counts)
+
+    if (event.t === 'friendAsk') {
+      if (event.direction === 'in') overview.social.unanswered += 1
+      else overview.social.asks += 1
+    }
+    if (event.t === 'friendMoveSent') {
+      overview.social.moves += 1
+      // Answering one takes it off the unanswered pile, wherever it was counted.
+      if (event.askId) overview.social.unanswered = Math.max(0, overview.social.unanswered - 1)
+    }
+    if (event.t === 'friendNote') overview.social.notes += 1
 
     if (event.t === 'moveRejected') {
       const about = titles.get(event.id)

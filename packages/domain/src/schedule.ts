@@ -1,4 +1,4 @@
-import type { Blip } from './project'
+import { type Blip, unansweredFriendMove } from './project'
 
 const DAY_MS = 86_400_000
 
@@ -29,6 +29,12 @@ function daysSince(iso: string, now: Date): number {
 export function isDue(blip: Blip, now: Date, activeTopics: string[] = []): boolean {
   if (blip.deleted) return false
   if (blip.status === 'retired' || blip.status === 'promoted') return false
+
+  // Somebody having thought about this on your behalf overrides everything, including a
+  // snooze and a retirement. A move from a friend is the one thing here that another
+  // person is waiting on, and letting it sit behind a deferral would be letting the
+  // scheduling quietly ignore the only part of this that involves somebody else.
+  if (unansweredFriendMove(blip)) return true
 
   // A matching topic overrides a snooze: "show me this when I'm thinking about X
   // again" is exactly the safety the design depends on. Explicit triggers are
@@ -63,8 +69,22 @@ export function scoreBlip(blip: Blip, ctx: FeedContext): number {
   const relatedActivity = Math.min(blip.links.length, 5) * 0.1
   const novelty = 1 / (1 + blip.schedule.timesShown)
   const skipPenalty = blip.schedule.timesSkipped
+  /**
+   * A move from a friend, until something is written against it.
+   *
+   * Large enough to lead the round rather than merely be present in it, and it stops
+   * applying the moment an entry is written — so it is a nudge from a person rather than
+   * a permanent promotion. Nothing else in this function is worth six.
+   */
+  const fromAFriend = unansweredFriendMove(blip) ? 6 : 0
   return (
-    1 * staleness + 2 * heat + 1.5 * overlapRatio + relatedActivity + 0.5 * novelty - skipPenalty
+    1 * staleness +
+    2 * heat +
+    1.5 * overlapRatio +
+    relatedActivity +
+    0.5 * novelty +
+    fromAFriend -
+    skipPenalty
   )
 }
 

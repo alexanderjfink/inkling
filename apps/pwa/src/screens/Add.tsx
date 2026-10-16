@@ -1,8 +1,15 @@
-import { BLIP_TYPES, type Blip, type BlipType, type FeedbackContext } from '@inkling/domain'
+import {
+  BLIP_TYPES,
+  type Blip,
+  type BlipType,
+  type FeedbackContext,
+  type ShareDefault,
+} from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import type { CaptureDraft } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { ButtonLabel } from '../components/Spinner'
+import type { ReceivedAsk } from '../state/useSocial'
 import { useSpeech } from '../state/useSpeech'
 
 const inputClass =
@@ -32,6 +39,11 @@ export function Add({
   onHelp,
   feedbackEnv,
   onFeedback,
+  socialOn,
+  shareDefault,
+  asking,
+  onFriends,
+  onNotifications,
 }: {
   onCapture: (draft: CaptureDraft) => Promise<unknown>
   /** Content handed over by the OS share sheet. */
@@ -50,6 +62,12 @@ export function Add({
   onHelp: () => void
   feedbackEnv: FeedbackEnv
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
+  socialOn: boolean
+  shareDefault: ShareDefault
+  /** Asks from friends, so the entry screen can say somebody is waiting. */
+  asking: ReceivedAsk[]
+  onFriends: () => void
+  onNotifications: () => void
 }) {
   const [text, setText] = useState(initial?.text ?? '')
   const [url, setUrl] = useState(initial?.url ?? '')
@@ -73,7 +91,17 @@ export function Add({
     const kind: CaptureDraft['kind'] = file ? 'image' : url.trim() ? 'url' : 'text'
     setBusy(true)
     try {
-      await onCapture({ kind, text, url, file, type: type === 'auto' ? undefined : type })
+      await onCapture({
+        kind,
+        text,
+        url,
+        file,
+        type: type === 'auto' ? undefined : type,
+        // Decided here, at the moment of writing, rather than by the fold: whether new
+        // Inklings start shared is a preference, and one applied later would silently
+        // re-share things written under a different one.
+        visibility: socialOn && shareDefault === 'friends' ? 'friends' : undefined,
+      })
       setText('')
       setUrl('')
       setFile(undefined)
@@ -112,6 +140,24 @@ export function Add({
       </div>
 
       {/* Above the field on purpose: with the keyboard up, anything below it is gone. */}
+      {socialOn && asking.length > 0 ? (
+        <button
+          type="button"
+          onClick={onNotifications}
+          className="card flex items-center gap-3 border border-accent/40 p-4 text-left transition active:scale-[0.99]"
+        >
+          <span className="circle h-10 w-10 shrink-0 text-lg leading-none">✎</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">
+              {asking.length === 1
+                ? `${asking[0]?.username} asked for a move`
+                : `${asking.length} friends asked for a move`}
+            </span>
+            <span className="block truncate text-xs text-ink-soft">{asking[0]?.context.title}</span>
+          </span>
+        </button>
+      ) : null}
+
       {waiting > 0 ? (
         <button
           type="button"
@@ -245,6 +291,16 @@ export function Add({
           onSend={onFeedback}
           className="text-xs text-ink-faint"
         />
+        {socialOn ? (
+          <button
+            type="button"
+            onClick={onFriends}
+            className="quiet text-xs underline"
+            data-tour="friends"
+          >
+            friends
+          </button>
+        ) : null}
         <button
           type="button"
           onClick={onAttic}

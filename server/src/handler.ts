@@ -1,7 +1,12 @@
 import {
+  type AskContext,
   type LLMProvider,
   type PublicUser,
+  type SocialMessage,
+  ASK_ENTRIES_MAX,
+  NOTE_MAX,
   isRole,
+  newId,
   noteFilename,
   parseLog,
   sha256Hex,
@@ -13,6 +18,14 @@ import { assetLinks, publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
 import { resolveLookUps } from './lookup'
 import { buildOverview } from './overview'
+import {
+  type SocialStore,
+  areFriends,
+  friendsOf,
+  ownsSharedBlip,
+  readSharedInklings,
+  sanitizeFriendMove,
+} from './social'
 import type { ModelStatus } from './provider'
 import { PRESETS } from './providerConfig'
 import { notBuiltPage, serveStatic } from './static'
@@ -187,6 +200,11 @@ export interface HandlerOptions {
   auth?: Auth
   /** Directory of the built PWA. When set, the server serves the app itself. */
   staticDir?: string
+  /**
+   * Friends and the postbox between them. Absent means the social routes are not served
+   * at all, which is what a server with no data directory to put them in looks like.
+   */
+  social?: SocialStore
 }
 
 /** Routes that must work before anyone has signed in. */
@@ -277,7 +295,13 @@ async function handleAccount(
   auth: Auth,
   token: string | null,
   storeSource: StoreSource,
+  social: SocialStore | undefined,
+  config: ServerConfig,
 ): Promise<Response | null> {
+  if (path === '/social' || path.startsWith('/social/')) {
+    if (!social) return json({ error: 'social features are not available here' }, 404)
+    return handleSocial(path, request, user, auth, social, storeSource, config)
+  }
   if (path === '/auth/me') return json({ user })
 
   if (path === '/auth/logout' && request.method === 'POST') {
@@ -442,6 +466,9 @@ export function createHandler(
     // take effect immediately.
     const live = account?.runtime ?? options.runtime?.() ?? { llm, embed, status, vault }
     const settingsBridge = account?.settings ?? options.settings
+    // Read once per request: the social toggle and the sharing default both live here,
+    // and a settings change should take effect on the next request rather than a restart.
+    const liveConfig = settingsBridge ? (await settingsBridge.read()).config : {}
 
     if (user && options.auth) {
       const accountRoute = await handleAccount(
@@ -451,6 +478,8 @@ export function createHandler(
         options.auth,
         token,
         storeSource,
+        options.social,
+        liveConfig,
       )
       if (accountRoute) return accountRoute
     }
@@ -798,4 +827,220 @@ export function createHandler(
 
     return json({ error: 'not found' }, 404)
   }
+}
+
+/**
+ * Friends, and the postbox between them.
+ *
+ * The server carries messages and does not interpret them: the recipient turns each into
+ * an event in their own log, which is where it becomes real. So a message that arrives
+ * twice is harmless, and a message that never arrives is a missing message rather than a
+ * missing fact.
+ *
+ * Every route here needs a session, and every one of them is refused outright when the
+ * person has turned social features off. There is no safe half of this to leave on: each
+ * route either reads somebody else's attention or writes to it.
+ */
+async function handleSocial(
+  path: string,
+  request: Request,
+  user: PublicUser,
+  auth: Auth,
+  social: SocialStore,
+  storeSource: StoreSource,
+  config: ServerConfig,
+): Promise<Response> {
+  if (config.socialEnabled === false) {
+    return json({ error: 'social features are off for this account', socialOff: true }, 403)
+  }
+
+  const rest = path
+    .slice('/social'.length)
+    .split('/')
+    .filter((part) => part.length > 0)
+
+  const users = await auth.list()
+  const usernames = new Map(users.map((entry) => [entry.id, entry.username]))
+  const friendships = await social.friendships()
+  const friendOf = (id: string) => users.find((entry) => entry.id === id)
+
+  // --- who my friends are, and asking somebody to be one ------------------------------
+  if (rest.length === 1 && rest[0] === 'friends') {
+    if (request.method === 'GET') {
+      return json({ friends: friendsOf(user.id, friendships, usernames) })
+    }
+
+    if (request.method === 'POST') {
+      const body = await readJson(request)
+      const wanted = str(body, 'username').trim().toLowerCase()
+      if (!wanted) return json({ error: 'a username is needed' }, 400)
+
+      const target = users.find((entry) => entry.username.toLowerCase() === wanted)
+      if (!target) return json({ error: 'no account with that username' }, 404)
+      if (target.id === user.id) return json({ error: 'that is you' }, 400)
+      if (areFriends(user.id, target.id, friendships)) {
+        return json({ error: `you are already friends with ${target.username}` }, 400)
+      }
+
+      // Asked rather than assumed. Typing somebody's username must not be enough to be
+      // shown what they have been noticing.
+      await social.addFriendEvent({ t: 'requested', from: user.id, to: target.id })
+      return json({
+        friends: friendsOf(user.id, await social.friendships(), usernames),
+      })
+    }
+
+    return json({ error: 'method not allowed' }, 405)
+  }
+
+  // --- what a friend has chosen to share ------------------------------------------------
+  if (rest.length === 3 && rest[0] === 'friends' && rest[2] === 'inklings') {
+    const other = rest[1] ?? ''
+    if (!areFriends(user.id, other, friendships)) {
+      return json({ error: 'you are not friends' }, 403)
+    }
+    return json({
+      inklings: await readSharedInklings(resolveStore(storeSource, other)),
+    })
+  }
+
+  // --- accepting, declining, removing --------------------------------------------------
+  if (rest.length === 3 && rest[0] === 'friends') {
+    const other = rest[1] ?? ''
+    const action = rest[2] ?? ''
+    const target = friendOf(other)
+    if (!target) return json({ error: 'no such account' }, 404)
+
+    if (request.method === 'POST' && (action === 'accept' || action === 'decline')) {
+      const pending = friendships.find(
+        (event) =>
+          event.t === 'requested' &&
+          event.from === other &&
+          event.to === user.id &&
+          event.at ===
+            friendships
+              .filter((e) => e.from === other && e.to === user.id)
+              .sort((a, b) => (a.at < b.at ? 1 : -1))[0]?.at,
+      )
+      if (!pending) return json({ error: 'nothing to answer from them' }, 400)
+      await social.addFriendEvent({
+        t: action === 'accept' ? 'accepted' : 'declined',
+        from: other,
+        to: user.id,
+      })
+      return json({ friends: friendsOf(user.id, await social.friendships(), usernames) })
+    }
+
+    if (request.method === 'DELETE') {
+      await social.addFriendEvent({ t: 'removed', from: user.id, to: other })
+      return json({ friends: friendsOf(user.id, await social.friendships(), usernames) })
+    }
+
+    return json({ error: 'method not allowed' }, 405)
+  }
+
+  // --- the postbox ----------------------------------------------------------------------
+  if (rest.length === 1 && rest[0] === 'inbox' && request.method === 'GET') {
+    const url = new URL(request.url)
+    const offset = Math.max(0, Number(url.searchParams.get('offset') ?? '0') || 0)
+    const { messages, size } = await social.readInbox(user.id, offset)
+    return json({ messages, size, friends: friendsOf(user.id, friendships, usernames) })
+  }
+
+  // --- asking a friend for a move --------------------------------------------------------
+  if (rest.length === 1 && rest[0] === 'ask' && request.method === 'POST') {
+    const body = await readJson(request)
+    const to = str(body, 'to')
+    const context = body?.context as AskContext | undefined
+    if (!friendOf(to) || !areFriends(user.id, to, friendships)) {
+      return json({ error: 'you are not friends' }, 403)
+    }
+    if (!context?.blipId || !context.title) return json({ error: 'the Inkling is missing' }, 400)
+
+    // Checked here rather than only in the app, so that "private means private" is true
+    // of what the server will pass on and not only of what a button will let you press.
+    if (!(await ownsSharedBlip(resolveStore(storeSource, user.id), context.blipId))) {
+      return json({ error: 'that Inkling is not shared with friends' }, 403)
+    }
+
+    const message: SocialMessage = {
+      id: newId(),
+      kind: 'ask',
+      from: user.id,
+      fromUsername: user.username,
+      to,
+      at: new Date().toISOString(),
+      context: {
+        blipId: context.blipId,
+        type: context.type,
+        title: context.title,
+        body: context.body?.slice(0, 2000),
+        topics: Array.isArray(context.topics) ? context.topics.slice(0, 12) : [],
+        entries: Array.isArray(context.entries)
+          ? context.entries.slice(0, ASK_ENTRIES_MAX).map((entry) => String(entry).slice(0, 600))
+          : [],
+        offered: Array.isArray(context.offered)
+          ? context.offered.slice(0, ASK_ENTRIES_MAX).map((title) => String(title).slice(0, 200))
+          : [],
+      },
+      note: str(body, 'note').trim().slice(0, NOTE_MAX) || undefined,
+    }
+    await social.send(message)
+    return json({ message })
+  }
+
+  // --- suggesting a move for somebody else's Inkling --------------------------------------
+  if (rest.length === 1 && rest[0] === 'move' && request.method === 'POST') {
+    const body = await readJson(request)
+    const to = str(body, 'to')
+    if (!friendOf(to) || !areFriends(user.id, to, friendships)) {
+      return json({ error: 'you are not friends' }, 403)
+    }
+
+    const move = sanitizeFriendMove(body?.move)
+    if (!move) return json({ error: 'a move needs a title and a goal' }, 400)
+
+    const message: SocialMessage = {
+      id: newId(),
+      kind: 'move',
+      from: user.id,
+      fromUsername: user.username,
+      to,
+      at: new Date().toISOString(),
+      askId: str(body, 'askId').slice(0, 64),
+      blipId: str(body, 'blipId').slice(0, 64),
+      move,
+      note: str(body, 'note').trim().slice(0, NOTE_MAX) || undefined,
+    }
+    await social.send(message)
+    return json({ message })
+  }
+
+  // --- a note: encouragement, kudos, thanks ----------------------------------------------
+  if (rest.length === 1 && rest[0] === 'note' && request.method === 'POST') {
+    const body = await readJson(request)
+    const to = str(body, 'to')
+    const kind = body?.kind === 'kudos' ? 'kudos' : 'thanks'
+    const text = str(body, 'text').trim().slice(0, NOTE_MAX)
+    if (!friendOf(to) || !areFriends(user.id, to, friendships)) {
+      return json({ error: 'you are not friends' }, 403)
+    }
+    if (!text) return json({ error: 'a note needs something in it' }, 400)
+
+    const message: SocialMessage = {
+      id: newId(),
+      kind,
+      from: user.id,
+      fromUsername: user.username,
+      to,
+      at: new Date().toISOString(),
+      blipId: str(body, 'blipId').slice(0, 64),
+      ...(kind === 'kudos' ? { moveTitle: str(body, 'moveTitle').slice(0, 200) } : {}),
+      text,
+    } as SocialMessage
+    await social.send(message)
+    return json({ message })
+  }
+
+  return json({ error: 'not found' }, 404)
 }

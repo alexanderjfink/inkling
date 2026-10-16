@@ -633,7 +633,7 @@ docker compose up -d --build
 
 # 3. Give it a real certificate, so the phone can install it and so image capture
 #    works (the browser only exposes crypto.subtle in a secure context).
-tailscale serve --bg 8787
+tailscale serve --bg 12838
 ```
 
 Then open the `https://<machine>.<tailnet>.ts.net` address Tailscale prints, on both
@@ -654,7 +654,7 @@ INKLING_DATA_DIR=/volume1/inkling docker compose up -d
 **To update:** `git pull && docker compose up -d --build`. Your data is untouched, since
 it lives outside the image.
 
-**To check it is up:** `curl -s localhost:8787/api/health`. The container also has a
+**To check it is up:** `curl -s localhost:12838/api/health`. The container also has a
 healthcheck, so `docker compose ps` shows whether it is healthy.
 
 ### Behind a reverse proxy
@@ -676,9 +676,11 @@ it.
 default. When it does, the card sits on "choosing a move…" and gives up, which reads as
 the model being broken. `proxy_read_timeout 180s`.
 
-**Where the proxy is.** The compose file binds to `127.0.0.1`, which is right when nginx
-runs on the same host. If nginx is itself in Docker or on another machine it cannot see
-that address:
+**Where the proxy is, and which port.** The compose file publishes the container's 8787
+on the host's **12838**, bound to `127.0.0.1` — so nginx on the same host proxies to
+`http://127.0.0.1:12838`. The left number is the host's; the right one is the container's
+and does not need to change. If nginx is itself in Docker or on another machine it cannot
+see `127.0.0.1` at all:
 
 ```bash
 INKLING_BIND=0.0.0.0 docker compose up -d     # or share a Docker network

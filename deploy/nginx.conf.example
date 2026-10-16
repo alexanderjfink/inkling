@@ -31,10 +31,11 @@ server {
 
     location / {
         # CHANGE ME — where the container is.
-        #   nginx on the same host  -> 127.0.0.1:8787 (the compose default)
+        #   nginx on the same host  -> 127.0.0.1:12838 (the compose default)
         #   nginx in Docker         -> http://inkling:8787 on a shared network
+        #                              (the container port, not the published one)
         #   nginx on another box    -> the host's address, with INKLING_BIND=0.0.0.0
-        proxy_pass http://127.0.0.1:8787;
+        proxy_pass http://127.0.0.1:12838;
 
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
@@ -58,19 +59,19 @@ server {
     # update serves the old app against the new API. Everything else under /assets is
     # named by hash and can be cached forever.
     location = /index.html {
-        proxy_pass http://127.0.0.1:8787;
+        proxy_pass http://127.0.0.1:12838;
         add_header Cache-Control "no-store" always;
     }
 
     location /assets/ {
-        proxy_pass http://127.0.0.1:8787;
+        proxy_pass http://127.0.0.1:12838;
         add_header Cache-Control "public, max-age=31536000, immutable" always;
     }
 
     # Android fetches this with no session, to prove the APK and the site are the same
     # thing. Only relevant if you build the Trusted Web Activity.
     location = /.well-known/assetlinks.json {
-        proxy_pass http://127.0.0.1:8787;
+        proxy_pass http://127.0.0.1:12838;
         add_header Cache-Control "no-store" always;
     }
 }

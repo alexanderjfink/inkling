@@ -22,10 +22,14 @@ function Ask({
   context,
   note,
   username,
+  children,
 }: {
   context: AskContext
   note?: string
   username: string
+  /** The action, inside the box rather than under it: this is one person's request, and a
+   *  button floating below the card belongs to no card in particular. */
+  children?: React.ReactNode
 }) {
   return (
     <div className="rounded-2xl border border-line bg-surface/60 p-3">
@@ -61,6 +65,7 @@ function Ask({
         </p>
       ) : null}
       {note ? <p className="mt-2 text-xs text-accent italic">“{note}”</p> : null}
+      {children}
     </div>
   )
 }
@@ -257,38 +262,39 @@ export function Notifications({
           social.asks.map((ask) => {
             const friend = friendFor(ask.userId)
             return (
-              <div key={ask.messageId} className="flex flex-col">
-                <Ask context={ask.context} note={ask.note} username={ask.username} />
-                {openFor !== ask.messageId ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
-                    {/* A button, and it says whose it is. "suggest a move" as an underline
+              <div key={ask.messageId}>
+                <Ask context={ask.context} note={ask.note} username={ask.username}>
+                  {openFor !== ask.messageId ? (
+                    <div className="mt-2 flex flex-wrap items-center gap-3">
+                      {/* A button, and it says whose it is. "suggest a move" as an underline
                       beside a timestamp was findable only if you already knew it was there,
                       and it never said who you would be helping. */}
-                    <button
-                      type="button"
-                      onClick={() => setOpenFor(ask.messageId)}
-                      className="rounded-full bg-ink px-4 py-2.5 text-xs font-semibold text-surface"
-                    >
-                      Suggest a move for {ask.username}
-                    </button>
-                    <span className="text-[11px] text-ink-faint">asked {when(ask.at)}</span>
-                  </div>
-                ) : null}
-                {openFor === ask.messageId ? (
-                  <Suggest
-                    context={ask.context}
-                    onCancel={() => setOpenFor(null)}
-                    onSend={(move, note) =>
-                      social.suggest({
-                        to: friend,
-                        askId: ask.messageId,
-                        blipId: ask.context.blipId,
-                        move,
-                        note: note || undefined,
-                      })
-                    }
-                  />
-                ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setOpenFor(ask.messageId)}
+                        className="rounded-full bg-ink px-4 py-2.5 text-xs font-semibold text-surface"
+                      >
+                        Suggest a move for {ask.username}
+                      </button>
+                      <span className="text-[11px] text-ink-faint">asked {when(ask.at)}</span>
+                    </div>
+                  ) : null}
+                  {openFor === ask.messageId ? (
+                    <Suggest
+                      context={ask.context}
+                      onCancel={() => setOpenFor(null)}
+                      onSend={(move, note) =>
+                        social.suggest({
+                          to: friend,
+                          askId: ask.messageId,
+                          blipId: ask.context.blipId,
+                          move,
+                          note: note || undefined,
+                        })
+                      }
+                    />
+                  ) : null}
+                </Ask>
               </div>
             )
           })

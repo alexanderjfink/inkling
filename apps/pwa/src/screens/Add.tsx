@@ -290,9 +290,12 @@ export function Add({
         ) : null}
       </div>
 
-      <p className="text-xs text-ink-faint">
-        a photo, a link, an idea, a question, or a quest — paste one in, or just write
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="min-w-0 flex-1 text-xs text-ink-faint">
+          a photo, a link, an idea, a question, or a quest — paste one in, or just write
+        </p>
+        <BlockPicker count={block ? 1 : 0} onAdd={async (kind) => setBlock(kind)} />
+      </div>
 
       {/* One row, and everything in it shrinks but the two things you press: the field above
           takes the room, and this takes what is left. The label in the middle is the part
@@ -322,7 +325,6 @@ export function Add({
             </option>
           ))}
         </select>
-        <BlockPicker count={block ? 1 : 0} onAdd={async (kind) => setBlock(kind)} />
 
         <button
           type="button"

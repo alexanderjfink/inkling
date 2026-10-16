@@ -1186,6 +1186,21 @@ export function Review({
           </div>
         ) : null}
 
+        {/* Asking a friend puts its next step where generating a move puts its result:
+            inside the card, above the actions. It used to open under the two buttons at the
+            bottom of the screen, so the thing you had just started was somewhere other than
+            where the thing you might have started instead would have been. */}
+        {!composer && askOpen ? (
+          <div className="mt-5">
+            <AskPanel
+              blip={current}
+              social={social}
+              onClose={() => setAskOpen(false)}
+              onShare={() => void actions.share(current.id, 'friends')}
+            />
+          </div>
+        ) : null}
+
         {composer ? (
           <div className="mt-5 flex flex-col gap-3">
             {composer.move ? (
@@ -1579,15 +1594,6 @@ export function Review({
               </button>
             ) : null}
           </div>
-
-          {askOpen ? (
-            <AskPanel
-              blip={current}
-              social={social}
-              onClose={() => setAskOpen(false)}
-              onShare={() => void actions.share(current.id, 'friends')}
-            />
-          ) : null}
 
           {current.friendAsks.length > 0 ? (
             <p className="text-[11px] text-ink-faint">

@@ -422,7 +422,10 @@ rather than quietly counted as empty.
 | **✓ until Saturday** | put it down; the label is the date it comes back |
 
 **Nothing is generated until you ask.** An Inkling opens with two buttons — **Generate a
-Move** and **Ask a Friend for a Move** — and no spinner. It used to start a model call on
+Move** and **Ask a Friend for a Move** — and no spinner. **Both put their next step in the
+same place**: inside the card, above the actions. Asking used to open its composer under the
+two buttons at the bottom of the screen, so the thing you had just started was somewhere
+other than where the thing you might have started instead would have been. It used to start a model call on
 open, so every card you glanced at cost a call and a few seconds of waiting, including the
 ones you were about to put down and the ones you were going to ask a friend about anyway.
 Two costs, and only one of them is money.
@@ -579,9 +582,10 @@ the server will pass on, not only of what a button will let you press.
 
 Everything a friend asked for lands in **Notifications**, where **the friend leads the card** —
 their initial, their name, and *"asked for a move"* — followed by their Inkling, the context
-above, and their note. **Suggest a move for Priya** is a button that says whose it is: the
-action used to be the words "suggest a move" underlined beside a timestamp, findable only if
-you already knew it was there, and never saying who you would be helping.
+above, their note, and **the action inside the same box**, under a rule. **Suggest a move for
+Priya** says whose it is: the action used to be the words "suggest a move" underlined beside a
+timestamp, findable only if you already knew it was there, and never saying who you would be
+helping — and it sat *below* the card, belonging to no card in particular.
 
 You suggest something: a title, a goal, how long it takes, and
 optionally something to look up. That is the same shape a move has always had, because a

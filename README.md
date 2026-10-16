@@ -349,6 +349,24 @@ immediately, with no restart:
 | **Backup** | download the log |
 | **Storage** | the IndexedDB-vs-OPFS benchmark |
 
+**A name that resolves to `127.0.0.1` cannot be used from the container.** Inside a
+container, `127.0.0.1` is the container itself, not the machine running it. So an address
+that works from the host fails from the container with nothing but "unable to connect".
+This is not exotic: the public wildcards `*.localdomain.cloud` and `localhost.direct`
+resolve to `127.0.0.1` on purpose, so a local service can have a real certificate, and
+they are exactly what you reach for when putting Ollama behind HTTPS.
+
+Point the name at the host, which leaves the certificate valid because the name does not
+change:
+
+```yaml
+    extra_hosts:
+      - "ollama.localdomain.cloud:host-gateway"   # or the host's address on your network
+```
+
+Inkling says so in the error when it happens, rather than leaving you with "unable to
+connect" and no reason.
+
 **A model that is not where the preset says.** The **model server address** field appears
 when it is the thing you are likely to want: for the local runners (Ollama, oMLX, vLLM,
 LM Studio), whose presets point at `127.0.0.1`, and for a custom endpoint, which has no

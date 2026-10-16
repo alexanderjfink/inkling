@@ -61,6 +61,27 @@ services:
       # on an https:// upstream. Mount the files in and point at the paths inside.
       # - ./certs:/certs:ro
 
+    # If your model server is reached by a name that resolves to 127.0.0.1, the container
+    # cannot use it. Inside a container, 127.0.0.1 is the container itself, not the
+    # machine running it — so an address that works perfectly from the host fails here
+    # with nothing but "unable to connect".
+    #
+    # This is not exotic. The public wildcards *.localdomain.cloud and localhost.direct
+    # resolve to 127.0.0.1 on purpose, so that a local service can have a real
+    # certificate, and they are exactly what you reach for when putting Ollama behind
+    # HTTPS.
+    #
+    # Point the name at the host instead. The name does not change, so the certificate
+    # still matches:
+    #
+    # extra_hosts:
+    #   - "ollama.localdomain.cloud:host-gateway"
+    #
+    # `host-gateway` is the host as seen from the container, and needs Docker 20.10 or
+    # newer. On anything older, use the host's address on your network:
+    #
+    #   - "ollama.localdomain.cloud:192.168.50.10"
+
     environment:
       - TZ=${TZ:-UTC}
 

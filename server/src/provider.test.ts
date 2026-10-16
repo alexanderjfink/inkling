@@ -8,6 +8,7 @@ import {
   createProvider,
   modelStatus,
 } from './provider'
+import { inContainer, loopbackHint } from './provider'
 import {
   PRESETS,
   describeProvider,
@@ -484,5 +485,42 @@ describe('an embedding provider that has been chosen but not finished', () => {
     expect(
       resolveEmbedProvider({ INKLING_EMBED_PROVIDER: 'anthropic' }, { authPath: NO_AUTH }),
     ).toBeNull()
+  })
+})
+
+describe('a name that points at loopback', () => {
+  /**
+   * The least obvious connection failure there is. A name resolving to 127.0.0.1 means
+   * "this machine" — and inside a container, this machine is the container. So an address
+   * that works from the host fails from the container with nothing but "unable to
+   * connect", and the reason is invisible from both ends.
+   *
+   * Names like *.localdomain.cloud and localhost.direct are public wildcards resolving to
+   * 127.0.0.1 on purpose, to give a local service a real certificate, which makes this
+   * failure common rather than exotic.
+   */
+  test('in a container, it explains what 127.0.0.1 means there', async () => {
+    const hint = await loopbackHint('https://ollama.localdomain.cloud/v1/models', true)
+    expect(hint).toContain('resolves to 127.0.0.1')
+    expect(hint).toContain('that is the container itself')
+    expect(hint).toContain('extra_hosts')
+  })
+
+  test('outside a container, it asks whether the server is running here', async () => {
+    const hint = await loopbackHint('http://localhost:9/v1/models', false)
+    expect(hint).toContain('which is this machine')
+    expect(hint).not.toContain('container itself')
+  })
+
+  test('a name that resolves elsewhere gets no hint at all', async () => {
+    expect(await loopbackHint('https://example.com/v1/models', true)).toBe('')
+  })
+
+  test('a name that does not resolve gets no hint, rather than a wrong one', async () => {
+    expect(await loopbackHint('https://nope.invalid/v1/models', true)).toBe('')
+  })
+
+  test('this machine is not a container', () => {
+    expect(inContainer()).toBe(false)
   })
 })

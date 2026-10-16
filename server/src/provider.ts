@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import type { LLMProvider, StructuredRequest } from '@inkling/domain'
 import type { KeySource, ResolvedProvider } from './providerConfig'
 
@@ -21,6 +22,44 @@ const REQUEST_TIMEOUT_MS = 60_000
  * `response_format`, which several local servers reject — so we ask for JSON, and
  * quietly ask again without it rather than failing the move.
  */
+/** Whether this process is in a container, which changes what 127.0.0.1 means. */
+export function inContainer(): boolean {
+  return existsSync('/.dockerenv') || existsSync('/run/.containerenv')
+}
+
+/**
+ * A hint for the least obvious connection failure there is.
+ *
+ * A name that resolves to loopback means "this machine" — and inside a container, this
+ * machine is the container. So an address that works perfectly from the host fails with
+ * nothing but "unable to connect", and the reason is a fact about networking that is not
+ * visible from either end. Names like `*.localdomain.cloud` and `localhost.direct` are
+ * public wildcards that resolve to 127.0.0.1 on purpose, to give a local service a real
+ * certificate, which makes this failure common.
+ */
+export async function loopbackHint(url: string, container = inContainer()): Promise<string> {
+  let hostname: string
+  try {
+    hostname = new URL(url).hostname
+  } catch {
+    return ''
+  }
+
+  let address: string
+  try {
+    const { lookup } = await import('node:dns/promises')
+    address = (await lookup(hostname)).address
+  } catch {
+    return ''
+  }
+
+  if (address !== '127.0.0.1' && address !== '::1') return ''
+
+  return container
+    ? ` — ${hostname} resolves to ${address}, and inside a container that is the container itself, not the machine running it. Point the name at the host, with an extra_hosts entry in the compose file, or use the host's address directly.`
+    : ` — ${hostname} resolves to ${address}, which is this machine. Is the server running here, and on that port?`
+}
+
 /**
  * The models an endpoint says it can serve, with a failure that says why.
  *
@@ -39,9 +78,8 @@ async function listModelsFrom(
     res = await fetch(url, { headers })
   } catch (error) {
     // A wrong address, a closed port, DNS and certificates all land here.
-    throw new Error(
-      `could not reach ${url}: ${error instanceof Error ? error.message : 'the request failed'}`,
-    )
+    const reason = error instanceof Error ? error.message : 'the request failed'
+    throw new Error(`could not reach ${url}: ${reason}${await loopbackHint(url)}`)
   }
 
   if (!res.ok) {

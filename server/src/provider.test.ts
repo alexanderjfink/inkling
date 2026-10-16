@@ -429,3 +429,60 @@ describe('AnthropicProvider', () => {
     await expect(new AnthropicProvider(resolved).embed(['a'])).rejects.toThrow('no embeddings API')
   })
 })
+
+describe('an embedding provider that has been chosen but not finished', () => {
+  /**
+   * Picking "custom" for embeddings used to do nothing at all. The provider was dropped
+   * for having no model — `custom` has no default — so the app reloaded the config, found
+   * no embedding provider, and cleared the selection. The address field that belongs to
+   * that provider went with it, which made it look as though custom endpoints could not
+   * be configured at all.
+   */
+  test('it is still the chosen provider, even with no model yet', () => {
+    const resolved = resolveEmbedProvider(
+      { INKLING_EMBED_PROVIDER: 'custom' },
+      { authPath: NO_AUTH },
+    )
+    expect(resolved).not.toBeNull()
+    expect(resolved?.preset.id).toBe('custom')
+    expect(resolved?.embedModel).toBeNull()
+  })
+
+  test('and it is reported as chosen, while embeddings are not available yet', () => {
+    const chat = resolveProvider(
+      { INKLING_PROVIDER: 'openai', INKLING_API_KEY: 'k' },
+      { authPath: NO_AUTH },
+    )
+    const embed = resolveEmbedProvider(
+      { INKLING_EMBED_PROVIDER: 'custom', INKLING_EMBED_BASE_URL: 'https://x.example.com/v1' },
+      { authPath: NO_AUTH },
+    )
+    const status = modelStatus(chat, embed, null)
+    expect(status.embedProvider).toBe('custom')
+    expect(status.embedBaseUrl).toBe('https://x.example.com/v1')
+    expect(status.embeddings).toBe(false)
+  })
+
+  test('once a model is named it is usable', () => {
+    const resolved = resolveEmbedProvider(
+      {
+        INKLING_EMBED_PROVIDER: 'custom',
+        INKLING_EMBED_BASE_URL: 'https://x.example.com/v1',
+        INKLING_EMBED_MODEL: 'my-embed',
+      },
+      { authPath: NO_AUTH },
+    )
+    expect(resolved?.embedModel).toBe('my-embed')
+    expect(resolved?.configured).toBe(true)
+  })
+
+  test('choosing nothing still means nothing', () => {
+    expect(resolveEmbedProvider({}, { authPath: NO_AUTH })).toBeNull()
+  })
+
+  test('a provider with no embeddings API is still refused outright', () => {
+    expect(
+      resolveEmbedProvider({ INKLING_EMBED_PROVIDER: 'anthropic' }, { authPath: NO_AUTH }),
+    ).toBeNull()
+  })
+})

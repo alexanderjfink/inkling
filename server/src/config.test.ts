@@ -86,9 +86,26 @@ describe('validateConfig', () => {
     expect(validateConfig({ provider: 'nope' })[0]?.field).toBe('provider')
   })
 
-  test('rejects empty values for fields that must have one', () => {
-    expect(validateConfig({ model: '   ' })[0]?.field).toBe('model')
-    expect(validateConfig({ vault: '' })[0]?.field).toBe('vault')
+  test('an empty value clears the field rather than failing the save', () => {
+    // The contract mergeConfig documents, and the one the settings form relies on: it
+    // sends an empty value for every field left blank. Refusing them meant a blank
+    // similarity floor failed the save that was carrying an API key.
+    expect(validateConfig({ model: '' })).toHaveLength(0)
+    expect(validateConfig({ vault: '' })).toHaveLength(0)
+    expect(validateConfig({ provider: '' })).toHaveLength(0)
+    expect(validateConfig({ embedSimilarity: null })).toHaveLength(0)
+  })
+
+  test('a whitespace-only value is left alone too, since trim would clear it anyway', () => {
+    expect(validateConfig({ model: '   ' })).toHaveLength(0)
+  })
+
+  test('a similarity that is not a number between 0 and 1 is still refused', () => {
+    expect(validateConfig({ embedSimilarity: 0 })[0]?.field).toBe('embedSimilarity')
+    expect(validateConfig({ embedSimilarity: 1 })[0]?.field).toBe('embedSimilarity')
+    expect(validateConfig({ embedSimilarity: 9 })[0]?.field).toBe('embedSimilarity')
+    expect(validateConfig({ embedSimilarity: Number.NaN })[0]?.field).toBe('embedSimilarity')
+    expect(validateConfig({ embedSimilarity: 0.75 })).toHaveLength(0)
   })
 
   test('rejects an embedding provider that cannot embed', () => {

@@ -304,8 +304,11 @@ export function resolveEmbedProvider(
   const resolved = resolveProvider(embedEnv, options)
   if (resolved.preset.noEmbeddings) return null
 
-  const embedModel = model || resolved.preset.defaultEmbedModel || resolved.model
-  if (!embedModel) return null
+  // A provider that has been chosen but has no model yet is still chosen. Returning null
+  // here dropped the selection the moment it was saved — which is why picking "custom"
+  // for embeddings appeared to do nothing, and why the address field that goes with it
+  // never appeared: the app reloaded the config, found no provider, and cleared it.
+  const embedModel = model || resolved.preset.defaultEmbedModel || resolved.model || null
   return { ...resolved, embedModel }
 }
 

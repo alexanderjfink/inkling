@@ -226,6 +226,7 @@ export function Settings({
   const modelTools = useModelTools(syncState.serverUrl)
 
   async function testModel(kind: 'chat' | 'embed') {
+    if (!(await persistModel())) return
     const result = await modelTools.testConnection(kind)
     setNote(
       result.ok
@@ -337,7 +338,14 @@ export function Settings({
     }
   }
 
-  async function saveModel() {
+  /**
+   * Save the settings form, before Load or Test get to use it.
+   *
+   * Both of those read the server's *saved* settings, so pasting a key and pressing Load
+   * answered "no model configured" — true, and no help at all. Saving first is what
+   * pressing Load was meant to do.
+   */
+  async function persistModel(): Promise<boolean> {
     const patch: Record<string, string | number | null> = {
       provider,
       model,
@@ -353,16 +361,22 @@ export function Settings({
     if (apiKey.trim()) patch.apiKey = apiKey.trim()
     if (embedApiKey.trim()) patch.embedApiKey = embedApiKey.trim()
 
-    if (await save(patch)) {
+    const ok = await save(patch)
+    if (ok) {
       setApiKey('')
       setEmbedApiKey('')
-      setSaved('model')
       await syncState.refreshModel()
-      // A new provider or key means a new list of models. Not quiet: if it fails, the
-      // reason is the whole point of having pressed Save.
-      void loadModels('chat')
-      void loadModels('embed')
     }
+    return ok
+  }
+
+  async function saveModel() {
+    if (!(await persistModel())) return
+    setSaved('model')
+    // A new provider or key means a new list of models. Not quiet: if it fails, the
+    // reason is the whole point of having pressed Save.
+    void loadModels('chat')
+    void loadModels('embed')
   }
 
   async function saveVault() {
@@ -685,7 +699,11 @@ export function Settings({
               custom={customChat}
               onCustomChange={setCustomChat}
               loading={modelTools.listing === 'chat'}
-              onLoad={() => void loadModels('chat')}
+              onLoad={() =>
+                void persistModel().then((ok) => {
+                  if (ok) void loadModels('chat')
+                })
+              }
               placeholder={config.model ?? ''}
             />
 
@@ -742,7 +760,11 @@ export function Settings({
               custom={customEmbed}
               onCustomChange={setCustomEmbed}
               loading={modelTools.listing === 'embed'}
-              onLoad={() => void loadModels('embed')}
+              onLoad={() =>
+                void persistModel().then((ok) => {
+                  if (ok) void loadModels('embed')
+                })
+              }
               placeholder={config.embedModel ?? ''}
             />
 
@@ -788,7 +810,11 @@ export function Settings({
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
-                onClick={() => void loadModels('chat')}
+                onClick={() =>
+                  void persistModel().then((ok) => {
+                    if (ok) void loadModels('chat')
+                  })
+                }
                 disabled={modelTools.listing !== null}
                 className={buttonClass}
               >
@@ -808,7 +834,11 @@ export function Settings({
               </button>
               <button
                 type="button"
-                onClick={() => void loadModels('embed')}
+                onClick={() =>
+                  void persistModel().then((ok) => {
+                    if (ok) void loadModels('embed')
+                  })
+                }
                 disabled={modelTools.listing !== null}
                 className={buttonClass}
               >
@@ -832,7 +862,7 @@ export function Settings({
               <p className={`text-xs ${note.ok ? 'text-good' : 'text-warn'}`}>{note.text}</p>
             ) : (
               <p className="text-xs text-ink-faint">
-                Load and Test act on what is saved, so save first if you have changed something.
+                Load and Test save your changes first, then act on them.
               </p>
             )}
 

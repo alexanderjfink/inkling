@@ -178,11 +178,18 @@ export interface ConfigProblem {
 /** Validate an incoming patch, so a typo cannot silently break the server. */
 export function validateConfig(patch: ServerConfig): ConfigProblem[] {
   const problems: ConfigProblem[] = []
+  /**
+   * An empty value is not a mistake.
+   *
+   * It is how mergeConfig reads "go back to the default", and the settings form sends one
+   * whenever a field is left blank — so refusing it did not just make clearing
+   * impossible, it made a blank *unrelated* field fail the whole save. That is what was
+   * happening here: the model never got its API key because the similarity floor beside
+   * it was empty, and the refusal arrived as "must be between 0 and 1".
+   */
   const check = (field: string, value: unknown, label: string) => {
-    if (value === undefined) return
-    if (typeof value !== 'string' || value.trim().length === 0) {
-      problems.push({ field, message: `${label} must not be empty` })
-    }
+    if (value === undefined || value === '') return
+    if (typeof value !== 'string') problems.push({ field, message: `${label} must be text` })
   }
 
   check('provider', patch.provider, 'provider')
@@ -229,10 +236,12 @@ export function validateConfig(patch: ServerConfig): ConfigProblem[] {
     }
   }
 
-  if (patch.provider !== undefined && !findPreset(patch.provider)) {
+  // "— server default —" is the first option in the picker and sends an empty string,
+  // which is not an unknown provider; it is the absence of one.
+  if (patch.provider && !findPreset(patch.provider)) {
     problems.push({ field: 'provider', message: `unknown provider "${patch.provider}"` })
   }
-  if (patch.embedProvider !== undefined && !findPreset(patch.embedProvider)) {
+  if (patch.embedProvider && !findPreset(patch.embedProvider)) {
     problems.push({ field: 'embedProvider', message: `unknown provider "${patch.embedProvider}"` })
   }
   if (patch.embedProvider) {
@@ -244,9 +253,12 @@ export function validateConfig(patch: ServerConfig): ConfigProblem[] {
       })
     }
   }
+  // Null clears it, which is what an empty box sends — so it is a value, not an error.
   if (
     patch.embedSimilarity !== undefined &&
+    patch.embedSimilarity !== null &&
     (typeof patch.embedSimilarity !== 'number' ||
+      !Number.isFinite(patch.embedSimilarity) ||
       patch.embedSimilarity <= 0 ||
       patch.embedSimilarity >= 1)
   ) {

@@ -677,13 +677,31 @@ default. When it does, the card sits on "choosing a move…" and gives up, which
 the model being broken. `proxy_read_timeout 180s`.
 
 **Where the proxy is, and which port.** The compose file publishes the container's 8787
-on the host's **12838**, bound to `127.0.0.1` — so nginx on the same host proxies to
-`http://127.0.0.1:12838`. The left number is the host's; the right one is the container's
-and does not need to change. If nginx is itself in Docker or on another machine it cannot
-see `127.0.0.1` at all:
+on the host's **12838**, bound to `127.0.0.1`. The left number is the host's; the right one
+is the container's and does not need to change. That gives two different upstreams, and
+mixing them up is the usual mistake:
+
+| nginx runs | upstream |
+|---|---|
+| on the same host | `http://127.0.0.1:12838` |
+| in Docker, on the same network | `http://inkling:8787` |
+| on another machine | the host's address, with `INKLING_BIND=0.0.0.0` |
+
+**`http://inkling:12838` does not work**, and it is worth knowing why: nothing listens on
+12838 inside the container. That number exists only on the host, as a door into 8787.
+
+If nginx is in Docker, put both on one network — two compose projects do not share one by
+default:
 
 ```bash
-INKLING_BIND=0.0.0.0 docker compose up -d     # or share a Docker network
+docker network create inkling        # then attach both containers to it
+```
+
+With nginx on that network the published port is not needed at all, and dropping it keeps
+12838 off the host entirely. If nginx is on another machine it cannot see `127.0.0.1`:
+
+```bash
+INKLING_BIND=0.0.0.0 docker compose up -d
 ```
 
 **If your proxy insists on an `https://` upstream**, the container can speak TLS itself:

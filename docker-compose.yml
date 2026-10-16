@@ -86,3 +86,20 @@ services:
       # the files must be mounted in — see the volumes above.
       # - INKLING_TLS_CERT=/certs/fullchain.pem
       # - INKLING_TLS_KEY=/certs/privkey.pem
+
+# If nginx is in Docker too, it needs a name to reach this by. Two compose projects do
+# not share a network by default, so make one and attach both:
+#
+#   docker network create inkling
+#
+# then uncomment this, and attach the nginx container to the same network. Its upstream
+# becomes http://inkling:8787 — the container's own port. Not 12838: that number is only
+# published on the host, and nothing inside the network listens on it.
+#
+# With nginx on that network the published port is not needed at all, and dropping it
+# keeps 12838 off the host entirely — nginx becomes the only way in.
+#
+# networks:
+#   default:
+#     name: inkling
+#     external: true

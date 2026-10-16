@@ -30,11 +30,16 @@ server {
     client_max_body_size 64m;
 
     location / {
-        # CHANGE ME — where the container is.
-        #   nginx on the same host  -> 127.0.0.1:12838 (the compose default)
-        #   nginx in Docker         -> http://inkling:8787 on a shared network
-        #                              (the container port, not the published one)
-        #   nginx on another box    -> the host's address, with INKLING_BIND=0.0.0.0
+        # CHANGE ME — where the container is. The cases want different ports, and that
+        # is not a typo: 12838 is published on the *host*, while inside the Docker
+        # network the container listens on 8787.
+        #
+        #   nginx on the host    ->  http://127.0.0.1:12838
+        #   nginx in Docker      ->  http://inkling:8787     (same Docker network)
+        #   nginx on another box ->  the host's address, with INKLING_BIND=0.0.0.0
+        #
+        # http://inkling:12838 does not work. Nothing listens on 12838 inside the
+        # container — that number exists only on the host, as a door into 8787.
         proxy_pass http://127.0.0.1:12838;
 
         proxy_http_version 1.1;

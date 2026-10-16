@@ -58,6 +58,14 @@ export interface InklingActions {
   /** Keep this move for later, or let it go. */
   saveMove(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
   unsaveMove(id: string, moveId: string): Promise<BlipEvent>
+  /**
+   * Forget what has been offered, keeping what was done.
+   *
+   * For when the history is wrong — moves recorded that were never seen — which leaves
+   * the Inkling being offered variations of the same prompt because everything looks
+   * used up.
+   */
+  forgetMoves(id: string): Promise<BlipEvent>
   /** Remove something you added. A tombstone, so nothing is really rewritten. */
   removeEntry(id: string, entryId: string): Promise<BlipEvent>
   /** Correct the Inkling itself, including what kind of thing it turned out to be. */
@@ -202,6 +210,9 @@ export function useInkling(accountId: string | null = null) {
       },
       unsaveMove(id, moveId) {
         return storage().append({ t: 'moveUnsaved', id, moveId })
+      },
+      forgetMoves(id) {
+        return storage().append({ t: 'movesForgotten', id })
       },
       removeEntry(id, entryId) {
         return storage().append({ t: 'entryRemoved', id, entryId })

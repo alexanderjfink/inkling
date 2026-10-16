@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import type { Blip, BlipEvent, BlipEventBody, BlipType, LLMProvider } from '../src/index'
+import type { Blip, BlipEvent, BlipEventBody, BlipType, LLMProvider, MoveSpec } from '../src/index'
 import {
   BLIP_TYPES,
   buildGuidancePrompt,
@@ -424,5 +424,101 @@ describe('toMoveSpec', () => {
     const template = MOVE_LIBRARY.find((t) => t.id === 'quest.firstSession')
     if (!template) throw new Error('missing template')
     expect(toMoveSpec(template).playbook).toBe('quest')
+  })
+})
+
+describe('forgetting what was only offered', () => {
+  const meta = (seq: number) => ({
+    deviceId: 'dev-a',
+    seq,
+    at: `2026-03-0${seq}T00:00:00Z`,
+  })
+
+  const spec = (id: string, title: string): MoveSpec => ({
+    id,
+    title,
+    why: 'because',
+    timeLimitSec: 300,
+    goal: 'something',
+    playbook: 'idea',
+    generatedBy: 'playbook',
+  })
+
+  /** One offer nobody touched, one move done, one shown and put down. */
+  const history: BlipEvent[] = [
+    { ...meta(1), t: 'captured', id: 'x', input: { kind: 'text', text: 'social' }, type: 'idea' },
+    {
+      ...meta(2),
+      t: 'moveShown',
+      id: 'x',
+      moveId: 'a',
+      moveSpec: spec('a', 'offered, never touched'),
+    },
+    { ...meta(3), t: 'moveShown', id: 'x', moveId: 'b', moveSpec: spec('b', 'done') },
+    { ...meta(4), t: 'moveDone', id: 'x', moveId: 'b' },
+    { ...meta(5), t: 'moveShown', id: 'x', moveId: 'c', moveSpec: spec('c', 'put down') },
+    { ...meta(6), t: 'moveSkipped', id: 'x', moveId: 'c' },
+  ]
+
+  test('the offers go, and what you actually did stays', () => {
+    // The history is what stops the same prompt coming back. When a bug put moves there
+    // that nobody saw, the Inkling was stuck being offered variations of one thing,
+    // because the app believed everything had already been tried.
+    const [before] = project(history)
+    expect(before?.moves.map((entry) => entry.moveId)).toEqual(['a', 'b', 'c'])
+
+    const [after] = project([...history, { ...meta(7), t: 'movesForgotten', id: 'x' }])
+    expect(after?.moves.map((entry) => entry.moveId)).toEqual(['b', 'c'])
+    expect(after?.moves.find((entry) => entry.moveId === 'b')?.outcome).toBe('done')
+    expect(after?.moves.find((entry) => entry.moveId === 'c')?.outcome).toBe('skipped')
+  })
+
+  test('forgetting twice does not undo a completion', () => {
+    const [blip] = project([
+      ...history,
+      { ...meta(7), t: 'movesForgotten', id: 'x' },
+      { ...meta(8), t: 'movesForgotten', id: 'x' },
+    ])
+    expect(blip?.moves).toHaveLength(2)
+  })
+
+  test('a re-adapted move is recorded again, so it does not come back as if it were new', () => {
+    // The old guard skipped the write whenever the move *id* was already in the history,
+    // so "Who has already made a notes app social?" and "Who has already tried a social,
+    // learning-first platform?" looked like one event to the app — and the second kept
+    // being offered because nothing recorded that it had been.
+    const [blip] = project([
+      { ...meta(1), t: 'captured', id: 'x', input: { kind: 'text', text: 'social' }, type: 'idea' },
+      {
+        ...meta(2),
+        t: 'moveShown',
+        id: 'x',
+        moveId: 'idea.prior',
+        moveSpec: spec('idea.prior', 'first wording'),
+      },
+      {
+        ...meta(3),
+        t: 'moveShown',
+        id: 'x',
+        moveId: 'idea.prior',
+        moveSpec: spec('idea.prior', 'second wording'),
+      },
+    ])
+    expect(blip?.moves.map((entry) => entry.spec.title)).toEqual([
+      'first wording',
+      'second wording',
+    ])
+  })
+})
+
+describe('the search phrase the model is asked for', () => {
+  test('it is told to name a concept, not a list of products', () => {
+    // "Are.na Cohost social platforms for thinking" is a real phrase that was produced
+    // and found nothing, because an encyclopaedia has no article matching a list of
+    // product names.
+    const blip = makeBlip('idea', 'a social platform for notes')
+    const { system } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
+    expect(system).toContain('general idea rather than particular products')
+    expect(system).toContain('a list of product names finds nothing')
   })
 })

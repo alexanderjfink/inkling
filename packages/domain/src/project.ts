@@ -172,6 +172,12 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
     case 'moveUnsaved':
       if (blip.savedMove?.id === event.moveId) blip.savedMove = undefined
       break
+    case 'movesForgotten':
+      // Only the offers go. A move that was actually done, or deliberately put down, is
+      // a record of something the person did, and forgetting it would be losing data
+      // rather than correcting a mistake.
+      blip.moves = blip.moves.filter((entry) => entry.outcome !== 'shown')
+      break
     case 'entryRemoved':
       blip.entries = blip.entries.filter((entry) => entry.id !== event.entryId)
       break

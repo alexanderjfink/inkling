@@ -446,6 +446,8 @@ export function buildMovePrompt(
     'at the same question again.',
     'If the move you choose is marked as looking something up, also supply a "query": a short,',
     'specific search phrase of two to eight words that would find the right page.',
+    'Name the general idea rather than particular products or brands — "social annotation tools"',
+    'finds an encyclopaedia article, a list of product names finds nothing at all.',
     'Never invent a URL — a search phrase is what is wanted.',
     'Reply with JSON only.',
   ].join(' ')

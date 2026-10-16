@@ -28,6 +28,12 @@ export function useSuggestedMove(
   blip: Blip | undefined,
   related: Blip[],
   provider: LLMProvider,
+  /**
+   * Bumped when the history itself changes — forgetting the offers, say. Without it the
+   * suggestion on screen is the one chosen when everything looked used up, which is
+   * exactly the suggestion you just asked to be reconsidered.
+   */
+  revision = 0,
 ): { move: MoveSpec | null; loading: boolean; reroll: () => void } {
   const [move, setMove] = useState<MoveSpec | null>(null)
   const [loading, setLoading] = useState(false)
@@ -38,7 +44,7 @@ export function useSuggestedMove(
   const avoidIds = avoid.blipId === blipId ? avoid.ids : []
   const relatedIds = related.map((other) => other.id).join(',')
   const savedId = blip?.savedMove?.id ?? ''
-  const key = blip ? `${blipId}:${avoidIds.join(',')}` : ''
+  const key = blip ? `${blipId}:${avoidIds.join(',')}:${revision}` : ''
 
   /**
    * The blip, without depending on its identity.

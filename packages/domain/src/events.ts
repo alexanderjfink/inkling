@@ -204,6 +204,15 @@ export type BlipEventBody =
   /** Keep this move for later, rather than losing it when the card moves on. */
   | { t: 'moveSaved'; id: string; moveId: string; moveSpec: MoveSpec }
   | { t: 'moveUnsaved'; id: string; moveId: string }
+  /**
+   * Forget what has merely been *offered*, keeping what was actually done.
+   *
+   * The history exists so the same prompt is not put in front of someone twice. When it
+   * is wrong — a bug recorded moves nobody saw, or a move was shown and dismissed — the
+   * only way to fix it is to forget, and until now there was none, so the Inkling was
+   * stuck being offered variations of the same thing forever.
+   */
+  | { t: 'movesForgotten'; id: string }
   /** Remove something you added. A tombstone, not a rewrite. */
   | { t: 'entryRemoved'; id: string; entryId: string }
   /** Correct the Inkling itself. Only the fields given are changed. */

@@ -160,8 +160,16 @@ function ActionButton({
 }
 
 /** The moves already put in front of you, quietly, behind a tap. */
-function MoveLog({ moves }: { moves: Blip['moves'] }) {
+function MoveLog({
+  moves,
+  onForget,
+}: {
+  moves: Blip['moves']
+  /** Present when there is something worth forgetting. */
+  onForget?: () => void
+}) {
   if (moves.length === 0) return null
+  const offered = moves.filter((entry) => entry.outcome === 'shown').length
   return (
     <details className="mt-5 border-t border-line pt-3">
       <summary className="cursor-pointer text-[11px] tracking-wide text-ink-faint uppercase">
@@ -185,6 +193,19 @@ function MoveLog({ moves }: { moves: Blip['moves'] }) {
           </li>
         ))}
       </ul>
+      {onForget && offered > 0 ? (
+        <div className="mt-3">
+          <button type="button" onClick={onForget} className="quiet text-[11px] underline">
+            forget the {offered} we only offered
+          </button>
+          <p className="mt-1 text-[11px] text-ink-faint">
+            This list is what stops the same prompt coming back. If it is wrong — moves here you
+            never saw — the app thinks you have tried everything and starts reaching for stranger
+            angles. Forgetting the offers lets it suggest the obvious ones again. What you actually
+            did is kept.
+          </p>
+        </div>
+      ) : null}
     </details>
   )
 }
@@ -231,6 +252,12 @@ export function Review({
   const [draftBody, setDraftBody] = useState('')
   const [draftType, setDraftType] = useState<BlipType>('idea')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  /**
+   * Bumped when the move history changes underneath the suggestion — forgetting the
+   * offers, say — so the card is reconsidered rather than left holding the suggestion
+   * that was chosen when everything looked used up.
+   */
+  const [moveRevision, setMoveRevision] = useState(0)
   /** null means "not asked yet"; an empty list means "nothing came back". */
   const [guidance, setGuidance] = useState<string[] | null>(null)
   const [guidanceLoading, setGuidanceLoading] = useState(false)
@@ -290,6 +317,7 @@ export function Review({
     current,
     currentRelated.map((entry_) => entry_.blip),
     provider,
+    moveRevision,
   )
 
   const deferLabel = formatDeferral(deferUntil(DEFAULT_DEFERRAL, new Date()))
@@ -302,14 +330,19 @@ export function Review({
   }, [moveId])
 
   // Record what was put in front of you, so it is not offered again. Once per move
-  // per Inkling, and only if the log does not already have it.
+  // per Inkling — and once per *wording*, because a re-adapted move is a different
+  // thing shown, and leaving it unrecorded is how the same move came back over and
+  // over with a new title each time.
   const recorded = useRef(new Set<string>())
   useEffect(() => {
     if (!current || !move || moveLoading) return
-    const key = `${current.id}:${move.id}`
+    const key = `${current.id}:${move.id}:${move.title}`
     if (recorded.current.has(key)) return
     recorded.current.add(key)
-    if (!current.moves.some((entry_) => entry_.moveId === move.id)) {
+    const alreadyRecorded = current.moves.some(
+      (entry_) => entry_.moveId === move.id && entry_.spec.title === move.title,
+    )
+    if (!alreadyRecorded) {
       void actions.recordMoveShown(current.id, move)
     }
   }, [current, move, moveLoading, actions])
@@ -778,7 +811,13 @@ export function Review({
           </p>
         )}
 
-        <MoveLog moves={current.moves} />
+        <MoveLog
+          moves={current.moves}
+          onForget={() => {
+            void actions.forgetMoves(current.id)
+            setMoveRevision((value) => value + 1)
+          }}
+        />
 
         {currentRelated.length > 0 ? (
           <div className="mt-5 border-t border-line pt-3">

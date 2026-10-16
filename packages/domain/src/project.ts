@@ -62,6 +62,8 @@ export interface Blip {
   moves: MoveHistoryEntry[]
   /** Suggestions judged bad, kept with the context they were made in. */
   rejections: MoveRejection[]
+  /** Written by the app as an example, so the card can say so and offer to take it away. */
+  demo?: boolean
   /** A move kept deliberately, offered again next time this surfaces. */
   savedMove?: MoveSpec
   export?: { notePath: string; at: string }
@@ -104,6 +106,7 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       body: event.body ?? event.input.text ?? '',
       input: event.input,
       context: event.context,
+      demo: event.demo,
       topics: [...(event.topics ?? [])],
       links: [],
       entries: [],

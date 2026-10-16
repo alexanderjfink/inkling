@@ -8,7 +8,7 @@ import type {
   MoveSpec,
   RejectionContext,
 } from '@inkling/domain'
-import { newId, project, snoozeUntil } from '@inkling/domain'
+import { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE, newId, project, snoozeUntil } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { type CaptureDraft, extractTopics, guessType, inferBody } from '../capture'
 import { AppendOnlyLog } from '../storage/appendOnlyLog'
@@ -42,6 +42,15 @@ export type SnoozeReason = 'engaged' | 'skipped' | 'shown'
 
 export interface InklingActions {
   capture(draft: CaptureDraft): Promise<BlipEvent>
+  /**
+   * Write the example Inkling, with its move already chosen.
+   *
+   * Two events, because that is what really happens: you notice something, and later a
+   * move is put in front of you. Going through the same doors means the example is an
+   * Inkling in every way that matters — it can be reviewed, written against, put down and
+   * removed — and none of that is a special case that can rot.
+   */
+  seedDemo(): Promise<void>
   addNote(id: string, text: string): Promise<BlipEvent>
   snooze(id: string, until?: string, triggers?: string[]): Promise<BlipEvent>
   snoozeAfter(id: string, reason: SnoozeReason, streak?: number): Promise<BlipEvent>
@@ -169,6 +178,28 @@ export function useInkling(accountId: string | null = null) {
           mediaIds: mediaId ? [mediaId] : undefined,
         }
         return store.append(emitted)
+      },
+      async seedDemo() {
+        const store = storage()
+        const id = newId()
+        const body = inferBody(DEMO_INPUT)
+        await store.append({
+          t: 'captured',
+          id,
+          input: DEMO_INPUT,
+          type: DEMO_TYPE,
+          body,
+          topics: extractTopics(body ?? '', DEMO_INPUT.url),
+          demo: true,
+        })
+        // A move you saved is the one to show, without asking a model — which is how the
+        // example works before anything has been set up.
+        await store.append({
+          t: 'moveSaved',
+          id,
+          moveId: DEMO_MOVE.id,
+          moveSpec: DEMO_MOVE,
+        })
       },
       addNote(id, text) {
         return storage().append({

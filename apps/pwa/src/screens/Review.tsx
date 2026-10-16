@@ -681,6 +681,11 @@ export function Review({
           <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">
             {current.type}
           </span>
+          {current.demo ? (
+            <span className="rounded-full border border-line px-2 py-0.5 text-ink-faint">
+              example
+            </span>
+          ) : null}
           {current.schedule.timesSkipped > 0 ? (
             <span className="text-ink-faint">put down {current.schedule.timesSkipped}×</span>
           ) : null}
@@ -861,7 +866,11 @@ export function Review({
             <p className="mt-1 text-sm font-medium">{move.title}</p>
             <p className="mt-1 text-xs text-ink-soft">goal: {move.goal}</p>
             {current.savedMove ? (
-              <p className="mt-1 text-[11px] text-good">saved — this is the move you kept</p>
+              <p className="mt-1 text-[11px] text-good">
+                {current.demo
+                  ? 'the move that comes with the example'
+                  : 'saved — this is the move you kept'}
+              </p>
             ) : null}
 
             <LookUps links={links} loading={materialLoading} />
@@ -878,7 +887,11 @@ export function Review({
               </button>
               <span className="text-xs text-ink-faint">
                 {Math.max(1, Math.round(move.timeLimitSec / 60))} min ·{' '}
-                {move.generatedBy === 'llm' ? 'adapted' : 'from the playbook'}
+                {move.generatedBy === 'llm'
+                  ? 'adapted'
+                  : current.demo
+                    ? 'the example'
+                    : 'from the playbook'}
               </span>
               <button
                 type="button"
@@ -1050,6 +1063,14 @@ export function Review({
           </button>
         ))}
       </div>
+
+      {current.demo ? (
+        <div className="mt-4 flex justify-center">
+          <button type="button" onClick={() => void remove()} className="quiet text-xs underline">
+            that was an example — remove it
+          </button>
+        </div>
+      ) : null}
 
       <div className="mt-4 flex justify-center gap-5 text-xs">
         {current.status === 'retired' || current.status === 'promoted' ? (

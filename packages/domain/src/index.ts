@@ -25,6 +25,7 @@ export {
 export type { EntryContext } from './events'
 export { REJECTION_REASONS } from './events'
 export type { RejectionContext, RejectionReason } from './events'
+export { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE } from './demo'
 export { stateDigest } from './digest'
 export { sha256Hex } from './hash'
 export { idTime, newId } from './ids'

@@ -1,5 +1,5 @@
 import { type Blip, buildDailyFeed } from '@inkling/domain'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Spinner } from './components/Spinner'
 import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
@@ -86,6 +86,26 @@ export default function App() {
     // `addedEvents` is zero however long the person has been using Inkling.
     hasHistory: active > 0 || (syncState.report?.addedEvents ?? 0) > 0,
   })
+
+  /**
+   * The example Inkling arrives with the walkthrough.
+   *
+   * Not before it: someone who opens the app to write something should find an empty
+   * field, not a stranger's keyboard. Once the walkthrough is being offered, an example
+   * is the one thing they can safely play with — and it makes the walkthrough's Review
+   * step point at a real card rather than describe one that is not there yet.
+   *
+   * Keyed on the account, because this hook is not remounted by signing out and in as
+   * somebody else — the second person needs their own example, and their own store.
+   */
+  const demoSeededFor = useRef<string | null>(null)
+  const accountId = auth.user?.id ?? null
+  useEffect(() => {
+    if (!tourOpen || !accountId || demoSeededFor.current === accountId) return
+    if (blips.some((blip) => blip.demo && !blip.deleted)) return
+    demoSeededFor.current = accountId
+    void actions.seedDemo()
+  }, [tourOpen, accountId, blips, actions])
 
   /** Finishing or skipping the walkthrough means it does not open by itself again. */
   const dismissTour = useCallback(() => {

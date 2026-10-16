@@ -251,6 +251,14 @@ export type BlipEventBody =
       context?: BlipContext
       mediaIds?: string[]
       topics?: string[]
+      /**
+       * Written by the app as an example, not by the person.
+       *
+       * A real event rather than a special case, because what is being demonstrated is
+       * what happens *after* you notice something — a demo mode would show a version of
+       * the app that does not exist.
+       */
+      demo?: boolean
     }
   | { t: 'entry'; id: string; entry: Entry; moveId?: string }
   | { t: 'blockAdded'; id: string; block: Block }

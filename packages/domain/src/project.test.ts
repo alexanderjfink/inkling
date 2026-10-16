@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { BlipEvent, BlipEventBody, BlipType } from '../src/index'
-import { liveBlips, newId, project } from '../src/index'
+import { DEMO_MOVE, liveBlips, newId, project } from '../src/index'
 
 const DEVICE = 'deviceA'
 
@@ -138,5 +138,62 @@ describe('project (fold)', () => {
       ev({ t: 'promoteToDesktop', id }, 1, '2026-01-02T00:00:00Z'),
     ])
     expect(blips[0]?.desktopPinned).toBe(true)
+  })
+})
+
+describe('the example Inkling', () => {
+  test('an example is an ordinary Inkling that happens to say so', () => {
+    // The point of writing it as a real event rather than a demo mode: everything the
+    // fold already does to an Inkling has to keep working on it.
+    const id = newId()
+    const [blip] = project([
+      ev(
+        {
+          t: 'captured',
+          id,
+          input: { kind: 'text', text: 'Learn a few chords on the keyboard' },
+          type: 'quest',
+          demo: true,
+        },
+        0,
+        '2026-01-01T00:00:00Z',
+      ),
+      ev(
+        { t: 'moveSaved', id, moveId: 'reference.firstLook', moveSpec: DEMO_MOVE },
+        1,
+        '2026-01-01T00:00:01Z',
+      ),
+    ])
+    expect(blip?.demo).toBe(true)
+    expect(blip?.status).toBe('active')
+    expect(blip?.savedMove?.title).toContain('MIDI keyboard')
+    expect(blip?.deleted).toBe(false)
+  })
+
+  test('the example can be retired, and deleted, like anything else', () => {
+    const id = newId()
+    const [retired] = project([
+      ev(
+        { t: 'captured', id, input: { kind: 'text', text: 'x' }, type: 'quest', demo: true },
+        0,
+        '2026-01-01T00:00:00Z',
+      ),
+      ev({ t: 'deleted', id }, 1, '2026-01-01T00:00:01Z'),
+    ])
+    expect(retired?.deleted).toBe(true)
+    expect(liveBlips([retired!])).toHaveLength(0)
+  })
+
+  test('an ordinary Inkling is not marked as an example', () => {
+    const [blip] = project([captured(newId(), 'something I noticed', 0, '2026-01-01T00:00:00Z')])
+    expect(blip?.demo).toBeUndefined()
+  })
+
+  test('its move is written out, so the example works before anything is configured', () => {
+    // A new person has no API key. An example whose move needs a model would sit on
+    // "choosing a move…" forever, which teaches the opposite of what it is for.
+    expect(DEMO_MOVE.generatedBy).toBe('playbook')
+    expect(DEMO_MOVE.lookUp?.length).toBeGreaterThan(1)
+    expect(DEMO_MOVE.timeLimitSec).toBeLessThanOrEqual(300)
   })
 })

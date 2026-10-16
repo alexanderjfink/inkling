@@ -37,7 +37,7 @@ export function Help({ onStartTour }: { onStartTour: () => void }) {
         <span className="min-w-0 flex-1">
           <span className="block text-sm font-semibold">Show me around</span>
           <span className="block text-xs text-ink-soft">
-            A short walkthrough of the screen you start on
+            A short walkthrough of the screen you start on, plus an example Inkling to try a move on
           </span>
         </span>
       </button>
@@ -82,6 +82,20 @@ export function Help({ onStartTour }: { onStartTour: () => void }) {
           was wrong. Tap a reason, say it in your own words, or both — and another move comes back
           for the same Inkling, chosen with what you said taken into account. These are kept, so the
           suggestions can be improved.
+        </p>
+      </Section>
+
+      <Section title="The example Inkling">
+        <p>
+          A new account arrives with one Inkling it did not write, marked{' '}
+          <span className="text-ink">example</span>. It is a real Inkling in every way that matters
+          — you can make its move, write against it, put it down — and its move is written out
+          rather than generated, so it works before any model is set up.
+        </p>
+        <p>
+          It exists so that the first thing you meet in Review is something you cannot get wrong.
+          Remove it from its card whenever you like; it is the only Inkling in here that is
+          nobody's.
         </p>
       </Section>
 

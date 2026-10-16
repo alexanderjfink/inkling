@@ -311,6 +311,11 @@ A step whose control is not on screen — Review only exists once something is w
 shown as a centred card instead of being dropped, so the walkthrough is the same length for
 everyone.
 
+**Step four introduces the word "move"**, because everything else assumes it: the slogan, the
+playbook, asking a friend. Nothing said it. The step where you first meet one is the place to
+define it — a single small thing to do with an Inkling, a couple of minutes long, made out of
+your own words rather than invented for you.
+
 **It is only offered to an account that has never been used**, and that is decided from two
 sources, because they cover opposite cases. A fresh device looking at an account whose
 Inklings are on the server: they arrive during the first sync, but reach the local
@@ -502,8 +507,16 @@ that proved it was somebody asking *how do I ask a friend for a move at all*.
 
 **Ask from the move card**, right under the suggestion, as a button rather than a footnote.
 That is the moment the question occurs to somebody: the move is not it, and there is a person
-who might know better. When there is no suggestion on screen the button appears below the
-card instead, so there is always exactly one way in and it is never below the fold.
+who might know better.
+
+**The panel opens where you pressed the button**, not at the bottom of the screen. It used to
+render in one fixed place, so pressing the button inside the card opened the composer
+somewhere else entirely — which reads as the button having opened the wrong thing. It is a
+component of its own now, rendered in whichever place was pressed, and it holds its own state
+so the friend you picked and the note you are typing survive the card re-rendering.
+
+When there is no suggestion on screen the button and its panel appear below the card instead,
+so there is always exactly one way in and it is never below the fold.
 
 Whatever you want to say about being stuck goes with it. The friend gets the Inkling's title, what it is, its topics, what has already
 been written against it, and **what has already been suggested** — so they can think of

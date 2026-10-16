@@ -45,8 +45,10 @@ export const TOUR_STEPS: TourStep[] = [
   {
     anchor: 'review',
     radius: 28,
-    title: 'Then it comes back',
-    body: 'When something is ready to return it waits here — one at a time, and never more than you could get through in a sitting. You can put it down again, add to it, or let it go for good.',
+    title: 'Then it comes back, with a move',
+    // The word the whole app is built on, introduced where it is actually met. Everything
+    // else — the slogan, the playbook, asking a friend — assumes it, and nothing said it.
+    body: 'When something is ready to return it waits here — one at a time, and never more than you could get through in a sitting. Each one comes with a move: a single small thing to do with it, a couple of minutes long, made out of your own words rather than invented for you. Do it, ask for a different one, or put it down and come back to it.',
   },
   {
     anchor: 'friends',

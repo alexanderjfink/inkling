@@ -164,6 +164,130 @@ function Note({
   )
 }
 
+/**
+ * Asking a friend for a move.
+ *
+ * A component of its own so it can be rendered wherever it was opened from: inside the move
+ * card when there is a suggestion to react to, and below the card when there is not. It used
+ * to render in one fixed place near the bottom of the screen, so pressing the button inside
+ * the card opened the panel somewhere else entirely — which reads as the button having
+ * opened the wrong thing.
+ *
+ * It holds its own state, so the pick and the note being typed survive the card re-rendering
+ * underneath it.
+ */
+function AskPanel({
+  blip,
+  social,
+  onClose,
+  onShare,
+}: {
+  blip: Blip
+  social: SocialState
+  onClose: () => void
+  onShare: () => void
+}) {
+  const [to, setTo] = useState<string | null>(null)
+  const [note, setNote] = useState('')
+  const [problem, setProblem] = useState<string | null>(null)
+  const [sending, setSending] = useState(false)
+
+  const accepted = social.friends.filter((friend) => friend.status === 'accepted')
+  /** There is somebody to ask, and something that may be shown to them. */
+  const canAsk = blip.visibility === 'friends' && accepted.length > 0
+
+  async function send() {
+    const friend = accepted.find((candidate) => candidate.userId === to)
+    if (!friend || sending) return
+    setSending(true)
+    try {
+      const problemText = await social.ask({
+        to: friend,
+        context: askContextFor(blip),
+        note: note.trim() || undefined,
+      })
+      setProblem(problemText)
+      if (!problemText) onClose()
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-2 rounded-2xl border border-line bg-surface/60 p-3">
+      <p className="text-[11px] tracking-wide text-ink-faint uppercase">ask a friend for a move</p>
+
+      {blip.visibility !== 'friends' ? (
+        <p className="text-xs text-ink-soft">
+          This one is private, so nobody can be shown it. Make it{' '}
+          <button type="button" onClick={onShare} className="underline">
+            shared with friends
+          </button>{' '}
+          first — asking somebody is showing them.
+        </p>
+      ) : accepted.length === 0 ? (
+        <p className="text-xs text-ink-soft">
+          You have not added anyone yet. Friends are added by username, and they have to say yes.
+        </p>
+      ) : (
+        <>
+          <div className="flex flex-wrap gap-1.5">
+            {accepted.map((friend) => (
+              <button
+                key={friend.userId}
+                type="button"
+                onClick={() => setTo(friend.userId)}
+                className={`rounded-full px-3 py-1.5 text-[11px] ${
+                  to === friend.userId
+                    ? 'bg-accent text-surface'
+                    : 'border border-line text-ink-soft'
+                }`}
+              >
+                {friend.username}
+              </button>
+            ))}
+          </div>
+          <input
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void send()
+            }}
+            placeholder="anything you want to say about it (optional)"
+            className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
+          />
+          {problem ? <p className="text-xs text-warn">{problem}</p> : null}
+        </>
+      )}
+
+      {/* Always, including when there is nothing to ask with: a panel you cannot close is
+          a panel you are stuck in, and the two states above both have a way in and no way
+          out — which is how it was until this line. */}
+      <div className="flex items-center gap-3">
+        <button type="button" onClick={onClose} className="quiet text-xs underline">
+          cancel
+        </button>
+        {canAsk ? (
+          <button
+            type="button"
+            disabled={!to || sending}
+            onClick={() => void send()}
+            className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
+          >
+            <ButtonLabel busy={sending}>
+              {sending
+                ? 'Asking…'
+                : to
+                  ? `Ask ${accepted.find((friend) => friend.userId === to)?.username ?? 'them'}`
+                  : 'Ask'}
+            </ButtonLabel>
+          </button>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 /** Whatever the move turned up to read. Absent entirely when it turned up nothing. */
 function Material({
   loading,
@@ -375,10 +499,8 @@ export function Review({
   const [noteProblem, setNoteProblem] = useState<string | null>(null)
   /** Open while the note is being rendered and handed over. */
   const [exporting, setExporting] = useState(false)
-  /** Which friend the ask composer is open for, or '' for none. */
-  const [asking, setAsking] = useState<string | null>(null)
-  const [askNote, setAskNote] = useState('')
-  const [askProblem, setAskProblem] = useState<string | null>(null)
+  /** Whether the ask composer is open, wherever it was opened from. */
+  const [askOpen, setAskOpen] = useState(false)
   const [materialLoading, setMaterialLoading] = useState(false)
   /** Open when non-null. A move means "doing that move"; null means a free note. */
   const [composer, setComposer] = useState<{ move: MoveSpec | null } | null>(null)
@@ -524,13 +646,6 @@ export function Review({
     // Keyed on the phrases themselves: `lookUp` is a fresh array every render.
   }, [lookUpKey, serverUrl])
 
-  /** Open the ask composer, cleared of whatever the last one was left holding. */
-  function openAsk() {
-    setAsking('')
-    setAskNote('')
-    setAskProblem(null)
-  }
-
   function settle(decision: Decision) {
     if (!current) return
     setDecisions((previous) => ({ ...previous, [current.id]: decision }))
@@ -544,9 +659,7 @@ export function Review({
     setRejectionNote('')
     setNoting(null)
     setNoteProblem(null)
-    setAsking(null)
-    setAskNote('')
-    setAskProblem(null)
+    setAskOpen(false)
     setExporting(false)
   }
 
@@ -977,6 +1090,27 @@ export function Review({
               </div>
             ) : null}
 
+            {!composer && socialOn ? (
+              <div className="mt-3 flex flex-col gap-2">
+                {askOpen ? (
+                  <AskPanel
+                    blip={current}
+                    social={social}
+                    onClose={() => setAskOpen(false)}
+                    onShare={() => void actions.share(current.id, 'friends')}
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAskOpen(true)}
+                    className="self-start rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
+                  >
+                    ask someone else
+                  </button>
+                )}
+              </div>
+            ) : null}
+
             {noting && !composer ? (
               <Note
                 kind={noting}
@@ -1153,19 +1287,32 @@ export function Review({
                 this is the moment the question occurs to somebody: the move is not it, and
                 there is a person who might know better. It used to be a quiet link under the
                 card, which is where things go to be not found. */}
-            {socialOn && !current.demo ? (
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => openAsk()}
-                  className="rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
-                >
-                  ask a friend for a move
-                </button>
-                {social.friends.some((friend) => friend.status === 'accepted') ? null : (
-                  <span className="text-[11px] text-ink-faint">
-                    add one by username first — they have to say yes
-                  </span>
+            {/* Only when the friend's move is not the one on screen: there is one ask per
+                card, always in the place you were looking when you wanted it. */}
+            {socialOn && !current.demo && !friendMove ? (
+              <div className="mt-3 flex flex-col gap-2">
+                {askOpen ? (
+                  <AskPanel
+                    blip={current}
+                    social={social}
+                    onClose={() => setAskOpen(false)}
+                    onShare={() => void actions.share(current.id, 'friends')}
+                  />
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setAskOpen(true)}
+                      className="self-start rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
+                    >
+                      ask a friend for a move
+                    </button>
+                    {social.friends.some((friend) => friend.status === 'accepted') ? null : (
+                      <span className="text-[11px] text-ink-faint">
+                        add one by username first — they have to say yes
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             ) : null}
@@ -1332,116 +1479,25 @@ export function Review({
         </div>
       ) : null}
 
-      {/* Asking a person rather than the model. The button appears once, in the move card
-          when there is a suggestion to react to, and here when there is not — so there is
-          always exactly one way in and it is never below the fold. */}
-      {socialOn && !current.demo ? (
+      {/* Only when there is no suggestion to react to: with one, the ask lives in the move
+          card itself, which is where the question occurs to you. */}
+      {socialOn && !current.demo && !friendMove && !move ? (
         <div className="mt-3 flex flex-col items-center gap-2">
-          {asking === null ? (
-            friendMove || move ? null : (
-              <button
-                type="button"
-                onClick={() => openAsk()}
-                className="rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
-              >
-                ask a friend for a move
-              </button>
-            )
+          {askOpen ? (
+            <AskPanel
+              blip={current}
+              social={social}
+              onClose={() => setAskOpen(false)}
+              onShare={() => void actions.share(current.id, 'friends')}
+            />
           ) : (
-            <div className="flex w-full flex-col gap-2 rounded-2xl border border-line bg-surface/60 p-3">
-              <p className="text-[11px] tracking-wide text-ink-faint uppercase">
-                ask a friend for a move
-              </p>
-
-              {current.visibility !== 'friends' ? (
-                <p className="text-xs text-ink-soft">
-                  This one is private, so nobody can be shown it. Make it{' '}
-                  <button
-                    type="button"
-                    onClick={() => void actions.share(current.id, 'friends')}
-                    className="underline"
-                  >
-                    shared with friends
-                  </button>{' '}
-                  first — asking somebody is showing them.
-                </p>
-              ) : social.friends.filter((friend) => friend.status === 'accepted').length === 0 ? (
-                <p className="text-xs text-ink-soft">
-                  You have not added anyone yet. Friends are added by username, and they have to say
-                  yes.
-                </p>
-              ) : (
-                <>
-                  <div className="flex flex-wrap gap-1.5">
-                    {social.friends
-                      .filter((friend) => friend.status === 'accepted')
-                      .map((friend) => (
-                        <button
-                          key={friend.userId}
-                          type="button"
-                          onClick={() => setAsking(friend.userId)}
-                          className={`rounded-full px-3 py-1.5 text-[11px] ${
-                            asking === friend.userId
-                              ? 'bg-accent text-surface'
-                              : 'border border-line text-ink-soft'
-                          }`}
-                        >
-                          {friend.username}
-                        </button>
-                      ))}
-                  </div>
-                  <input
-                    value={askNote}
-                    onChange={(event) => setAskNote(event.target.value)}
-                    placeholder="anything you want to say about it (optional)"
-                    className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
-                  />
-                  {askProblem ? <p className="text-xs text-warn">{askProblem}</p> : null}
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setAsking(null)}
-                      className="quiet text-xs underline"
-                    >
-                      cancel
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!asking || busy}
-                      onClick={() =>
-                        void (async () => {
-                          const friend = social.friends.find(
-                            (candidate) => candidate.userId === asking,
-                          )
-                          if (!friend) return
-                          setBusy(true)
-                          try {
-                            const problemText = await social.ask({
-                              to: friend,
-                              context: askContextFor(current),
-                              note: askNote.trim() || undefined,
-                            })
-                            setAskProblem(problemText)
-                            if (!problemText) setAsking(null)
-                          } finally {
-                            setBusy(false)
-                          }
-                        })()
-                      }
-                      className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
-                    >
-                      <ButtonLabel busy={busy}>
-                        {busy
-                          ? 'Asking…'
-                          : asking
-                            ? `Ask ${social.friends.find((f) => f.userId === asking)?.username ?? 'them'}`
-                            : 'Ask'}
-                      </ButtonLabel>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+            <button
+              type="button"
+              onClick={() => setAskOpen(true)}
+              className="rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
+            >
+              ask a friend for a move
+            </button>
           )}
 
           {current.friendAsks.length > 0 ? (

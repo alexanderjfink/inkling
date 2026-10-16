@@ -36,6 +36,7 @@ export interface MoveRejection {
   spec: MoveSpec
   at: string
   reason?: string
+  note?: string
   context: RejectionContext
 }
 
@@ -185,6 +186,7 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
         spec: event.moveSpec,
         at: event.at,
         reason: event.reason,
+        note: event.note,
         context: event.context,
       })
       // And in the history, so it is not offered again — and so the move log shows it as

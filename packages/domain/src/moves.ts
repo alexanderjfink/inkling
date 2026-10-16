@@ -469,6 +469,19 @@ export function buildMovePrompt(
     .map((entry) => `- "${entry.spec.title}" — ${entry.outcome === 'done' ? 'done' : 'put down'}`)
     .join('\n')
 
+  // What has been judged bad here, and why.
+  //
+  // The strongest signal there is that a direction is wrong, and the only one that says
+  // *why*. Without it the model has no way to know that the move it is about to offer is
+  // the kind of thing that was just refused — which is exactly what a rejection means.
+  const rejected = blip.rejections
+    .slice(-5)
+    .map(
+      (rejection) =>
+        `- "${rejection.spec.title}"${rejection.reason ? ` — ${rejection.reason}` : ''}`,
+    )
+    .join('\n')
+
   const menu = candidates
     .slice(0, 8)
     .map(
@@ -485,6 +498,9 @@ export function buildMovePrompt(
     entries ? `WHAT THEY HAVE ALREADY WRITTEN:\n${entries}` : '',
     related ? `RELATED BLIPS:\n${related}` : '',
     history ? `MOVES ALREADY PUT IN FRONT OF THEM:\n${history}` : '',
+    rejected
+      ? `JUDGED BAD FOR THIS BLIP, with the reason given — do not offer anything like these:\n${rejected}`
+      : '',
     `TIMES THEY HAVE PUT THIS DOWN: ${blip.schedule.timesSkipped}`,
     '',
     `MOVES TO CHOOSE FROM:\n${menu}`,
@@ -492,6 +508,9 @@ export function buildMovePrompt(
     'Choose one id from the list and adapt its title, why and goal to this specific blip.',
     'Do not repeat a move they have already had: either pick a different one, or take the',
     'same kind of move from an angle you have not used yet.',
+    'Where a move was judged bad, treat the reason as a correction: if it was too vague, be',
+    'concrete; if it was too big, make it smaller; if it had nothing to do with this, use',
+    "the blip's own words instead of a general angle.",
     'Keep the time limit under 5 minutes.',
     'Reply with exactly:',
     '{"id": "<one id from the list>", "title": "...", "why": "...", "goal": "...", "timeLimitSec": 120, "query": "<only if the move looks something up>"}',

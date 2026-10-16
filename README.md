@@ -288,8 +288,18 @@ That context is the point. A rejection on its own says "wrong"; the context says
 the time anyone looks, because the move history holds only what was offered, not what it
 was offered for.
 
-A rejected move is not offered again for that Inkling. **Settings → Backup → Download bad
-suggestions** writes every one of them as JSONL, one per line, ready to read.
+A rejected move is not offered again, and **the rejection goes into the prompt for the
+next one** — so it is a correction rather than a reroll. The reason is treated as
+instruction: *too vague* asks for something concrete, *too big* for something smaller,
+*nothing to do with this* for the blip's own words. You can tap a reason, type your own,
+or both; the two are stored separately because a category and a detail are different
+things.
+
+A new suggestion comes back for the *same* Inkling, because "this is bad" is a request for
+a better one, not a reason to move on.
+
+**Settings → Backup → Download bad suggestions** writes every one of them as JSONL, one
+per line, ready to read.
 
 *The first rejection collected immediately showed something: the topics extracted for that
 Inkling were "behave", "different", "differently". Those drive relatedness and resurfacing,

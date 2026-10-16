@@ -44,7 +44,15 @@ export function useSuggestedMove(
   const avoidIds = avoid.blipId === blipId ? avoid.ids : []
   const relatedIds = related.map((other) => other.id).join(',')
   const savedId = blip?.savedMove?.id ?? ''
-  const key = blip ? `${blipId}:${avoidIds.join(',')}:${revision}` : ''
+  /**
+   * Part of the key because a rejection changes what the prompt should say.
+   *
+   * Keyed on the count rather than bumped by hand: the refetch has to happen *after* the
+   * rejection is in the projection, or the new move is chosen by a model that has not
+   * been told what was just refused — which is the whole point of refusing it.
+   */
+  const rejections = blip?.rejections.length ?? 0
+  const key = blip ? `${blipId}:${avoidIds.join(',')}:${revision}:${rejections}` : ''
 
   /**
    * The blip, without depending on its identity.

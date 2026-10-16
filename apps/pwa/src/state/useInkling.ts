@@ -69,6 +69,7 @@ export interface InklingActions {
     moveSpec: MoveSpec,
     context: RejectionContext,
     reason?: string,
+    note?: string,
   ): Promise<BlipEvent>
   /** Keep this move for later, or let it go. */
   saveMove(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
@@ -220,13 +221,14 @@ export function useInkling(accountId: string | null = null) {
       recordMoveShown(id, moveSpec) {
         return storage().append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
       },
-      rejectMove(id, moveSpec, context, reason) {
+      rejectMove(id, moveSpec, context, reason, note) {
         return storage().append({
           t: 'moveRejected',
           id,
           moveId: moveSpec.id,
           moveSpec,
           reason,
+          note,
           context,
         })
       },

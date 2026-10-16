@@ -273,6 +273,8 @@ export function Review({
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   /** Open when the person is saying a suggestion was bad, rather than just unwanted. */
   const [rejecting, setRejecting] = useState(false)
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null)
+  const [rejectionNote, setRejectionNote] = useState('')
   /**
    * Bumped when the move history changes underneath the suggestion — forgetting the
    * offers, say — so the card is reconsidered rather than left holding the suggestion
@@ -398,6 +400,8 @@ export function Review({
     setEditing(false)
     setConfirmingDelete(false)
     setRejecting(false)
+    setRejectionReason(null)
+    setRejectionNote('')
   }
 
   /**
@@ -419,15 +423,30 @@ export function Review({
     }
   }
 
-  /** Say a suggestion was bad. A reason is welcome but never required. */
-  async function reject(reason?: string) {
+  /**
+   * Say a suggestion was bad, and ask for a better one for the same Inkling.
+   *
+   * Deliberately not a decision about the Inkling: "this is bad" is a request for another
+   * suggestion, not a reason to move on. The rejection goes into the prompt for the next
+   * one, so it is a correction rather than a reroll — and the refetch is keyed on the
+   * rejection count, so it cannot happen before the rejection is in the projection.
+   */
+  async function reject() {
     if (!current || !move) return
     const context = rejectionContext()
     if (!context) return
     setBusy(true)
     try {
-      await actions.rejectMove(current.id, move, context, reason)
-      settle('rejected')
+      await actions.rejectMove(
+        current.id,
+        move,
+        context,
+        rejectionReason ?? undefined,
+        rejectionNote.trim() || undefined,
+      )
+      setRejecting(false)
+      setRejectionReason(null)
+      setRejectionNote('')
     } finally {
       setBusy(false)
     }
@@ -875,33 +894,53 @@ export function Review({
                       key={reason}
                       type="button"
                       disabled={busy}
-                      onClick={() => void reject(reason)}
-                      className="rounded-full border border-line px-2.5 py-1 text-[11px] text-ink-soft disabled:opacity-50"
+                      onClick={() =>
+                        setRejectionReason((chosen) => (chosen === reason ? null : reason))
+                      }
+                      className={`rounded-full px-2.5 py-1 text-[11px] disabled:opacity-50 ${
+                        rejectionReason === reason
+                          ? 'bg-accent text-surface'
+                          : 'border border-line text-ink-soft'
+                      }`}
                     >
                       {reason}
                     </button>
                   ))}
                 </div>
+                <input
+                  value={rejectionNote}
+                  onChange={(event) => setRejectionNote(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') void reject()
+                  }}
+                  placeholder="or say it in your own words"
+                  className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
+                />
                 <div className="flex items-center gap-4 text-xs">
                   <button
                     type="button"
                     disabled={busy}
                     onClick={() => void reject()}
-                    className="quiet underline disabled:opacity-50"
+                    className="rounded-full bg-ink px-3.5 py-1.5 font-semibold text-surface disabled:opacity-40"
                   >
-                    just mark it bad
+                    <ButtonLabel busy={busy}>{busy ? 'Marking…' : 'Mark it bad'}</ButtonLabel>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setRejecting(false)}
+                    onClick={() => {
+                      setRejecting(false)
+                      setRejectionReason(null)
+                      setRejectionNote('')
+                    }}
                     className="quiet underline"
                   >
                     cancel
                   </button>
                 </div>
                 <p className="text-[11px] text-ink-faint">
-                  Kept with this Inkling, along with what the move was working from, so the
-                  suggestions can be improved later. It will not be offered again.
+                  Another move will be suggested for this Inkling, and this one goes into the prompt
+                  as a correction — kept with what it was working from, so it can be looked at
+                  later.
                 </p>
               </div>
             ) : null}

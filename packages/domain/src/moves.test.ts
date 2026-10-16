@@ -644,3 +644,112 @@ describe('marking a suggestion as bad', () => {
     }
   })
 })
+
+describe('a rejection teaches the next suggestion', () => {
+  const meta = (seq: number) => ({
+    deviceId: 'dev-a',
+    seq,
+    // Padded, because this test needs more than nine events and `2026-03-010` is not a
+    // date — the sort would then be wrong and the test would pass for the wrong reason.
+    at: `2026-03-${String(seq).padStart(2, '0')}T00:00:00Z`,
+  })
+
+  const spec: MoveSpec = {
+    id: 'any.read',
+    title: 'Read a short summary of what makes sourdough starters act differently',
+    why: 'because',
+    timeLimitSec: 240,
+    goal: 'one sentence naming a specific reason',
+    playbook: 'any',
+    generatedBy: 'llm',
+  }
+
+  const context: RejectionContext = {
+    blipType: 'yearning',
+    blipTitle: 'why do starters behave differently',
+    topics: ['behave', 'different'],
+    entries: 0,
+    alreadyOffered: ['any.read'],
+    related: [],
+  }
+
+  function blipWithRejection(reason?: string) {
+    const [blip] = project([
+      {
+        ...meta(1),
+        t: 'captured',
+        id: 'x',
+        input: { kind: 'text', text: 'why do starters behave differently' },
+        type: 'yearning',
+      },
+      { ...meta(2), t: 'moveShown', id: 'x', moveId: 'any.read', moveSpec: spec },
+      {
+        ...meta(3),
+        t: 'moveRejected',
+        id: 'x',
+        moveId: 'any.read',
+        moveSpec: spec,
+        reason,
+        context,
+      },
+    ])
+    if (!blip) throw new Error('expected a blip')
+    return blip
+  }
+
+  test('the prompt says what was refused, and why', () => {
+    // Without this the model has no way to know that the move it is about to offer is the
+    // kind of thing that was just refused — which is what a rejection means.
+    const blip = blipWithRejection('too vague to act on')
+    const { prompt } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
+    expect(prompt).toContain('JUDGED BAD FOR THIS BLIP')
+    expect(prompt).toContain('what makes sourdough starters act differently')
+    expect(prompt).toContain('too vague to act on')
+  })
+
+  test('and tells the model what to do about the reason, not only what to avoid', () => {
+    const blip = blipWithRejection('too vague to act on')
+    const { prompt } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
+    expect(prompt).toContain('treat the reason as a correction')
+    expect(prompt).toContain('if it was too vague, be')
+    expect(prompt).toContain('if it was too big, make it smaller')
+  })
+
+  test('a rejection with no reason is still carried, because the refusal is the signal', () => {
+    const blip = blipWithRejection()
+    const { prompt } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
+    expect(prompt).toContain('JUDGED BAD FOR THIS BLIP')
+    expect(prompt).toContain('what makes sourdough starters act differently')
+  })
+
+  test('an Inkling with no rejections gets no such section', () => {
+    const blip = makeBlip('yearning', 'why do starters behave differently')
+    const { prompt } = buildMovePrompt({ blip }, candidateTemplates({ blip }))
+    expect(prompt).not.toContain('JUDGED BAD')
+  })
+
+  test('only the recent ones are carried, so the prompt does not fill up with them', () => {
+    const many = Array.from({ length: 9 }, (_, index) => ({
+      ...meta(index + 2),
+      t: 'moveRejected' as const,
+      id: 'x',
+      moveId: `m${index}`,
+      moveSpec: { ...spec, id: `m${index}`, title: `rejected number ${index}` },
+      reason: 'nothing to do with this',
+      context,
+    }))
+    const [blip] = project([
+      {
+        ...meta(1),
+        t: 'captured',
+        id: 'x',
+        input: { kind: 'text', text: 'x' },
+        type: 'yearning',
+      },
+      ...many,
+    ])
+    const { prompt } = buildMovePrompt({ blip: blip! }, candidateTemplates({ blip: blip! }))
+    expect(prompt).toContain('rejected number 8')
+    expect(prompt).not.toContain('rejected number 0')
+  })
+})

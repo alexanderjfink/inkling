@@ -111,7 +111,9 @@ export function renderMarkdownBackup(blips: Blip[], now = new Date()): string {
       lines.push('', '**Suggestions marked bad**')
       for (const rejection of blip.rejections) {
         lines.push(
-          `- ${rejection.spec.title}${rejection.reason ? ` — ${rejection.reason}` : ''} (${rejection.at.slice(0, 10)})`,
+          `- ${rejection.spec.title}${rejection.reason ? ` — ${rejection.reason}` : ''}${
+            rejection.note ? `: ${rejection.note}` : ''
+          } (${rejection.at.slice(0, 10)})`,
         )
       }
     }
@@ -170,6 +172,7 @@ export function rejectionRows(blips: Blip[]): unknown[] {
     blip.rejections.map((rejection) => ({
       at: rejection.at,
       reason: rejection.reason ?? null,
+      note: rejection.note ?? null,
       move: {
         id: rejection.moveId,
         title: rejection.spec.title,

@@ -252,7 +252,10 @@ export type BlipEventBody =
       id: string
       moveId: string
       moveSpec: MoveSpec
+      /** One of REJECTION_REASONS, when one was tapped. */
       reason?: string
+      /** What they typed, in their own words. Not a replacement for the reason. */
+      note?: string
       context: RejectionContext
     }
   /** Keep this move for later, rather than losing it when the card moves on. */

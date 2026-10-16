@@ -272,32 +272,47 @@ describe('accounts do not see each other', () => {
         }),
       ),
     )
+    // Priya is a member, so she cannot set the model — it is the server's now, and only an
+    // admin changes it. Her own settings are still hers.
     await handle(
       api(
         '/config',
-        authed(priya.token, {
-          method: 'PUT',
-          body: JSON.stringify({ model: 'priya-model', vault: '/tmp/priya-vault' }),
-        }),
+        authed(priya.token, { method: 'PUT', body: JSON.stringify({ vault: '/tmp/priya-vault' }) }),
+      ),
+    )
+    await handle(
+      api(
+        '/config',
+        authed(sam.token, { method: 'PUT', body: JSON.stringify({ model: 'priya-model' }) }),
       ),
     )
 
     const samConfig = (await (await handle(api('/config', authed(sam.token)))).json()).config
     const priyaConfig = (await (await handle(api('/config', authed(priya.token)))).json()).config
-    expect(samConfig.model).toBe('sam-model')
     expect(samConfig.vault).toBe('/tmp/sam-vault')
-    expect(priyaConfig.model).toBe('priya-model')
     expect(priyaConfig.vault).toBe('/tmp/priya-vault')
+
+    // The model is one thing for the server, not one thing per person: it runs on the
+    // server, it holds the keys, and every account is asking the same process. So the last
+    // one written wins and both accounts see it — which is the point of the change.
+    expect(samConfig.model).toBe('priya-model')
+    expect(priyaConfig.model).toBe('priya-model')
   })
 
   test('the settings files really are in separate directories', async () => {
     const { handle } = await harness()
     const sam = await setupAdmin(handle)
     await handle(
-      api('/config', authed(sam.token, { method: 'PUT', body: JSON.stringify({ model: 'x' }) })),
+      api(
+        '/config',
+        authed(sam.token, { method: 'PUT', body: JSON.stringify({ vault: '/tmp/x' }) }),
+      ),
     )
     const path = join(dir, 'users', sam.user.id, 'config.json')
-    expect(JSON.parse(await readFile(path, 'utf8')).model).toBe('x')
+    expect(JSON.parse(await readFile(path, 'utf8')).vault).toBe('/tmp/x')
+
+    // And the model is not in there at all, because it is not the account's to keep.
+    expect(JSON.parse(await readFile(path, 'utf8')).model).toBeUndefined()
   })
 })
 
@@ -601,8 +616,13 @@ describe('adopting data from before accounts existed', () => {
     const log = await (await handle(api('/logs/olddevice01', authed(sam.token)))).text()
     expect(log).toContain('from before')
 
+    // The model was per account before this, so it is lifted onto the server rather than
+    // left behind: nobody should have to find and re-paste a key because of a change they
+    // did not ask for.
     const config = (await (await handle(api('/config', authed(sam.token)))).json()).config
     expect(config.model).toBe('old-model')
+    const onDisk = JSON.parse(await readFile(join(dir, 'server.json'), 'utf8'))
+    expect(onDisk.model).toBe('old-model')
     expect(config.vault).toBe('/tmp/old-vault')
 
     expect(accounts.adopted()).toHaveLength(1)
@@ -680,11 +700,13 @@ describe('adopting data from before accounts existed', () => {
     expect(links.status).toBe(200)
 
     const own = JSON.parse(await readFile(join(dir, 'users', sam.user.id, 'config.json'), 'utf8'))
-    expect(own.model).toBe('old-model')
+    // Both kinds of server setting leave the person's config: the TWA fields always did,
+    // and the model does now that it is one thing for the whole machine.
+    expect(own.model).toBeUndefined()
     expect(own.twaPackage).toBeUndefined()
-    expect(JSON.parse(await readFile(join(dir, 'server.json'), 'utf8')).twaPackage).toBe(
-      'app.inkling.mobile',
-    )
+    const server = JSON.parse(await readFile(join(dir, 'server.json'), 'utf8'))
+    expect(server.twaPackage).toBe('app.inkling.mobile')
+    expect(server.model).toBe('old-model')
   })
 })
 

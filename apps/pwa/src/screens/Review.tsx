@@ -27,6 +27,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Blocks } from '../components/Blocks'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { EntryContextPanel } from '../components/EntryContext'
+import { ExportNote } from '../components/ExportNote'
+import { PROMOTE_ENABLED } from '../features'
 import { Markdown } from '../components/Markdown'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 import { StoredImage } from '../components/StoredImage'
@@ -371,6 +373,8 @@ export function Review({
   const [links, setLinks] = useState<MoveLink[]>([])
   const [noting, setNoting] = useState<'kudos' | 'thanks' | null>(null)
   const [noteProblem, setNoteProblem] = useState<string | null>(null)
+  /** Open while the note is being rendered and handed over. */
+  const [exporting, setExporting] = useState(false)
   /** Which friend the ask composer is open for, or '' for none. */
   const [asking, setAsking] = useState<string | null>(null)
   const [askNote, setAskNote] = useState('')
@@ -536,6 +540,7 @@ export function Review({
     setAsking(null)
     setAskNote('')
     setAskProblem(null)
+    setExporting(false)
   }
 
   /**
@@ -1243,16 +1248,32 @@ export function Review({
             this one became a note: {current.export.notePath}
           </p>
         ) : null}
+
+        {/* Taking the note does not finish the Inkling — you may well come back to it —
+            so this sits on the card rather than replacing the card with a receipt. */}
+        {exporting ? (
+          <ExportNote
+            blip={current}
+            related={currentRelated.map((entry_) => entry_.blip)}
+            provider={provider}
+            onClose={() => setExporting(false)}
+            onPromoted={(filename) => setLastNote({ title: current.title, path: filename })}
+          />
+        ) : null}
       </div>
 
       <div className="mt-6 flex items-start justify-center gap-6">
-        <ActionButton
-          icon="↑"
-          label="Promote to note"
-          onClick={() => void promote()}
-          busy={promotingId === current.id}
-          busyLabel="writing the note…"
-        />
+        {PROMOTE_ENABLED ? (
+          <ActionButton
+            icon="↑"
+            label="Promote to note"
+            onClick={() => void promote()}
+            busy={promotingId === current.id}
+            busyLabel="writing the note…"
+          />
+        ) : (
+          <ActionButton icon="↑" label="Export to note" onClick={() => setExporting((on) => !on)} />
+        )}
         <ActionButton
           icon="+"
           label="Add entry"

@@ -6,6 +6,7 @@ import {
   validateUsername,
 } from '@inkling/domain'
 import { useCallback, useEffect, useState } from 'react'
+import type { useServerConfig } from '../state/useServerConfig'
 import {
   addUser,
   listUsers,
@@ -15,6 +16,8 @@ import {
   setUserRole,
 } from '../admin'
 import { Dashboard } from '../components/Dashboard'
+import { ModelSettings } from '../components/ModelSettings'
+import { Section } from '../components/SettingsBits'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 
 const field =
@@ -33,7 +36,19 @@ function when(value: string): string {
  * you cannot delete yourself, and a password is checked for length. This screen repeats
  * them only so the refusal appears before the round trip, not instead of it.
  */
-export function Admin({ serverUrl, me }: { serverUrl: string; me: PublicUser }) {
+export function Admin({
+  serverUrl,
+  me,
+  serverConfig,
+  modelStatus,
+  onRefreshModel,
+}: {
+  serverUrl: string
+  me: PublicUser
+  serverConfig: ReturnType<typeof useServerConfig>
+  modelStatus: { baseUrl: string | null; embedBaseUrl: string | null } | null
+  onRefreshModel: () => Promise<void>
+}) {
   const [users, setUsers] = useState<PublicUser[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
@@ -125,6 +140,21 @@ export function Admin({ serverUrl, me }: { serverUrl: string; me: PublicUser }) 
         error={overviewError}
         onRefresh={() => void loadOverview()}
       />
+
+      {/* One model for the whole server, so it is set here rather than in each person's
+          settings: it runs on this machine, it holds the keys, and every account is asking
+          the same process. */}
+      <Section
+        title="Model"
+        hint="Saved settings override the server environment. Keys are written, never read back. One model for the whole server — everybody here is asking the same process."
+      >
+        <ModelSettings
+          serverConfig={serverConfig}
+          serverUrl={serverUrl}
+          modelStatus={modelStatus}
+          onRefreshModel={onRefreshModel}
+        />
+      </Section>
 
       <p className="text-[11px] tracking-wide text-ink-faint uppercase">accounts</p>
       <p className="text-xs text-ink-soft">

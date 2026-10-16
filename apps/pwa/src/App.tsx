@@ -248,7 +248,13 @@ export default function App() {
       ) : null}
 
       {ready && screen === 'admin' && auth.user ? (
-        <Admin serverUrl={server.serverUrl} me={auth.user} />
+        <Admin
+          serverUrl={server.serverUrl}
+          me={auth.user}
+          serverConfig={serverConfig}
+          modelStatus={syncState.model}
+          onRefreshModel={syncState.refreshModel}
+        />
       ) : null}
 
       {ready && screen === 'add' ? (

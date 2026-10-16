@@ -162,21 +162,36 @@ describe('buildRuntime', () => {
 })
 
 describe('config routes', () => {
+  /**
+   * A server with settings, and with the model fields where they now live.
+   *
+   * `serverSettings` is the bridge for the fields that describe the server — the model and
+   * its keys — which used to be per account and are now one thing for the whole machine.
+   */
   function withBridge(initial: ServerConfig = {}) {
     let config = initial
     let runtime: Runtime = buildRuntime(config)
+    let server = initial
     const handle = createHandler(new FileStore(dir), {
       runtime: () => runtime,
       settings: {
         read: async () => ({ config, runtime }),
         update: async (patch) => {
           config = mergeConfig(config, patch)
-          runtime = buildRuntime(config)
+          runtime = buildRuntime({ ...server, vault: config.vault, folder: config.folder })
           return { config, runtime, problems: [] }
         },
       },
+      serverSettings: {
+        read: async () => ({ config: server, runtime: buildRuntime(server) }),
+        update: async (patch) => {
+          server = mergeConfig(server, patch)
+          runtime = buildRuntime({ ...server, vault: config.vault, folder: config.folder })
+          return { config: server, runtime: buildRuntime(server), problems: [] }
+        },
+      },
     })
-    return { handle, current: () => config }
+    return { handle, current: () => config, server: () => server }
   }
 
   test('answers 503 when the server has no settings bridge', async () => {
@@ -395,23 +410,31 @@ describe('a model server that is not where the preset says', () => {
    */
   async function withServer(initial: ServerConfig = {}) {
     const dir = await mkdtemp(join(tmpdir(), 'inkling-baseurl-'))
-    let config = initial
-    let runtime: Runtime = buildRuntime(config)
+    let config: ServerConfig = {}
+    let server: ServerConfig = initial
+    const runtime = () => buildRuntime({ ...server, vault: config.vault, folder: config.folder })
     const handle = createHandler(new FileStore(dir), {
-      runtime: () => runtime,
+      runtime,
       settings: {
-        read: async () => ({ config, runtime }),
+        read: async () => ({ config, runtime: runtime() }),
         update: async (patch) => {
           config = mergeConfig(config, patch)
+          await saveConfig(dir, config)
+          return { config, runtime: runtime(), problems: [] }
+        },
+      },
+      serverSettings: {
+        read: async () => ({ config: server, runtime: runtime() }),
+        update: async (patch) => {
+          server = mergeConfig(server, patch)
           // Persist, as the real bridge does — otherwise "survives a restart" would not
           // actually be testing anything.
-          await saveConfig(dir, config)
-          runtime = buildRuntime(config)
-          return { config, runtime, problems: [] }
+          await saveConfig(dir, server, 'server.json')
+          return { config: server, runtime: runtime(), problems: [] }
         },
       },
     })
-    return { handle, dir, current: () => config }
+    return { handle, dir, current: () => server }
   }
 
   const put = (handle: (r: Request) => Promise<Response>, body: unknown) =>
@@ -500,7 +523,8 @@ describe('a model server that is not where the preset says', () => {
     const { handle, dir } = await withServer()
     try {
       await put(handle, { provider: 'ollama', baseUrl: 'https://ollama.example.com/v1' })
-      const saved = await loadConfig(dir)
+      // In the server's own file, because the model is one thing for the whole machine.
+      const saved = await loadConfig(dir, 'server.json')
       expect(saved.baseUrl).toBe('https://ollama.example.com/v1')
       expect(buildRuntime(saved).status.baseUrl).toBe('https://ollama.example.com/v1')
     } finally {

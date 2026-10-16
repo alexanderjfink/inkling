@@ -557,6 +557,48 @@ Typing a topic into the Today box — or advancing a blip with that topic — of
 matching snoozed blips as "bring them in". Offered rather than injected, so the finite
 list stays finite.
 
+## Settings, and the model
+
+Settings is five tabs, because there is genuinely more than one kind of thing on it and a
+single column of twelve sections is a screen you scroll past rather than read.
+
+| | |
+|---|---|
+| **You** | your account, the theme, reminders |
+| **Sync** | the server, backups, the Android app, storage |
+| **Notes** | where notes go, when writing them comes back |
+| **Friends** | the social half, and who you can ask |
+| **About** | help, feedback, the build |
+
+**The model is not in there any more.** It moved to the admin screen, and it is now one
+model for the whole server rather than one per account. That is the honest shape: it runs on
+the server, it holds the keys, and every account is asking the same process. A per-account
+copy of a server-wide fact was two places to change one thing, and it meant anybody with an
+account could point the server at an address of their choosing.
+
+Moving it does not lose an existing key. At startup, if the server has no model settings and
+somebody's account does, they are lifted onto the server and deleted from the account — so
+nobody has to find and re-paste a key because of a change they did not ask for.
+
+The vault stays per account: a note goes into one person's folder, not everybody's.
+
+## Writing a note out
+
+**Promoting to a note is switched off for now** (`PROMOTE_ENABLED` in
+`apps/pwa/src/features.ts`). Putting a file into somebody's vault is a promise about their
+file system, and it needs the path to be right, the folder to exist and the naming to be
+settled before it is worth making.
+
+**Export to note** replaces it, and does everything up to the file: the note is rendered
+exactly as it would have been written — frontmatter, what you collected, the moves, what it
+links to — and then handed over. **Download** saves it, **Copy** puts it on the clipboard,
+and **Share** opens the system share sheet with it as a real `.md` file, so a phone offers
+Notes, Obsidian, Files or Messages.
+
+Nothing is lost by turning promoting back on. The path is still here, the server route is
+still there, the vault settings are still there, and the next steps are still drafted — the
+only difference is who does the last step.
+
 ## Configuring it
 
 Almost everything is editable from the app — Home → **⚙** — and takes effect

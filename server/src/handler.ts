@@ -127,6 +127,13 @@ function configPatch(body: Record<string, unknown>): ServerConfig {
     const value = body[key]
     if (typeof value === 'string') target[key] = value.trim()
   }
+  // Booleans and one-word choices, which are neither strings nor numbers. They were
+  // missing here, so the social settings saved nothing at all — a form that appears to
+  // work and silently discards what you told it.
+  if (typeof body.socialEnabled === 'boolean') target.socialEnabled = body.socialEnabled
+  if (body.shareDefault === 'friends' || body.shareDefault === 'private') {
+    target.shareDefault = body.shareDefault
+  }
   const similarity = body.embedSimilarity
   if (similarity === null) {
     target.embedSimilarity = null
@@ -221,8 +228,32 @@ function isPublic(path: string): boolean {
  * they belong to the server rather than to a person. Everything else on the settings
  * screen is per account.
  */
+/**
+ * Which settings describe the server rather than the person signed in.
+ *
+ * The model is here now, and that is the point of the change: it runs on the server, it
+ * holds the keys, and every account is asking the same process. A per-account copy of a
+ * server-wide fact was two places to change one thing, and it let anybody with an account
+ * point the server at an address of their choosing.
+ *
+ * The vault stays per account: a note goes into one person's folder, not everybody's.
+ */
+const SERVER_FIELDS = new Set([
+  'twaPackage',
+  'twaFingerprint',
+  'provider',
+  'model',
+  'embedProvider',
+  'embedModel',
+  'embedSimilarity',
+  'baseUrl',
+  'embedBaseUrl',
+  'apiKey',
+  'embedApiKey',
+])
+
 function isServerField(key: string): boolean {
-  return key === 'twaPackage' || key === 'twaFingerprint'
+  return SERVER_FIELDS.has(key)
 }
 
 function splitPatch(patch: ServerConfig): { server: ServerConfig; account: ServerConfig } {
@@ -639,10 +670,16 @@ export function createHandler(
         if (!options.serverSettings) return {}
         return (await options.serverSettings.read()).config
       }
+      // The server's own fields are read from the server, so the app sees one answer
+      // rather than whatever the account happens to have stored.
       const withServer = (config: ServerConfig, runtime: Runtime, server: ServerConfig) => ({
         ...publicConfig(config, runtime),
         twaPackage: server.twaPackage ?? null,
         twaFingerprint: server.twaFingerprint ?? null,
+        baseUrl: server.baseUrl ?? null,
+        embedBaseUrl: server.embedBaseUrl ?? null,
+        apiKeySet: Boolean(server.apiKey),
+        embedApiKeySet: Boolean(server.embedApiKey),
       })
 
       if (request.method === 'GET') {
@@ -664,7 +701,10 @@ export function createHandler(
         }
 
         if (Object.keys(server).length > 0) {
-          if (user?.role !== 'admin') {
+          // Only an admin, when there are accounts at all. A server with none has one
+          // person using it and nobody to be an admin *of* — and refusing them would mean
+          // a single-user server could never set its own model.
+          if (options.auth && user?.role !== 'admin') {
             return json({ error: 'only an admin can change the app settings' }, 403)
           }
           if (!options.serverSettings) {

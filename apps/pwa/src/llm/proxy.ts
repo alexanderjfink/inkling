@@ -21,6 +21,8 @@ export interface ModelHealth {
   /** Where the request actually goes, after any override in Settings. */
   baseUrl: string | null
   embedBaseUrl: string | null
+  /** Which build the server is running, to compare against this app's own. */
+  build: string | null
   note: string | null
 }
 
@@ -37,6 +39,7 @@ const UNKNOWN: ModelHealth = {
   keySource: null,
   baseUrl: null,
   embedBaseUrl: null,
+  build: null,
   note: null,
 }
 

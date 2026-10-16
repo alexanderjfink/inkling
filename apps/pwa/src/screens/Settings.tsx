@@ -2,6 +2,7 @@ import type { Blip, BlipEvent } from '@inkling/domain'
 import { validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import { changeOwnPassword } from '../admin'
+import { APP_BUILD } from '../build'
 import type { Auth } from '../state/useAuth'
 import { BACKUP_LAST_KEY, daysSince, downloadBackup, downloadMarkdownBackup } from '../backup'
 import { ButtonLabel } from '../components/Spinner'
@@ -591,6 +592,19 @@ export function Settings({
               ? '● checking…'
               : `● cannot reach ${serverUrl}`}
         </p>
+        {/* Which build is running on each side. Without this, "I rebuilt and nothing
+            changed" is unanswerable: a stale image looks exactly like a fix that did
+            not work. */}
+        <p className="text-xs text-ink-faint">
+          app {APP_BUILD} · server {syncState.model?.build ?? '—'}
+        </p>
+        {syncState.model?.build && syncState.model.build !== APP_BUILD ? (
+          <p className="text-xs text-warn">
+            The app and the server are different builds. The app comes from the image, so rebuilding
+            and restarting is what brings them back together — and if the app stamp has not moved,
+            the build did not pick up new code.
+          </p>
+        ) : null}
         {diagnosis.detail ? <p className="text-xs text-ink-soft">{diagnosis.detail}</p> : null}
 
         {status !== 'ok' ? (

@@ -7,6 +7,7 @@ import {
   sha256Hex,
 } from '@inkling/domain'
 import type { Auth } from './auth'
+import { BUILD } from './build'
 import type { ConfigProblem, Runtime, ServerConfig } from './config'
 import { assetLinks, publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
@@ -226,7 +227,7 @@ async function handlePublic(
   options: HandlerOptions,
 ): Promise<Response> {
   if (path === '/health') {
-    return json({ ok: true, service: 'inkling', time: new Date().toISOString() })
+    return json({ ok: true, service: 'inkling', build: BUILD, time: new Date().toISOString() })
   }
 
   const auth = options.auth
@@ -455,6 +456,7 @@ export function createHandler(
         keySource: live.status?.keySource ?? null,
         baseUrl: live.status?.baseUrl ?? null,
         embedBaseUrl: live.status?.embedBaseUrl ?? null,
+        build: BUILD,
         note: live.status?.note ?? null,
       })
     }

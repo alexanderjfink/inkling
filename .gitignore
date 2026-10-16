@@ -49,3 +49,4 @@ coverage/
 # Local tooling that has nothing to do with the project.
 .openchamber/
 .opencode/
+build-stamp

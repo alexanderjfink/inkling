@@ -3,8 +3,23 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+/**
+ * Which build this is.
+ *
+ * Stamped in at image build time from a hash of the source, so that "I rebuilt and
+ * nothing changed" has an answer instead of a guess. The app shows its own stamp and the
+ * server's side by side, and says so when they differ — which is what a stale image
+ * looks like from the inside.
+ *
+ * Unset outside a stamped build, so local development reads `dev` on both sides.
+ */
+const build = process.env.VITE_INKLING_BUILD?.trim() || 'dev'
+
 export default defineConfig({
   plugins: [react(), tailwindcss(), basicSsl()],
+  define: {
+    __INKLING_BUILD__: JSON.stringify(build),
+  },
   // Reachable from the phone. HTTPS is not optional here: a plain `http://<LAN-IP>`
   // page is not a secure context, so crypto.subtle (blob hashing) and OPFS are
   // unavailable on the device. Accept the self-signed certificate once on the phone.

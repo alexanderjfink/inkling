@@ -22,7 +22,16 @@ RUN bun install --frozen-lockfile
 COPY . .
 # Only the app needs building. The server runs its TypeScript directly under Bun,
 # so there is no second build step and no compiled output to keep in step.
-RUN bun run build
+#
+# The stamp is a hash of the source this image was built from. It goes into the app at
+# compile time and into a file beside it, and both are reported in Settings — because
+# "I rebuilt and nothing changed" needs an answer, and a stale image looks exactly like
+# a fix that did not work.
+RUN STAMP=$(find server/src packages/domain/src apps/pwa/src -type f \
+      \( -name '*.ts' -o -name '*.tsx' -o -name '*.css' -o -name '*.html' \) \
+      -exec cat {} + | sha256sum | cut -c1-8) \
+    && echo "$STAMP" > /app/.build-stamp \
+    && VITE_INKLING_BUILD="$STAMP" bun run build
 
 # --- run ----------------------------------------------------------------------
 FROM oven/bun:1 AS runtime

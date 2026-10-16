@@ -4,7 +4,6 @@ import {
   blockKindInfo,
   blockSummary,
   checklistCounts,
-  newBlock,
   pollLeader,
   progressFraction,
   withItemAdded,
@@ -123,25 +122,37 @@ export function Blocks({ blip, actions }: { blip: Blip; actions: InklingActions 
 }
 
 /**
- * A block, drawn but not usable.
+ * Structure being written, before there is an Inkling to attach it to.
  *
- * For showing what a choice will look like before the Inkling holding it exists. Inert by
- * pointer events rather than by disarming every control inside, which keeps one renderer
- * rather than two that drift.
+ * Usable, not a picture of itself: a checklist you cannot tick is a drawing of a checklist,
+ * and the point of adding one while you write is to put down the parts as you think of them.
+ * It is the same renderer as the card's, because two would drift.
  */
-export function BlockPreview({ kind }: { kind: BlockKind }) {
+export function DraftBlocks({
+  blocks,
+  onChange,
+  onStoreImage,
+}: {
+  blocks: Block[]
+  onChange: (blocks: Block[]) => void
+  onStoreImage: (file: File) => Promise<{ hash: string; mime: string }>
+}) {
+  const replace = (next: Block) =>
+    onChange(blocks.map((block) => (block.id === next.id ? next : block)))
+
   return (
-    <div className="pointer-events-none opacity-70">
-      <ul className="flex flex-col gap-3">
+    <ul className="flex flex-col gap-3">
+      {blocks.map((block) => (
         <BlockCard
-          block={newBlock(kind)}
+          key={block.id}
+          block={block}
           busy={null}
-          onPatch={() => {}}
-          onRemoveBlock={() => {}}
-          onStoreImage={async (file) => ({ hash: '', mime: file.type })}
+          onPatch={(change) => replace({ ...block, ...change })}
+          onRemoveBlock={() => onChange(blocks.filter((entry) => entry.id !== block.id))}
+          onStoreImage={onStoreImage}
         />
-      </ul>
-    </div>
+      ))}
+    </ul>
   )
 }
 

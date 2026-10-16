@@ -85,6 +85,24 @@ export async function setMyColor(url: string, color: string | null): Promise<Out
   return result.ok ? { ok: true, value: result.value.user } : result
 }
 
+/**
+ * A picture of you.
+ *
+ * Already shrunk by the caller: this is a face at thirty pixels, and the original photograph
+ * is several megabytes of detail nobody will ever see.
+ */
+export async function setMyAvatar(url: string, image: Blob): Promise<Outcome<PublicUser>> {
+  const body = new FormData()
+  body.set('avatar', image, 'avatar.webp')
+  const result = await call<{ user: PublicUser }>(url, '/auth/avatar', { method: 'PUT', body })
+  return result.ok ? { ok: true, value: result.value.user } : result
+}
+
+/** Take it away. The picture itself stays on disk; this is the account no longer pointing at it. */
+export async function clearMyAvatar(url: string): Promise<Outcome> {
+  return call(url, '/auth/avatar', { method: 'DELETE' })
+}
+
 /** Change your own password, from the settings screen. */
 export function changeOwnPassword(
   url: string,

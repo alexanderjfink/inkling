@@ -22,6 +22,14 @@ export interface PublicUser {
    * than the device, because it is about them, not about where they are.
    */
   color?: string
+  /**
+   * A picture, as the content hash of an image the server holds.
+   *
+   * A hash rather than a URL: the server is where it lives, and the address it is served from
+   * is the client's business — a phone on a Tailscale name and a laptop on localhost are
+   * looking at the same picture.
+   */
+  avatar?: string
 }
 
 /** The palette a person can be. Enough to tell people apart, few enough that they do not clash. */

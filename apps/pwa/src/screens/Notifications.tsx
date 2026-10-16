@@ -24,12 +24,16 @@ function Ask({
   note,
   username,
   color,
+  userId,
+  hash,
   children,
 }: {
   context: AskContext
   note?: string
   username: string
   color?: string
+  userId: string
+  hash?: string
   /** The action, inside the box rather than under it: this is one person's request, and a
    *  button floating below the card belongs to no card in particular. */
   children?: React.ReactNode
@@ -41,7 +45,7 @@ function Ask({
           appeared. It used to open with the type and the name in small grey capitals, which
           reads as metadata rather than as somebody. */}
       <div className="flex items-center gap-2.5">
-        <Avatar username={username} color={color} />
+        <Avatar username={username} color={color} userId={userId} hash={hash} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{username}</span>
           <span className="block text-[11px] tracking-wide text-ink-faint uppercase">
@@ -231,7 +235,13 @@ export function Notifications({
           <p className="text-[11px] tracking-wide text-ink-faint uppercase">
             suggesting for {picked.friend.username}
           </p>
-          <Ask context={picked.context} username={picked.friend.username} />
+          <Ask
+            context={picked.context}
+            username={picked.friend.username}
+            userId={picked.friend.userId}
+            color={picked.friend.color}
+            hash={picked.friend.avatar}
+          />
           <Suggest
             context={picked.context}
             onCancel={onClearPicked}
@@ -269,6 +279,8 @@ export function Notifications({
                   note={ask.note}
                   username={ask.username}
                   color={friend.color}
+                  userId={friend.userId}
+                  hash={friend.avatar}
                 >
                   {openFor !== ask.messageId ? (
                     <div className="mt-2 flex flex-wrap items-center gap-3">

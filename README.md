@@ -468,9 +468,10 @@ with the move you liked) and **help me with the next step** (a short list of wha
 look for, specific to the move and to whatever material was found).
 
 **Structure is added where you are writing**, not on the card you are reading: a button in
-the field that starts an Inkling and in the field that adds to one. **And it is shown, not
-named** — choosing a grid draws a grid inside the writing box, inert until there is an Inkling
-to attach it to. "Grid ×" told you nothing you had not just chosen.
+the field that starts an Inkling and in the field that adds to one. **And it is usable, not named** — choosing a checklist draws a real checklist in the
+writing box that you can tick and add steps to before the Inkling exists. A checklist you
+cannot tick is a drawing of a checklist, and the point of adding one while you write is to put
+the parts down as you think of them. It is attached the moment the Inkling is made.
 
 Two kinds are offered, because two of them are *shapes* — a checklist is parts to tick off, a
 grid is variations side by side, and both arrange something you already have. Reading progress

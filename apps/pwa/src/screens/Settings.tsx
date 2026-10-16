@@ -7,7 +7,7 @@ import {
 } from '@inkling/domain'
 import { validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
-import { changeOwnPassword, setMyColor } from '../admin'
+import { changeOwnPassword, clearMyAvatar, setMyAvatar, setMyColor } from '../admin'
 import { Admin } from './Admin'
 import { APP_BUILD } from '../build'
 import type { Auth } from '../state/useAuth'
@@ -19,6 +19,7 @@ import {
   downloadMarkdownBackup,
   downloadRejections,
 } from '../backup'
+import { shrinkToAvatar } from '../avatar'
 import { Avatar } from '../components/Avatar'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { PROMOTE_ENABLED } from '../features'
@@ -166,6 +167,7 @@ export function Settings({
   const [color, setColor] = useState<string | undefined>()
   const [savingColor, setSavingColor] = useState(false)
   const [colorSaved, setColorSaved] = useState(false)
+  const [avatarBusy, setAvatarBusy] = useState(false)
 
   useEffect(() => {
     if (!config) return
@@ -227,6 +229,24 @@ export function Settings({
   useEffect(() => {
     setColor(auth.user?.color)
   }, [auth.user?.color, auth.user?.id])
+
+  async function saveAvatar(file: File | null) {
+    setAvatarBusy(true)
+    setColorSaved(false)
+    try {
+      const image = file ? await shrinkToAvatar(file) : null
+      const result = image ? await setMyAvatar(serverUrl, image) : await clearMyAvatar(serverUrl)
+      if (result.ok) void auth.refresh()
+    } catch (problem) {
+      setSaved(
+        `that picture did not work: ${
+          problem instanceof Error ? problem.message : 'unknown reason'
+        }`,
+      )
+    } finally {
+      setAvatarBusy(false)
+    }
+  }
 
   async function saveColor(next: string) {
     setSavingColor(true)
@@ -399,9 +419,39 @@ export function Settings({
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5">
-              <Avatar username={auth.user?.username ?? '?'} color={color} size={24} />
+              <Avatar
+                userId={auth.user?.id}
+                username={auth.user?.username ?? '?'}
+                color={color}
+                hash={auth.user?.avatar}
+                size={24}
+              />
               <span className="text-xs">{auth.user?.username}</span>
             </span>
+            <label className="cursor-pointer rounded-full border border-line px-3 py-1.5 text-xs text-ink-soft">
+              {avatarBusy ? 'shrinking…' : auth.user?.avatar ? 'change picture' : 'add a picture'}
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={avatarBusy}
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  event.target.value = ''
+                  if (file) void saveAvatar(file)
+                }}
+              />
+            </label>
+            {auth.user?.avatar ? (
+              <button
+                type="button"
+                onClick={() => void saveAvatar(null)}
+                disabled={avatarBusy}
+                className="quiet text-xs underline disabled:opacity-40"
+              >
+                remove
+              </button>
+            ) : null}
             {PROFILE_COLORS.map((option) => (
               <button
                 key={option}

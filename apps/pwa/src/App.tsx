@@ -1,4 +1,4 @@
-import { type AskContext, type Blip, type Friend, buildDailyFeed, newBlock } from '@inkling/domain'
+import { type AskContext, type Blip, type Friend, buildDailyFeed } from '@inkling/domain'
 import { APP_BUILD } from './build'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FeedbackEnv } from './components/Feedback'
@@ -283,7 +283,8 @@ export default function App() {
       {ready && screen === 'add' ? (
         <Add
           onCapture={actions.capture}
-          onAddBlock={(id, kind) => actions.addBlock(id, newBlock(kind))}
+          onAddBlock={(id, block) => actions.addBlock(id, block)}
+          onStoreImage={actions.storeImage}
           initial={shared}
           onConsumed={() => setShared(null)}
           waiting={waiting}

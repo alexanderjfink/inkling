@@ -1074,7 +1074,9 @@ export function Review({
             <div className="flex items-center gap-2.5">
               <Avatar
                 username={friendMove.fromUsername}
+                userId={friendMove.from}
                 color={social.friends.find((f) => f.userId === friendMove.from)?.color}
+                hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
                 size={28}
               />
               <p className="text-[11px] tracking-wide text-ink-faint uppercase">
@@ -1544,33 +1546,42 @@ export function Review({
           move actions, which made one row of five things where three were a question and two
           were an answer. */}
       {!composer ? (
-        <div className="mt-6 flex flex-wrap items-stretch justify-center gap-2">
+        <div className="mt-6 flex flex-wrap items-end justify-center gap-5">
           {move && !friendMove ? null : (
             <button
               type="button"
               onClick={generateMove}
               disabled={moveLoading}
-              className="rounded-full bg-ink px-4 py-3 text-sm font-semibold text-surface disabled:opacity-40"
+              className="flex flex-col items-center gap-1.5 disabled:opacity-40"
             >
-              <ButtonLabel busy={moveLoading}>
-                {moveLoading ? 'Thinking…' : 'Generate a Move'}
-              </ButtonLabel>
+              <span className="circle h-12 w-12 text-lg">✦</span>
+              <span className="text-[11px] text-ink-soft">
+                <ButtonLabel busy={moveLoading}>
+                  {moveLoading ? 'thinking…' : 'Generate'}
+                </ButtonLabel>
+              </span>
             </button>
           )}
+
+          {/* The one you press most, and it looks like it: the only filled, round thing in
+              the row, and bigger than the others, so the thumb finds it without looking. */}
           <button
             type="button"
             onClick={() => setComposer({ move: null })}
-            className="rounded-full border border-line px-4 py-3 text-sm font-medium text-ink-soft"
+            className="flex flex-col items-center gap-1.5"
           >
-            New Move
+            <span className="circle circle--accent h-16 w-16 text-2xl">+</span>
+            <span className="text-[11px] font-medium text-ink">New Move</span>
           </button>
+
           {socialOn && !current.demo ? (
             <button
               type="button"
               onClick={() => setAskOpen((open) => !open)}
-              className="rounded-full border border-accent/50 px-4 py-3 text-sm font-medium text-accent"
+              className="flex flex-col items-center gap-1.5"
             >
-              Ask a Friend
+              <span className="circle h-12 w-12 text-lg">☺</span>
+              <span className="text-[11px] text-accent">Ask a Friend</span>
             </button>
           ) : null}
         </div>

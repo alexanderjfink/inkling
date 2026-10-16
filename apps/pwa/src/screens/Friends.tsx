@@ -82,7 +82,12 @@ export function Friends({
               key={friend.userId}
               className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-3"
             >
-              <Avatar username={friend.username} color={friend.color} />
+              <Avatar
+                username={friend.username}
+                userId={friend.userId}
+                color={friend.color}
+                hash={friend.avatar}
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{friend.username}</span>
                 <span className="block text-[11px] text-ink-faint">
@@ -125,7 +130,12 @@ export function Friends({
               key={friend.userId}
               className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-3"
             >
-              <Avatar username={friend.username} color={friend.color} />
+              <Avatar
+                username={friend.username}
+                userId={friend.userId}
+                color={friend.color}
+                hash={friend.avatar}
+              />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{friend.username}</span>
                 <span className="block text-[11px] text-ink-faint">since {when(friend.at)}</span>

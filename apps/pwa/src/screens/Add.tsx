@@ -1,16 +1,17 @@
 import {
   BLIP_TYPES,
-  type BlockKind,
+  type Block,
   type Blip,
   type BlipType,
   type FeedbackContext,
+  newBlock,
   type ShareDefault,
 } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import { type CaptureDraft, findUrl, isOnlyALink } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { FriendsButton } from '../components/FriendsButton'
-import { BlockPicker, BlockPreview } from '../components/Blocks'
+import { BlockPicker, DraftBlocks } from '../components/Blocks'
 import { ButtonLabel } from '../components/Spinner'
 import type { ReceivedAsk } from '../state/useSocial'
 import { useSpeech } from '../state/useSpeech'
@@ -47,10 +48,11 @@ export function Add({
   friendsWaiting,
   transcribeUrl,
   onAddBlock,
+  onStoreImage,
 }: {
   onCapture: (draft: CaptureDraft) => Promise<{ id: string }>
   /** Attach structure to the Inkling that was just made, once it exists. */
-  onAddBlock: (id: string, kind: BlockKind) => Promise<unknown>
+  onAddBlock: (id: string, block: Block) => Promise<unknown>
   /** Content handed over by the OS share sheet. */
   initial?: { text?: string; url?: string } | null
   onConsumed?: () => void
@@ -77,6 +79,8 @@ export function Add({
   friendsWaiting: number
   /** A server that can hear, if one is set up. Null means the browser's own recogniser. */
   transcribeUrl: string | null
+  /** Where a picture goes when structure asks for one before the Inkling exists. */
+  onStoreImage: (file: File) => Promise<{ hash: string; mime: string }>
 }) {
   // A shared link arrives as text and an address, and they both go in the one field: a
   // shared page reads as its title, then its address, which is exactly how somebody
@@ -99,7 +103,7 @@ export function Add({
    * these are the intention, applied the moment the Inkling exists. Shown while you write,
    * because a choice with no visible effect is a choice the app did not receive.
    */
-  const [blocks, setBlocks] = useState<BlockKind[]>([])
+  const [blocks, setBlocks] = useState<Block[]>([])
   /**
    * Whether the field has been opened.
    *
@@ -159,7 +163,7 @@ export function Add({
         // re-share things written under a different one.
         visibility: socialOn && shareDefault === 'friends' ? 'friends' : undefined,
       })
-      for (const kind of blocks) await onAddBlock(captured.id, kind)
+      for (const block of blocks) await onAddBlock(captured.id, block)
       setText('')
       setFile(undefined)
       setType('auto')
@@ -297,8 +301,9 @@ export function Add({
               type="button"
               onClick={() => setStarted(true)}
               data-tour="field"
-              className="w-full py-8 text-left text-lg text-ink-faint"
+              className="flex w-full items-center gap-3 py-8 text-left text-lg text-ink-faint"
             >
+              <span className="circle h-10 w-10 shrink-0 text-base">✎</span>
               What did you notice?
             </button>
           )}
@@ -318,22 +323,10 @@ export function Add({
             </span>
           ) : null}
 
-          {/* The structure itself, not its name: a checklist you can see is a checklist,
-              and "Checklist ×" told you nothing you had not just chosen. Inert here because
-              there is no Inkling yet to attach it to. */}
-          {blocks.map((kind) => (
-            <div key={kind} className="relative">
-              <BlockPreview kind={kind} />
-              <button
-                type="button"
-                onClick={() => setBlocks((list) => list.filter((entry) => entry !== kind))}
-                aria-label={`Remove the ${kind}`}
-                className="quiet absolute top-2 right-2 px-1 text-xs leading-none"
-              >
-                ×
-              </button>
-            </div>
-          ))}
+          {/* The structure itself, and usable: a checklist you cannot tick is a drawing of
+              a checklist, and the point of adding one while you write is to put the parts
+              down as you think of them. It is attached when the Inkling is made. */}
+          <DraftBlocks blocks={blocks} onChange={setBlocks} onStoreImage={onStoreImage} />
         </div>
       </div>
 
@@ -346,7 +339,7 @@ export function Add({
       <div className="self-start">
         <BlockPicker
           count={blocks.length}
-          onAdd={async (kind) => setBlocks((list) => [...list, kind])}
+          onAdd={async (kind) => setBlocks((list) => [...list, newBlock(kind)])}
         />
       </div>
 

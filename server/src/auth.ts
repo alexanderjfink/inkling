@@ -55,6 +55,7 @@ function toPublic(user: StoredUser): PublicUser {
     role: user.role,
     createdAt: user.createdAt,
     color: user.color,
+    avatar: user.avatar,
   }
 }
 
@@ -319,6 +320,18 @@ export class Auth {
       }
       if (color) user.color = color
       else delete user.color
+      await this.#saveUsers()
+      return { ok: true, value: null }
+    })
+  }
+
+  /** A picture, or nothing to take it away. */
+  async setAvatar(userId: string, avatar: string | null): Promise<Result<null>> {
+    return this.#serial(async () => {
+      const user = (await this.#loadUsers()).find((entry) => entry.id === userId)
+      if (!user) return { ok: false, error: 'no such account' }
+      if (avatar) user.avatar = avatar
+      else delete user.avatar
       await this.#saveUsers()
       return { ok: true, value: null }
     })

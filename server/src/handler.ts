@@ -243,6 +243,9 @@ function isPublic(path: string): boolean {
  *
  * The vault stays per account: a note goes into one person's folder, not everybody's.
  */
+/** A picture, not a photo library. Big enough for a face, small enough to serve inline. */
+const MAX_AVATAR = 512 * 1024
+
 const SERVER_FIELDS = new Set([
   'twaPackage',
   'twaFingerprint',
@@ -347,6 +350,50 @@ async function handleAccount(
   if (path === '/auth/logout' && request.method === 'POST') {
     await auth.logout(token)
     return json({ ok: true })
+  }
+
+  /**
+   * Somebody's picture.
+   *
+   * Readable by anyone signed in, which on a personal server is the people you know. It has
+   * to be readable by them: a friend's suggestion is easier to take from a face, and the
+   * picture lives on whichever account put it there.
+   */
+  if (path.startsWith('/avatar/') && request.method === 'GET') {
+    const owner = path.slice('/avatar/'.length)
+    const wanted = (await auth.list()).find((entry) => entry.id === owner)?.avatar
+    if (!wanted || !isSafeHash(wanted)) return new Response('not found', { status: 404 })
+    const bytes = await resolveStore(storeSource, owner).getBlob(wanted)
+    if (!bytes) return new Response('not found', { status: 404 })
+    return new Response(new Uint8Array(bytes).buffer, {
+      headers: { 'content-type': 'image/webp', 'cache-control': 'private, max-age=3600' },
+    })
+  }
+
+  // A picture of you, put there by you.
+  if (path === '/auth/avatar' && request.method === 'PUT') {
+    let bytes: Uint8Array | null = null
+    try {
+      const form = await request.formData()
+      const file = form.get('avatar')
+      if (file instanceof Blob && file.size > 0 && file.size <= MAX_AVATAR) {
+        bytes = new Uint8Array(await file.arrayBuffer())
+      }
+    } catch {
+      bytes = null
+    }
+    if (!bytes) return json({ error: 'that picture did not arrive, or is too big' }, 400)
+
+    const hash = await sha256Hex(bytes)
+    await resolveStore(storeSource, user.id).putBlob(hash, bytes)
+    const saved = await auth.setAvatar(user.id, hash)
+    if (!saved.ok) return json({ error: saved.error }, 400)
+    return json({ user: { ...user, avatar: hash } })
+  }
+
+  if (path === '/auth/avatar' && request.method === 'DELETE') {
+    await auth.setAvatar(user.id, null)
+    return json({ user })
   }
 
   // How you appear to friends. Yours to set, and only yours.
@@ -946,13 +993,15 @@ async function handleSocial(
   const usernames = new Map(users.map((entry) => [entry.id, entry.username]))
   const colors = new Map(users.map((entry) => [entry.id, defaultColor(entry.id)]))
   for (const user of users) if (user.color) colors.set(user.id, user.color)
+  const avatars = new Map<string, string>()
+  for (const user of users) if (user.avatar) avatars.set(user.id, user.avatar)
   const friendships = await social.friendships()
   const friendOf = (id: string) => users.find((entry) => entry.id === id)
 
   // --- who my friends are, and asking somebody to be one ------------------------------
   if (rest.length === 1 && rest[0] === 'friends') {
     if (request.method === 'GET') {
-      return json({ friends: friendsOf(user.id, friendships, usernames, colors) })
+      return json({ friends: friendsOf(user.id, friendships, usernames, colors, avatars) })
     }
 
     if (request.method === 'POST') {
@@ -971,7 +1020,7 @@ async function handleSocial(
       // shown what they have been noticing.
       await social.addFriendEvent({ t: 'requested', from: user.id, to: target.id })
       return json({
-        friends: friendsOf(user.id, await social.friendships(), usernames, colors),
+        friends: friendsOf(user.id, await social.friendships(), usernames, colors, avatars),
       })
     }
 
@@ -1029,7 +1078,11 @@ async function handleSocial(
     const url = new URL(request.url)
     const offset = Math.max(0, Number(url.searchParams.get('offset') ?? '0') || 0)
     const { messages, size } = await social.readInbox(user.id, offset)
-    return json({ messages, size, friends: friendsOf(user.id, friendships, usernames, colors) })
+    return json({
+      messages,
+      size,
+      friends: friendsOf(user.id, friendships, usernames, colors, avatars),
+    })
   }
 
   // --- asking a friend for a move --------------------------------------------------------

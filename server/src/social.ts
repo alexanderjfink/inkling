@@ -66,6 +66,7 @@ export function friendsOf(
   events: FriendEvent[],
   usernames: Map<string, string>,
   colors: Map<string, string> = new Map(),
+  avatars: Map<string, string> = new Map(),
 ): Friend[] {
   const out: Friend[] = []
   for (const event of foldFriendships(events).values()) {
@@ -83,6 +84,7 @@ export function friendsOf(
       status,
       at: event.at,
       color: colors.get(other) ?? defaultColor(other),
+      avatar: avatars.get(other),
     })
   }
   return out.sort((a, b) => a.username.localeCompare(b.username))

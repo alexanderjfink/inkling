@@ -28,6 +28,7 @@ export interface Friend {
   at: ISODate
   /** How they appear, so a friend's move is recognisably theirs at a glance. */
   color?: string
+  avatar?: string
 }
 
 /**

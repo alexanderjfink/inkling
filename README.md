@@ -188,7 +188,27 @@ goal: One sentence: who made it, and what they were trying to fix
 └──────────────────────────────────────────────────────────┘
 ```
 
-If nothing turns up, the move still works and says so.
+If nothing turns up, the move still works and says so — naming the phrase it searched, so
+an absence is explainable rather than mysterious.
+
+**And then the answer is checked.** Wikipedia's search is generous: give it five words
+and it will find an article containing one of them. That is how *"social learning
+platform"* returned **Piper Alpha**, an oil platform destroyed in 1988 — it matched on
+"platform", and on "learning" from a paper cited in the article's references, and nothing
+else in the phrase. *"social platform postmortem"* returned the article about a suicide,
+which is worse than useless.
+
+So a result is used only if Wikipedia's **own** match markers show that it matched two
+words of the phrase, or one word of the title. Two, because one is what an unrelated page
+looks like. This is deliberately blunt, and the costs are lopsided: showing nothing costs
+almost nothing, while showing something unrelated costs your trust in every other
+suggestion.
+
+It still accepts a page whose title shares nothing with the query, which is the point:
+*"stages of change"* and *Transtheoretical model* have no words in common, and that is the
+right answer. Wikipedia's ranking is followed rather than re-ranked — an earlier attempt
+preferred title matches, which put *Four stages of competence* ahead of it purely because
+the word "stages" was in its title.
 
 The division of labour is deliberate. **The model selects and adapts; it does not
 invent.** A reply is only accepted if it picks a move that was actually on the menu,

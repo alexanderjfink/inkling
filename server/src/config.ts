@@ -58,6 +58,17 @@ export interface ServerConfig {
    * shares anything. Per Inkling overrides it, and turning social off makes it moot.
    */
   shareDefault?: ShareDefault
+  /**
+   * Where speech is transcribed.
+   *
+   * Its own provider on purpose: chat models cannot hear, and the things that can — Whisper,
+   * Parakeet, whatever a machine has — are usually somewhere else entirely. Empty means the
+   * browser transcribes, which is what a phone does anyway.
+   */
+  transcribeProvider?: string
+  transcribeModel?: string
+  transcribeBaseUrl?: string
+  transcribeApiKey?: string
   /** Accepted on write; never returned. */
   apiKey?: string
   embedApiKey?: string
@@ -116,6 +127,12 @@ function overlay(config: ServerConfig, env: Record<string, string | undefined>) 
     ...(typeof config.embedSimilarity === 'number'
       ? { INKLING_EMBED_SIMILARITY: String(config.embedSimilarity) }
       : {}),
+    ...(config.transcribeProvider
+      ? { INKLING_TRANSCRIBE_PROVIDER: config.transcribeProvider }
+      : {}),
+    ...(config.transcribeModel ? { INKLING_TRANSCRIBE_MODEL: config.transcribeModel } : {}),
+    ...(config.transcribeBaseUrl ? { INKLING_TRANSCRIBE_BASE_URL: config.transcribeBaseUrl } : {}),
+    ...(config.transcribeApiKey ? { INKLING_TRANSCRIBE_API_KEY: config.transcribeApiKey } : {}),
     ...(config.vault ? { INKLING_VAULT: config.vault } : {}),
     ...(config.folder !== undefined ? { INKLING_VAULT_FOLDER: config.folder } : {}),
   }
@@ -160,6 +177,10 @@ export function publicConfig(config: ServerConfig, runtime: Runtime) {
     embedApiKeySet: Boolean(config.embedApiKey),
     socialEnabled: config.socialEnabled !== false,
     shareDefault: config.shareDefault ?? 'friends',
+    transcribeProvider: config.transcribeProvider ?? null,
+    transcribeModel: config.transcribeModel ?? null,
+    transcribeBaseUrl: config.transcribeBaseUrl ?? null,
+    transcribeApiKeySet: Boolean(config.transcribeApiKey),
   }
 }
 
@@ -318,6 +339,10 @@ export function mergeConfig(current: ServerConfig, patch: ServerConfig): ServerC
       key === 'embedBaseUrl' ||
       key === 'twaPackage' ||
       key === 'twaFingerprint' ||
+      key === 'transcribeProvider' ||
+      key === 'transcribeModel' ||
+      key === 'transcribeBaseUrl' ||
+      key === 'transcribeApiKey' ||
       key === 'socialEnabled' ||
       key === 'shareDefault' ||
       key === 'embedSimilarity'

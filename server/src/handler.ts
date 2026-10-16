@@ -18,6 +18,7 @@ import type { ConfigProblem, Runtime, ServerConfig } from './config'
 import { assetLinks, publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
 import { resolveLookUps } from './lookup'
+import { resolveTranscriber, transcribe } from './transcribe'
 import { buildOverview } from './overview'
 import {
   type SocialStore,
@@ -124,6 +125,9 @@ function configPatch(body: Record<string, unknown>): ServerConfig {
     'twaFingerprint',
     'apiKey',
     'embedApiKey',
+    'transcribeProvider',
+    'transcribeModel',
+    'transcribeBaseUrl',
   ] as const) {
     const value = body[key]
     if (typeof value === 'string') target[key] = value.trim()
@@ -251,6 +255,10 @@ const SERVER_FIELDS = new Set([
   'embedBaseUrl',
   'apiKey',
   'embedApiKey',
+  'transcribeProvider',
+  'transcribeModel',
+  'transcribeBaseUrl',
+  'transcribeApiKey',
 ])
 
 function isServerField(key: string): boolean {
@@ -784,6 +792,31 @@ export function createHandler(
           : []
       if (queries.length === 0) return json({ error: 'queries is required' }, 400)
       return json(await resolveLookUps(queries))
+    }
+
+    // A recording, turned into words. The browser sends what it captured and gets text back;
+    // where the listening happens is the server's business, not the app's.
+    if (parts.length === 1 && parts[0] === 'transcribe' && request.method === 'POST') {
+      const transcriber = resolveTranscriber(liveConfig)
+      if (!transcriber) {
+        return json({ error: 'no transcriber is set up — set one in Admin' }, 503)
+      }
+      let audio: Blob | null = null
+      try {
+        const form = await request.formData()
+        const file = form.get('audio')
+        if (file instanceof Blob && file.size > 0) audio = file
+      } catch {
+        audio = null
+      }
+      if (!audio) return json({ error: 'the recording did not arrive' }, 400)
+      try {
+        const result = await transcribe(transcriber, audio)
+        return json(result)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'the transcriber failed'
+        return json({ error: message }, 502)
+      }
     }
 
     if (parts.length === 1 && parts[0] === 'fetch' && request.method === 'POST') {

@@ -1007,6 +1007,22 @@ The back button and the Android back gesture go back a screen, because every scr
 history entry. Without that the gesture leaves the app entirely — from a card you were reading
 — and the entry screen is the one with nothing behind it.
 
+## Voice
+
+Two ways to ramble, and it picks whichever is available.
+
+**The browser's own recogniser** transcribes as you talk, which is what a sofa wants. It is
+not everywhere — Firefox has none of it, and some phones only in a language you are not
+speaking — so it wins only when it exists, because it is instant and costs nothing.
+
+**Otherwise the recording is sent.** The microphone writes to a file, the file goes to the
+server, and the server asks a transcription model. Anywhere that speaks OpenAI's audio
+endpoint works: Whisper, `whisper.cpp`, a Parakeet server on a spare GPU, a hosted service.
+It is set up in **Settings → Admin**, next to the model, because it is the server's to
+configure and it is usually a different machine from the one doing the thinking.
+
+With neither, the microphone button says so and nothing else pretends to work.
+
 ## Admin
 
 **Settings → Admin** is the admin screen, and it is in three parts: *how it is going*, the

@@ -25,6 +25,11 @@ export interface PublicConfig {
   socialEnabled: boolean
   /** Whether new Inklings start shared with friends. */
   shareDefault: ShareDefault
+  /** Where speech is transcribed, when the server has been given somewhere. */
+  transcribeProvider: string | null
+  transcribeModel: string | null
+  transcribeBaseUrl: string | null
+  transcribeApiKeySet: boolean
 }
 
 export interface ProviderOption {

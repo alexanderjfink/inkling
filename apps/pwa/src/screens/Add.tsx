@@ -45,6 +45,7 @@ export function Add({
   onFriends,
   onNotifications,
   friendsWaiting,
+  transcribeUrl,
   onAddBlock,
 }: {
   onCapture: (draft: CaptureDraft) => Promise<{ id: string }>
@@ -74,6 +75,8 @@ export function Add({
   onNotifications: () => void
   /** Friends waiting on something from you, shown on the button. */
   friendsWaiting: number
+  /** A server that can hear, if one is set up. Null means the browser's own recogniser. */
+  transcribeUrl: string | null
 }) {
   // A shared link arrives as text and an address, and they both go in the one field: a
   // shared page reads as its title, then its address, which is exactly how somebody
@@ -109,8 +112,11 @@ export function Add({
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(0)
 
-  const speech = useSpeech((spoken) =>
-    setText((current) => (current.trim() ? `${current.trim()} ${spoken}` : spoken)),
+  const speech = useSpeech(
+    (spoken) => setText((current) => (current.trim() ? `${current.trim()} ${spoken}` : spoken)),
+    // The server's transcriber, when it has one: a recording goes up and words come back.
+    // Null means the browser's own, if it has one.
+    { transcribeUrl: transcribeUrl ? `${transcribeUrl}/api/transcribe` : null },
   )
 
   useEffect(() => {
@@ -378,14 +384,18 @@ export function Add({
           onClick={() => (speech.listening ? speech.stop() : speech.start())}
           disabled={!speech.supported}
           className={`circle h-12 w-12 shrink-0 ${speech.listening ? 'circle--accent' : ''}`}
-          title={
-            speech.supported ? 'Ramble, and it transcribes as you talk' : (speech.reason ?? '')
-          }
+          title={speech.supported ? 'Ramble, and it transcribes as you talk' : ''}
         >
           <span>🎙</span>
         </button>
         <span className="min-w-0 flex-1 truncate text-xs text-ink-faint">
-          {!speech.supported ? 'no voice here' : speech.listening ? 'listening…' : 'or ramble'}
+          {!speech.supported
+            ? 'no microphone here'
+            : speech.thinking
+              ? 'writing it down…'
+              : speech.listening
+                ? 'listening…'
+                : 'or ramble'}
         </span>
 
         <button

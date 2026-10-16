@@ -310,6 +310,9 @@ export default function App() {
           onFriends={() => go('friends')}
           onNotifications={() => go('notifications')}
           friendsWaiting={friendsWaiting}
+          transcribeUrl={
+            serverConfig.config?.transcribeModel ? server.serverUrl.replace(/\/+$/, '') : null
+          }
         />
       ) : null}
 

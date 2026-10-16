@@ -31,41 +31,104 @@ function recognitionCtor(): RecognitionCtor | null {
 }
 
 /**
- * Voice capture, transcribed on the device.
+ * Voice capture.
  *
- * Deliberately the browser's own recogniser rather than uploading audio: the
- * source material's example move is "set a timer for two minutes and ramble into
- * the microphone", and a ramble that has to be shipped to a server and back is a
- * worse fit for a sofa than one that transcribes as you talk.
+ * Two ways, and it picks whichever is available.
  *
- * Honest limit: Chrome on Android supports this well; Firefox does not, and the
- * button says so rather than failing silently.
+ * The browser's own recogniser transcribes as you talk, which is what a sofa wants: rambling
+ * for two minutes and watching the words appear. It is not everywhere though — Firefox has
+ * none of it, and some phones have it only in a language you are not speaking — so when the
+ * server has a transcriber set up, the recording is captured to a file, sent there, and the
+ * words come back. That path works anywhere the microphone does, including with a model
+ * running on your own machine.
+ *
+ * The browser wins when both exist, because it is instant and costs nothing.
  */
-export function useSpeech(onText: (text: string) => void) {
-  const supported = useMemo(() => recognitionCtor() !== null, [])
-
-  // Say why, rather than leaving a dead button. The two causes are quite different.
-  const reason = supported
-    ? null
-    : window.isSecureContext === false
-      ? 'voice needs a secure connection — https, or localhost'
-      : 'this browser cannot transcribe speech. Chrome on Android or desktop can.'
+export function useSpeech(
+  onText: (text: string) => void,
+  options: { transcribeUrl?: string | null } = {},
+) {
+  const builtIn = useMemo(() => recognitionCtor() !== null, [])
+  const canRecord = useMemo(
+    () => typeof MediaRecorder !== 'undefined' && Boolean(navigator.mediaDevices?.getUserMedia),
+    [],
+  )
+  const uploads = Boolean(options.transcribeUrl) && canRecord
+  const supported = builtIn || uploads
 
   const [listening, setListening] = useState(false)
+  const [thinking, setThinking] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
   const handlerRef = useRef(onText)
   handlerRef.current = onText
+  const urlRef = useRef(options.transcribeUrl ?? null)
+  urlRef.current = options.transcribeUrl ?? null
 
+  /** Stop everything the microphone is doing, whichever way it was being used. */
   const stop = useCallback(() => {
     recognitionRef.current?.stop()
+    recorderRef.current?.stop()
+    for (const track of streamRef.current?.getTracks() ?? []) track.stop()
+    streamRef.current = null
     setListening(false)
+  }, [])
+
+  /** Record to a file, send it, and put what comes back where the words would have gone. */
+  const recordAndSend = useCallback(async () => {
+    const url = urlRef.current
+    if (!url) return
+    let stream: MediaStream
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    } catch {
+      setError('the microphone was refused')
+      return
+    }
+
+    const chunks: Blob[] = []
+    const recorder = new MediaRecorder(stream)
+    recorderRef.current = recorder
+    streamRef.current = stream
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data)
+    }
+    recorder.onstop = () => {
+      for (const track of stream.getTracks()) track.stop()
+      setListening(false)
+      if (chunks.length === 0) return
+      setThinking(true)
+      void (async () => {
+        try {
+          const body = new FormData()
+          body.set('audio', new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }))
+          const res = await fetch(url, { method: 'POST', body })
+          const answer = (await res.json().catch(() => ({}))) as { text?: string; error?: string }
+          if (!res.ok) {
+            setError(answer.error ?? `the transcriber said ${res.status}`)
+            return
+          }
+          if (answer.text?.trim()) handlerRef.current(answer.text.trim())
+        } catch {
+          setError('could not reach the transcriber')
+        } finally {
+          setThinking(false)
+        }
+      })()
+    }
+
+    recorder.start()
+    setError(null)
+    setListening(true)
   }, [])
 
   const start = useCallback(() => {
     const Ctor = recognitionCtor()
-    if (!Ctor) {
-      setError('this browser cannot transcribe speech — type instead')
+    // No built-in recogniser, or it is the one thing that has it: record and send instead.
+    if (!Ctor || (uploads && !builtIn)) {
+      void recordAndSend()
       return
     }
 
@@ -94,7 +157,7 @@ export function useSpeech(onText: (text: string) => void) {
     setListening(true)
   }, [])
 
-  useEffect(() => () => recognitionRef.current?.stop(), [])
+  useEffect(() => () => stop(), [stop])
 
-  return { supported, reason, listening, error, start, stop }
+  return { supported, alwaysAvailable: uploads, listening, thinking, error, start, stop }
 }

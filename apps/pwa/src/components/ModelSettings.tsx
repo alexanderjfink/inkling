@@ -54,6 +54,10 @@ export function ModelSettings({
   const [embedModel, setEmbedModel] = useState('')
   const [embedApiKey, setEmbedApiKey] = useState('')
   const [similarity, setSimilarity] = useState('')
+  const [transcribeProvider, setTranscribeProvider] = useState('')
+  const [transcribeModel, setTranscribeModel] = useState('')
+  const [transcribeBaseUrl, setTranscribeBaseUrl] = useState('')
+  const [transcribeApiKey, setTranscribeApiKey] = useState('')
 
   const [chatModels, setChatModels] = useState<string[]>([])
   const [embedModels, setEmbedModels] = useState<string[]>([])
@@ -71,6 +75,9 @@ export function ModelSettings({
     setSimilarity(config.embedSimilarity === null ? '' : String(config.embedSimilarity))
     setBaseUrl(config.baseUrl ?? '')
     setEmbedBaseUrl(config.embedBaseUrl ?? '')
+    setTranscribeProvider(config.transcribeProvider ?? '')
+    setTranscribeModel(config.transcribeModel ?? '')
+    setTranscribeBaseUrl(config.transcribeBaseUrl ?? '')
   }, [config])
 
   async function loadModels(kind: 'chat' | 'embed', quiet = false) {
@@ -120,15 +127,20 @@ export function ModelSettings({
       // request to clear the override.
       baseUrl: baseUrl.trim(),
       embedBaseUrl: embedBaseUrl.trim(),
+      transcribeProvider,
+      transcribeModel,
+      transcribeBaseUrl: transcribeBaseUrl.trim(),
     }
     // Only send a key when one was typed, so an empty box does not erase it.
     if (apiKey.trim()) patch.apiKey = apiKey.trim()
     if (embedApiKey.trim()) patch.embedApiKey = embedApiKey.trim()
+    if (transcribeApiKey.trim()) patch.transcribeApiKey = transcribeApiKey.trim()
 
     const ok = await save(patch)
     if (ok) {
       setApiKey('')
       setEmbedApiKey('')
+      setTranscribeApiKey('')
       setSaved(true)
       await onRefreshModel()
     }
@@ -315,6 +327,55 @@ export function ModelSettings({
           className={inputClass}
         />
       </Field>
+
+      {/* Its own provider, because chat models cannot hear: Whisper on a laptop, Parakeet on
+          a spare GPU, a hosted service. Empty means the browser does the listening, which is
+          what a phone does anyway. */}
+      <Field label="Voice transcription model">
+        <input
+          value={transcribeModel}
+          onChange={(event) => setTranscribeModel(event.target.value)}
+          placeholder="whisper-1, parakeet-tdt, or whatever yours is called"
+          autoCapitalize="none"
+          autoCorrect="off"
+          spellCheck={false}
+          className={inputClass}
+        />
+        <p className="text-xs text-ink-faint">
+          Leave empty to use the browser&apos;s own speech recognition, which is instant and costs
+          nothing but is not on every phone.
+        </p>
+      </Field>
+
+      {transcribeModel.trim() ? (
+        <>
+          <Field label="Transcription server address">
+            <input
+              value={transcribeBaseUrl}
+              onChange={(event) => setTranscribeBaseUrl(event.target.value)}
+              placeholder="http://127.0.0.1:9000/v1"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className={inputClass}
+            />
+            <p className="text-xs text-ink-faint">
+              The recording is uploaded here. Anything speaking OpenAI&apos;s audio endpoint,
+              including whisper.cpp and Parakeet servers.
+            </p>
+          </Field>
+          <Field label={`Transcription key ${config.transcribeApiKeySet ? '(set)' : '(not set)'}`}>
+            <input
+              value={transcribeApiKey}
+              onChange={(event) => setTranscribeApiKey(event.target.value)}
+              type="password"
+              placeholder={config.transcribeApiKeySet ? 'type to replace' : 'usually not needed'}
+              autoComplete="off"
+              className={inputClass}
+            />
+          </Field>
+        </>
+      ) : null}
 
       <p className="text-xs text-ink-soft">
         in use now: {config.configured ? `${config.providerName} · ${config.model}` : 'none'}

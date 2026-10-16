@@ -12,6 +12,7 @@ import type { ConfigProblem, Runtime, ServerConfig } from './config'
 import { assetLinks, publicConfig, validateConfig } from './config'
 import { fetchPage, isFetchableUrl } from './fetchPage'
 import { resolveLookUps } from './lookup'
+import { buildOverview } from './overview'
 import type { ModelStatus } from './provider'
 import { PRESETS } from './providerConfig'
 import { notBuiltPage, serveStatic } from './static'
@@ -275,6 +276,7 @@ async function handleAccount(
   user: PublicUser,
   auth: Auth,
   token: string | null,
+  storeSource: StoreSource,
 ): Promise<Response | null> {
   if (path === '/auth/me') return json({ user })
 
@@ -297,7 +299,7 @@ async function handleAccount(
 
   if (path === '/admin' || path.startsWith('/admin/')) {
     if (user.role !== 'admin') return json({ error: 'admins only' }, 403)
-    return handleAdmin(path, request, user, auth)
+    return handleAdmin(path, request, user, auth, storeSource)
   }
 
   return null
@@ -309,11 +311,28 @@ async function handleAdmin(
   request: Request,
   actor: PublicUser,
   auth: Auth,
+  storeSource: StoreSource,
 ): Promise<Response> {
   const rest = path
     .slice('/admin/'.length)
     .split('/')
     .filter((part) => part.length > 0)
+
+  /**
+   * How the app is actually doing, across everybody.
+   *
+   * Read from the logs on demand rather than kept as a running tally: the logs are the
+   * only thing guaranteed to be there, and a counter beside them would be a second
+   * source of truth free to disagree with the first.
+   */
+  if (rest.length === 1 && rest[0] === 'overview' && request.method === 'GET') {
+    const users = await auth.list()
+    return json(
+      await buildOverview(
+        users.map((user) => ({ user, store: resolveStore(storeSource, user.id) })),
+      ),
+    )
+  }
 
   if (rest.length === 1 && rest[0] === 'users') {
     if (request.method === 'GET') return json({ users: await auth.list() })
@@ -425,7 +444,14 @@ export function createHandler(
     const settingsBridge = account?.settings ?? options.settings
 
     if (user && options.auth) {
-      const accountRoute = await handleAccount(path, request, user, options.auth, token)
+      const accountRoute = await handleAccount(
+        path,
+        request,
+        user,
+        options.auth,
+        token,
+        storeSource,
+      )
       if (accountRoute) return accountRoute
     }
 

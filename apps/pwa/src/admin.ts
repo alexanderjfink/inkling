@@ -1,4 +1,4 @@
-import type { PublicUser, Role } from '@inkling/domain'
+import type { Overview, PublicUser, Role } from '@inkling/domain'
 import { apiFetch } from './api'
 
 /**
@@ -57,6 +57,17 @@ export function removeUser(url: string, id: string): Promise<Outcome> {
 
 export function setUserPassword(url: string, id: string, password: string): Promise<Outcome> {
   return call(url, `/admin/users/${id}/password`, json({ password }, 'POST'))
+}
+
+/**
+ * How the app is doing across everybody.
+ *
+ * Only reachable with an admin session, and only ever asked for on the admin screen: it
+ * reads every account's logs, which is a lot of work to do for a screen nobody is looking
+ * at.
+ */
+export async function overview(url: string): Promise<Outcome<Overview>> {
+  return call<Overview>(url, '/admin/overview', { method: 'GET' })
 }
 
 export function setUserRole(url: string, id: string, role: Role): Promise<Outcome> {

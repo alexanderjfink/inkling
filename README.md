@@ -170,11 +170,38 @@ on a phone in one sitting. The playbook in `packages/domain/src/moves.ts` holds 
 came up", "what would have to be true for this to be false?", "argue the opposite for
 two minutes", "do the ugliest possible first version".
 
-**Some moves bring you something to read.** The paper's complaint about naive
-resurfacing is that it shows you the same blank prompt again; new material is the fix.
-For those moves the model supplies a *search phrase*, never a URL — a hallucinated link
-looks like an answer, whereas a search phrase simply finds nothing if it is wrong. The
-server resolves it against Wikipedia, which needs no key:
+**Most moves send you somewhere to look.** The paper's complaint about naive resurfacing
+is that it shows you the same blank prompt again; new material is the fix. So a move
+carries one to three places to look, and the model supplies *search phrases*, never URLs —
+a hallucinated link looks like an answer, whereas a search phrase simply finds nothing if
+it is wrong.
+
+Each phrase is then resolved into a link the server can vouch for, and the link says which
+kind it is:
+
+| | |
+|---|---|
+| **a page** | a real article, found and checked to be about the thing. It also brings back something to read |
+| **a search** | "go and look". Used when no single page is the right answer — and for a phrase like *best starter MIDI keyboard*, no single page should be |
+
+That second kind is the point of the distinction. Pretending an encyclopaedia article is
+the answer to "what should I buy" would be worse than saying "go and look":
+
+```
+where to look
+┌──────────────────────────────────────────────────────────┐
+│ MIDI keyboard                                       page │
+├──────────────────────────────────────────────────────────┤
+│ search for “best starter MIDI keyboard for a phone… search│
+└──────────────────────────────────────────────────────────┘
+```
+
+The phrases are resolved together rather than in turn, and the search URL lives in the
+domain rather than on the server, so a move still sends you somewhere when the server is
+unreachable.
+
+When a phrase does land on a page, the server resolves it against Wikipedia, which needs
+no key:
 
 ```
 a move, if you want one
@@ -300,6 +327,69 @@ the other guard is what actually keeps it away from someone who already uses the
 is where the walkthrough lives once you have seen it: *Show me around* replays it, and it is
 written for someone who has been using Inkling for a month and wants to know what a thing
 actually does rather than for someone who has never seen it.
+
+### The example Inkling
+
+A new account arrives with one Inkling it did not write, marked **example**. It is a real
+Inkling, written through the same door as any other — a `captured` event and a `moveSaved`
+event — because what is being demonstrated is what happens *after* you notice something.
+A separate demo mode would show a version of the app that does not exist and teach the
+wrong thing.
+
+Its move is written out rather than generated, so the example works before any model is
+configured. That is the point: the first thing you meet in Review should be something you
+cannot get wrong, and it should show you what a move looks like — including both kinds of
+link — without anything being set up first.
+
+It arrives with the walkthrough rather than before it, so someone who opens the app to write
+something still finds an empty field. The card says what it is throughout, and there is a
+way to remove it. `generatedBy` stays `playbook`, which is the truth: nobody's model wrote it.
+
+### Feedback, and the dashboard
+
+**feedback** sits in the footer of the entry screen and under the Review card, and in
+Settings. Not only in Settings, because "where were you when it went wrong" is the first
+question about any report — and answering it by having been in Settings is not an answer.
+
+What you were doing is gathered automatically and **shown back before sending**: the screen,
+the Inkling's title (never its text), the move that was on screen, the provider and model,
+both build stamps, the viewport, and how much is in the log. A report box that silently
+attaches information about you is a box people stop using, and the whole value here is that
+people keep using it.
+
+It is written to the same log as everything else, with a fresh id so the fold ignores it and
+it never becomes an Inkling. That means it reaches the server with no second mechanism, and
+cannot be lost by a failed request.
+
+**Settings → Manage accounts** opens the dashboard, for admins:
+
+```
+HOW IT IS GOING
+accounts        2   1 admin · 2 joined this week
+devices seen    3
+Inklings        4   0 example
+ · in play      2   1 put down
+ · in the attic 1
+ · written      1   25%
+ · abandoned    1   kept coming back, never written against
+moves offered   1   0 done · 0 put down · 0 kept for later
+ · marked bad   1   100%
+```
+
+Then the two lists worth a person's time: everything **marked bad**, with the reason, the
+note, and the Inkling it was about; and everything **said about the app**, with the screen
+and the move it came from.
+
+**Abandoned is the number to watch.** Retiring is a decision and a perfectly good outcome;
+this counts the Inklings that keep coming back and never get written against, which is what
+a suggestion that does not fit looks like from the outside. Both ways of waving something
+away count — "not this one" on the card, and putting it down for later — because the more
+common way for something to quietly stop happening is the second.
+
+It is all read from the logs on demand rather than from a running tally: the logs are the
+only thing guaranteed to be there, and a counter beside them would be a second source of
+truth free to disagree with the first. An account whose logs cannot be read is **named**
+rather than quietly counted as empty.
 
 **Review** shows a single Inkling and three actions, and nothing else competes with them:
 

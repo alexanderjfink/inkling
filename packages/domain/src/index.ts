@@ -22,7 +22,7 @@ export {
   hasContext,
   totalOrder,
 } from './events'
-export type { EntryContext } from './events'
+export type { EntryContext, FeedbackContext } from './events'
 export { REJECTION_REASONS } from './events'
 export type { RejectionContext, RejectionReason } from './events'
 export { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE } from './demo'
@@ -88,6 +88,7 @@ export {
   tokens,
   topRelated,
 } from './related'
+export type { BadMove, FeedbackReport, Overview } from './overview'
 export type { NextStepsDraft, NoteOptions } from './obsidian'
 export {
   buildNextStepsPrompt,

@@ -1,6 +1,7 @@
-import { BLIP_TYPES, type Blip, type BlipType } from '@inkling/domain'
+import { BLIP_TYPES, type Blip, type BlipType, type FeedbackContext } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import type { CaptureDraft } from '../capture'
+import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { ButtonLabel } from '../components/Spinner'
 import { useSpeech } from '../state/useSpeech'
 
@@ -29,6 +30,8 @@ export function Add({
   onAttic,
   onSettings,
   onHelp,
+  feedbackEnv,
+  onFeedback,
 }: {
   onCapture: (draft: CaptureDraft) => Promise<unknown>
   /** Content handed over by the OS share sheet. */
@@ -45,6 +48,8 @@ export function Add({
   onAttic: () => void
   onSettings: () => void
   onHelp: () => void
+  feedbackEnv: FeedbackEnv
+  onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
 }) {
   const [text, setText] = useState(initial?.text ?? '')
   const [url, setUrl] = useState(initial?.url ?? '')
@@ -234,6 +239,12 @@ export function Add({
         {capturedToday > 0 ? (
           <span className="text-ink-faint">{capturedToday} captured today — all saved</span>
         ) : null}
+        <Feedback
+          env={feedbackEnv}
+          screen="entry"
+          onSend={onFeedback}
+          className="text-xs text-ink-faint"
+        />
         <button
           type="button"
           onClick={onAttic}

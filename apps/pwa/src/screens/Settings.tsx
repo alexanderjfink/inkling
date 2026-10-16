@@ -1,4 +1,4 @@
-import type { Blip, BlipEvent } from '@inkling/domain'
+import type { Blip, BlipEvent, FeedbackContext } from '@inkling/domain'
 import { validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import { changeOwnPassword } from '../admin'
@@ -11,6 +11,7 @@ import {
   downloadMarkdownBackup,
   downloadRejections,
 } from '../backup'
+import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { ButtonLabel } from '../components/Spinner'
 import {
   NUDGE_KEY,
@@ -157,6 +158,8 @@ export function Settings({
   auth,
   onOpenAdmin,
   onOpenHelp,
+  feedbackEnv,
+  onFeedback,
 }: {
   syncState: ReturnType<typeof useSync>
   events: BlipEvent[]
@@ -168,6 +171,8 @@ export function Settings({
   auth: Auth
   onOpenAdmin: () => void
   onOpenHelp: () => void
+  feedbackEnv: FeedbackEnv
+  onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
 }) {
   const { report, syncing, sync } = syncState
   const { config, providers, error, saving, save, loaded, load, status } = serverConfig
@@ -945,6 +950,19 @@ export function Settings({
             </button>
           </>
         ) : null}
+      </Section>
+
+      <Section title="Feedback">
+        <p className="text-xs text-ink-faint">
+          What the app gets wrong, or what it is missing. Whatever you were doing is attached to it
+          automatically — you can see exactly what before sending.
+        </p>
+        <Feedback
+          env={feedbackEnv}
+          screen="settings"
+          onSend={onFeedback}
+          className="self-start text-xs text-ink-soft"
+        />
       </Section>
 
       <Section title="Help">

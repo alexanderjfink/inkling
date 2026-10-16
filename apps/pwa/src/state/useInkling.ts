@@ -5,6 +5,7 @@ import type {
   Block,
   CaptureInput,
   EntryContext,
+  FeedbackContext,
   MoveSpec,
   RejectionContext,
 } from '@inkling/domain'
@@ -51,6 +52,14 @@ export interface InklingActions {
    * removed — and none of that is a special case that can rot.
    */
   seedDemo(): Promise<void>
+  /**
+   * Say something about the app itself.
+   *
+   * Written to the same log as everything else, because that is the only thing that syncs
+   * and is never rewritten — so it reaches the server without a second mechanism, and it
+   * cannot be lost by a failed request.
+   */
+  giveFeedback(text: string, context: FeedbackContext): Promise<BlipEvent>
   addNote(id: string, text: string): Promise<BlipEvent>
   snooze(id: string, until?: string, triggers?: string[]): Promise<BlipEvent>
   snoozeAfter(id: string, reason: SnoozeReason, streak?: number): Promise<BlipEvent>
@@ -200,6 +209,11 @@ export function useInkling(accountId: string | null = null) {
           moveId: DEMO_MOVE.id,
           moveSpec: DEMO_MOVE,
         })
+      },
+      giveFeedback(text, context) {
+        // A fresh id rather than a blip's: the fold ignores events for ids it has not
+        // seen, which is exactly right for something that is not about an Inkling.
+        return storage().append({ t: 'feedback', id: newId(), text, context })
       },
       addNote(id, text) {
         return storage().append({

@@ -1,5 +1,7 @@
 import { type Blip, buildDailyFeed } from '@inkling/domain'
+import { APP_BUILD } from './build'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { FeedbackEnv } from './components/Feedback'
 import { Spinner } from './components/Spinner'
 import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
@@ -163,6 +165,22 @@ export default function App() {
       .length
   }, [blips])
 
+  /**
+   * What a feedback report needs about the app itself.
+   *
+   * Built here because it is the one place that already knows all of it, and passed down
+   * rather than reached for, so a screen cannot quietly report a stale build.
+   */
+  const feedbackEnv: FeedbackEnv = {
+    app: APP_BUILD,
+    server: syncState.model?.build ?? 'unknown',
+    provider: syncState.model?.providerName ?? syncState.model?.provider ?? undefined,
+    model: syncState.model?.model ?? undefined,
+    inklings: active,
+    events: events.length,
+    today: capturedToday,
+  }
+
   // Signing in comes before everything: until we know who you are, there is no store
   // to open and no Inklings to show.
   if (!server.loaded || !auth.ready) {
@@ -234,6 +252,8 @@ export default function App() {
           onAttic={() => setScreen('all')}
           onSettings={() => setScreen('settings')}
           onHelp={() => setScreen('help')}
+          feedbackEnv={feedbackEnv}
+          onFeedback={actions.giveFeedback}
         />
       ) : null}
 
@@ -254,6 +274,8 @@ export default function App() {
           onOpenBlip={(id) => setFocusId(id)}
           focusId={focusId}
           serverUrl={syncState.serverUrl}
+          feedbackEnv={feedbackEnv}
+          onFeedback={actions.giveFeedback}
         />
       ) : null}
 
@@ -288,6 +310,8 @@ export default function App() {
           auth={auth}
           onOpenAdmin={() => setScreen('admin')}
           onOpenHelp={() => setScreen('help')}
+          feedbackEnv={feedbackEnv}
+          onFeedback={actions.giveFeedback}
         />
       ) : null}
 

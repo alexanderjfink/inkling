@@ -1,6 +1,20 @@
-import { type PublicUser, type Role, validatePassword, validateUsername } from '@inkling/domain'
+import {
+  type Overview,
+  type PublicUser,
+  type Role,
+  validatePassword,
+  validateUsername,
+} from '@inkling/domain'
 import { useCallback, useEffect, useState } from 'react'
-import { addUser, listUsers, removeUser, setUserPassword, setUserRole } from '../admin'
+import {
+  addUser,
+  listUsers,
+  overview as fetchOverview,
+  removeUser,
+  setUserPassword,
+  setUserRole,
+} from '../admin'
+import { Dashboard } from '../components/Dashboard'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 
 const field =
@@ -34,6 +48,10 @@ export function Admin({ serverUrl, me }: { serverUrl: string; me: PublicUser }) 
   /** Which row is asking to be deleted. */
   const [confirming, setConfirming] = useState<string | null>(null)
 
+  const [overview, setOverview] = useState<Overview | null>(null)
+  const [overviewBusy, setOverviewBusy] = useState(false)
+  const [overviewError, setOverviewError] = useState<string | null>(null)
+
   const refresh = useCallback(async () => {
     const result = await listUsers(serverUrl)
     if (result.ok) {
@@ -44,9 +62,30 @@ export function Admin({ serverUrl, me }: { serverUrl: string; me: PublicUser }) 
     }
   }, [serverUrl])
 
+  /**
+   * Separate from `refresh`, and not called by it: this one reads every account's whole
+   * log, which is real work on a server with history in it. Refreshing the account list
+   * after adding someone should not re-read a year of events.
+   */
+  const loadOverview = useCallback(async () => {
+    setOverviewBusy(true)
+    try {
+      const result = await fetchOverview(serverUrl)
+      if (result.ok) {
+        setOverview(result.value)
+        setOverviewError(null)
+      } else {
+        setOverviewError(result.error)
+      }
+    } finally {
+      setOverviewBusy(false)
+    }
+  }, [serverUrl])
+
   useEffect(() => {
     void refresh()
-  }, [refresh])
+    void loadOverview()
+  }, [refresh, loadOverview])
 
   async function act(key: string, work: () => Promise<{ ok: boolean; error?: string }>) {
     setBusy(key)
@@ -80,6 +119,13 @@ export function Admin({ serverUrl, me }: { serverUrl: string; me: PublicUser }) 
 
   return (
     <div className="flex flex-col gap-5 pb-8">
+      <Dashboard
+        overview={overview}
+        loading={overviewBusy}
+        error={overviewError}
+        onRefresh={() => void loadOverview()}
+      />
+
       <p className="text-xs text-ink-soft">
         Everyone here has their own Inklings, their own model settings and their own vault. Nothing
         is shared between accounts.

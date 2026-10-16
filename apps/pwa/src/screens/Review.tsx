@@ -1,6 +1,7 @@
 import type {
   Blip,
   BlipType,
+  FeedbackContext,
   DeferralChoice,
   LLMProvider,
   MoveLink,
@@ -22,6 +23,7 @@ import {
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Blocks } from '../components/Blocks'
+import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { EntryContextPanel } from '../components/EntryContext'
 import { Markdown } from '../components/Markdown'
 import { ButtonLabel, Spinner } from '../components/Spinner'
@@ -271,6 +273,8 @@ export function Review({
   onOpenBlip,
   focusId,
   serverUrl,
+  feedbackEnv,
+  onFeedback,
 }: {
   blips: Blip[]
   actions: InklingActions
@@ -285,6 +289,8 @@ export function Review({
   /** An Inkling picked from the list, or from the related list, to open first. */
   focusId?: string | null
   serverUrl: string
+  feedbackEnv: FeedbackEnv
+  onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
 }) {
   const [session, setSession] = useState<string[] | null>(null)
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
@@ -1071,6 +1077,19 @@ export function Review({
           </button>
         </div>
       ) : null}
+
+      {/* Here as well as on the entry screen, because this is where a suggestion is
+          judged — and "the moves are bad" is worth hearing from the card that showed one. */}
+      <div className="mt-3 flex justify-center">
+        <Feedback
+          env={feedbackEnv}
+          screen="review"
+          blip={current}
+          move={move}
+          onSend={onFeedback}
+          className="text-[11px] text-ink-faint"
+        />
+      </div>
 
       <div className="mt-4 flex justify-center gap-5 text-xs">
         {current.status === 'retired' || current.status === 'promoted' ? (

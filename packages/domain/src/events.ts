@@ -195,6 +195,41 @@ export interface MoveSpec {
   lookUp?: string[]
 }
 
+/**
+ * What someone was doing when they said the app was wrong.
+ *
+ * The whole point of collecting feedback is that a complaint without context is a
+ * complaint nobody can act on: "the moves are bad" is unanswerable, while "the moves are
+ * bad, on a quest about keyboards, when the model was this one, on this build" is a bug
+ * report. Everything here is gathered automatically so the person only has to write the
+ * sentence they wanted to write.
+ *
+ * Deliberately not the Inkling's body: the title is enough to recognise it, and a feedback
+ * box is not a place to start copying someone's notes into an admin panel.
+ */
+export interface FeedbackContext {
+  /** Which screen they were looking at. */
+  screen: string
+  /** The Inkling in front of them, when there was one. */
+  blip?: { id: string; type: BlipType; title: string; topics: string[]; entries: number }
+  /** The move on screen, when there was one. */
+  move?: { id: string; title: string; generatedBy: string }
+  /** Where the app was pointed, so a report can be reproduced. */
+  provider?: string
+  model?: string
+  /** Both build stamps, so a stale image shows up in the report instead of staying invisible. */
+  app: string
+  server: string
+  /**
+   * Coarse device facts: enough to reproduce a layout problem, not enough to identify
+   * anyone. The user agent is sent because a whole class of bug is "only on this browser".
+   */
+  viewport: { width: number; height: number }
+  userAgent: string
+  /** How much is in the log — the first question about anything. */
+  counts: { inklings: number; events: number; today: number }
+}
+
 /** Carried by every event, and what makes the total order deterministic. */
 export interface EventMeta {
   deviceId: string
@@ -312,6 +347,14 @@ export type BlipEventBody =
   | { t: 'promoteToDesktop'; id: string }
   | { t: 'unpinFromDesktop'; id: string }
   | { t: 'classified'; id: string; type: BlipType }
+  /**
+   * Something the person wants to say about the app itself.
+   *
+   * Carries a fresh id rather than a blip's, so it is ignored by the fold and never
+   * becomes an Inkling — the log is the right place for it because it is the only thing
+   * that syncs and is never rewritten, but it is not about an Inkling.
+   */
+  | { t: 'feedback'; id: string; text: string; context: FeedbackContext }
 
 export type BlipEvent = BlipEventBody & EventMeta
 

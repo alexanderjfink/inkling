@@ -42,9 +42,7 @@ export function Home({
           className="mx-auto mb-4 h-18 w-18 rounded-2xl"
         />
         <h1 className="text-center text-3xl font-semibold tracking-tight">Inkling</h1>
-        <p className="mt-1 text-center text-sm text-ink-faint">
-          Make Moves on your Inklings.
-        </p>
+        <p className="mt-1 text-center text-sm text-ink-faint">Make Moves on your Inklings.</p>
       </div>
 
       <button
@@ -56,7 +54,8 @@ export function Home({
         <span>
           <span className="block text-lg font-semibold">Add an Inkling</span>
           <span className="block text-sm text-ink-soft">
-            Notice something — text, a link, a photo, or your voice
+            Notice something you want to return to — a photo, a link, an idea, a question, or a
+            quest
           </span>
         </span>
       </button>

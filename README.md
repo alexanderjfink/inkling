@@ -254,7 +254,7 @@ playbook".
 Three screens, and two of them are the only things you do.
 
 ```
-Home ─┬─ Add an Inkling   text, a link, a photo, or your voice (⌘↵ / Ctrl+↵ to keep it)
+Home ─┬─ Add an Inkling   a photo, a link, an idea, a question, or a quest (⌘↵ / Ctrl+↵ to keep it)
       ├─ Review          one Inkling at a time, full screen
       └─ ⚙ Settings      theme, sync, model, notes, reminders, backup, storage
 ```

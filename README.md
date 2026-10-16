@@ -495,8 +495,17 @@ directions at once.
 
 ### Asking
 
-Under any Inkling's card: *ask a friend for a move*, with whatever you want to say about
-being stuck. The friend gets the Inkling's title, what it is, its topics, what has already
+**The way to friends is a button in the header**, on every screen, carrying the number of
+people waiting on you — an ask to answer, or a request to accept. It used to be a quiet link
+in the footer of one screen, which is where a thing goes to be not found, and the question
+that proved it was somebody asking *how do I ask a friend for a move at all*.
+
+**Ask from the move card**, right under the suggestion, as a button rather than a footnote.
+That is the moment the question occurs to somebody: the move is not it, and there is a person
+who might know better. When there is no suggestion on screen the button appears below the
+card instead, so there is always exactly one way in and it is never below the fold.
+
+Whatever you want to say about being stuck goes with it. The friend gets the Inkling's title, what it is, its topics, what has already
 been written against it, and **what has already been suggested** — so they can think of
 something the app did not, rather than repeating it.
 

@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from 'react'
 import type { CaptureDraft } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
+import { FriendsButton } from '../components/FriendsButton'
 import { ButtonLabel } from '../components/Spinner'
 import type { ReceivedAsk } from '../state/useSocial'
 import { useSpeech } from '../state/useSpeech'
@@ -44,6 +45,7 @@ export function Add({
   asking,
   onFriends,
   onNotifications,
+  friendsWaiting,
 }: {
   onCapture: (draft: CaptureDraft) => Promise<unknown>
   /** Content handed over by the OS share sheet. */
@@ -68,6 +70,8 @@ export function Add({
   asking: ReceivedAsk[]
   onFriends: () => void
   onNotifications: () => void
+  /** Friends waiting on something from you, shown on the button. */
+  friendsWaiting: number
 }) {
   const [text, setText] = useState(initial?.text ?? '')
   const [url, setUrl] = useState(initial?.url ?? '')
@@ -120,6 +124,9 @@ export function Add({
           <p className="text-base leading-tight font-semibold">Inkling</p>
           <p className="text-[11px] text-ink-faint">Make Moves on your Inklings</p>
         </div>
+        <span data-tour="friends">
+          <FriendsButton count={friendsWaiting} onClick={onFriends} />
+        </span>
         <button
           type="button"
           onClick={onHelp}
@@ -291,16 +298,7 @@ export function Add({
           onSend={onFeedback}
           className="text-xs text-ink-faint"
         />
-        {socialOn ? (
-          <button
-            type="button"
-            onClick={onFriends}
-            className="quiet text-xs underline"
-            data-tour="friends"
-          >
-            friends
-          </button>
-        ) : null}
+
         <button
           type="button"
           onClick={onAttic}

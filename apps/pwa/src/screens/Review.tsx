@@ -524,6 +524,13 @@ export function Review({
     // Keyed on the phrases themselves: `lookUp` is a fresh array every render.
   }, [lookUpKey, serverUrl])
 
+  /** Open the ask composer, cleared of whatever the last one was left holding. */
+  function openAsk() {
+    setAsking('')
+    setAskNote('')
+    setAskProblem(null)
+  }
+
   function settle(decision: Decision) {
     if (!current) return
     setDecisions((previous) => ({ ...previous, [current.id]: decision }))
@@ -1142,6 +1149,27 @@ export function Review({
               </button>
             </div>
 
+            {/* Right next to the suggestion, and louder than the rest of this row, because
+                this is the moment the question occurs to somebody: the move is not it, and
+                there is a person who might know better. It used to be a quiet link under the
+                card, which is where things go to be not found. */}
+            {socialOn && !current.demo ? (
+              <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => openAsk()}
+                  className="rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
+                >
+                  ask a friend for a move
+                </button>
+                {social.friends.some((friend) => friend.status === 'accepted') ? null : (
+                  <span className="text-[11px] text-ink-faint">
+                    add one by username first — they have to say yes
+                  </span>
+                )}
+              </div>
+            ) : null}
+
             {rejecting ? (
               <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line bg-surface/60 p-3">
                 <p className="text-[11px] tracking-wide text-ink-faint uppercase">
@@ -1304,22 +1332,21 @@ export function Review({
         </div>
       ) : null}
 
-      {/* Asking a person rather than the model. Under the card rather than inside it,
-          because it is what you do when the suggestion above was not it. */}
+      {/* Asking a person rather than the model. The button appears once, in the move card
+          when there is a suggestion to react to, and here when there is not — so there is
+          always exactly one way in and it is never below the fold. */}
       {socialOn && !current.demo ? (
         <div className="mt-3 flex flex-col items-center gap-2">
           {asking === null ? (
-            <button
-              type="button"
-              onClick={() => {
-                setAsking('')
-                setAskNote('')
-                setAskProblem(null)
-              }}
-              className="quiet text-xs underline"
-            >
-              ask a friend for a move
-            </button>
+            friendMove || move ? null : (
+              <button
+                type="button"
+                onClick={() => openAsk()}
+                className="rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
+              >
+                ask a friend for a move
+              </button>
+            )
           ) : (
             <div className="flex w-full flex-col gap-2 rounded-2xl border border-line bg-surface/60 p-3">
               <p className="text-[11px] tracking-wide text-ink-faint uppercase">

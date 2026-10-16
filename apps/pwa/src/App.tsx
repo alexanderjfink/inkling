@@ -2,6 +2,7 @@ import { type AskContext, type Blip, type Friend, buildDailyFeed } from '@inklin
 import { APP_BUILD } from './build'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FeedbackEnv } from './components/Feedback'
+import { FriendsButton } from './components/FriendsButton'
 import { Spinner } from './components/Spinner'
 import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
@@ -184,6 +185,15 @@ export default function App() {
   }, [blips])
 
   /**
+   * Everybody waiting on something from you.
+   *
+   * An ask to answer, or a request to accept — both are somebody having done something that
+   * needs a person, which is the only kind of number worth putting on a button.
+   */
+  const friendsWaiting =
+    social.asks.length + social.friends.filter((friend) => friend.status === 'asked-of-you').length
+
+  /**
    * What a feedback report needs about the app itself.
    *
    * Built here because it is the one place that already knows all of it, and passed down
@@ -235,7 +245,10 @@ export default function App() {
           >
             ‹
           </button>
-          <h1 className="text-base font-semibold">{TITLES[screen]}</h1>
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{TITLES[screen]}</h1>
+          {socialOn ? (
+            <FriendsButton count={friendsWaiting} onClick={() => setScreen('friends')} />
+          ) : null}
         </header>
       ) : null}
 
@@ -273,6 +286,7 @@ export default function App() {
           asking={social.asks}
           onFriends={() => setScreen('friends')}
           onNotifications={() => setScreen('notifications')}
+          friendsWaiting={friendsWaiting}
         />
       ) : null}
 

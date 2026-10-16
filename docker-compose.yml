@@ -15,20 +15,23 @@ services:
     restart: unless-stopped
 
     ports:
-      # Bound to this machine only. Put Tailscale in front for the phone:
+      # Bound to this machine only, which is right when nginx runs on the same host:
+      # it proxies to 127.0.0.1:8787 and nothing else can reach the port.
+      #
+      # If nginx is itself in Docker, or on another machine, it cannot see 127.0.0.1 —
+      # set INKLING_BIND=0.0.0.0 and let your network be the boundary, or put both
+      # containers on one Docker network and use the container name as the upstream.
+      #
+      #   INKLING_BIND=0.0.0.0 docker compose up -d
+      #
+      # Tailscale instead of nginx also works, and gives the phone a real certificate:
       #
       #   tailscale serve --bg 8787
       #
-      # and open the https://….ts.net address it prints. That is not only about the
-      # service worker: the app hashes image blobs with crypto.subtle, which the browser
-      # exposes only in a secure context, so over plain http:// image capture fails while
-      # everything else looks fine.
-      #
-      # Change to "8787:8787" only if you trust every device on this network. There is a
-      # login, so it is not wide open — but anyone who reaches the port can try
-      # passwords, and on a server with no accounts yet the first person to reach it
-      # becomes the admin.
-      - "127.0.0.1:8787:8787"
+      # A secure context is not optional — the app hashes image blobs with
+      # crypto.subtle, which the browser exposes only over https or on localhost, so on
+      # a plain http:// address image capture fails while everything else looks fine.
+      - "${INKLING_BIND:-127.0.0.1}:8787:8787"
 
     volumes:
       # Where everything lives: the accounts, and then per account their logs, blobs and
@@ -44,6 +47,11 @@ services:
       # folder your notes sync to and set the vault to /vault in Settings. Without it
       # everything works except promotion, which says plainly that it could not write.
       # - /volume1/Notebook:/vault
+
+      # Optional — TLS on the container itself. Normally unnecessary: your reverse proxy
+      # terminates TLS and talks plain http to this. Set both only if the proxy insists
+      # on an https:// upstream. Mount the files in and point at the paths inside.
+      # - ./certs:/certs:ro
 
     environment:
       - TZ=${TZ:-UTC}
@@ -65,3 +73,8 @@ services:
       # - INKLING_API_KEY=
       # - INKLING_EMBED_PROVIDER=omlx
       # - INKLING_EMBED_MODEL=granite-embedding-small-english-r2
+
+      # Only if the reverse proxy insists on an https:// upstream. Both are needed, and
+      # the files must be mounted in — see the volumes above.
+      # - INKLING_TLS_CERT=/certs/fullchain.pem
+      # - INKLING_TLS_KEY=/certs/privkey.pem

@@ -32,9 +32,32 @@ if (await auth.needsSetup()) {
   }
 }
 
+/**
+ * Optional TLS.
+ *
+ * Off by default, and normally unnecessary: a reverse proxy terminates TLS and talks
+ * plain HTTP to this. It exists for the case where the proxy insists on an `https://`
+ * upstream, which is a real arrangement and not worth arguing with — nginx in front of
+ * nginx, or a proxy config you do not control.
+ */
+const tlsCert = process.env.INKLING_TLS_CERT?.trim()
+const tlsKey = process.env.INKLING_TLS_KEY?.trim()
+const useTls = Boolean(tlsCert && tlsKey)
+if (useTls) {
+  for (const path of [tlsCert, tlsKey]) {
+    if (path && !existsSync(path)) {
+      console.error(`  INKLING_TLS_CERT / INKLING_TLS_KEY are set, but ${path} does not exist`)
+      process.exit(1)
+    }
+  }
+}
+
 const server = Bun.serve({
   port,
   hostname: '0.0.0.0',
+  ...(useTls
+    ? { tls: { cert: Bun.file(tlsCert as string), key: Bun.file(tlsKey as string) } }
+    : {}),
   fetch: createHandler(accounts.storeFor, {
     staticDir: servingApp ? staticDir : undefined,
     auth,
@@ -43,7 +66,9 @@ const server = Bun.serve({
   }),
 })
 
-console.log(`Inkling sync server listening on http://${server.hostname}:${server.port}`)
+console.log(
+  `Inkling sync server listening on ${useTls ? 'https' : 'http'}://${server.hostname}:${server.port}`,
+)
 console.log(`  data directory: ${dataDir}`)
 console.log(
   (await auth.needsSetup())

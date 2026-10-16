@@ -11,6 +11,16 @@ dist
 # Your log, your blobs, and your API keys. Never in an image.
 server/data
 
+# Certificates, if you mount them in for the https-upstream case. They must not be
+# baked into the image as well.
+certs/
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+*.jks
+
 # The Android project is generated and is not needed to build or run the server.
 apps/pwa/android
 

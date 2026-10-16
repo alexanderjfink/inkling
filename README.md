@@ -657,6 +657,47 @@ it lives outside the image.
 **To check it is up:** `curl -s localhost:8787/api/health`. The container also has a
 healthcheck, so `docker compose ps` shows whether it is healthy.
 
+### Behind a reverse proxy
+
+There is a working config in `deploy/nginx.conf.example`. **Inkling needs almost nothing
+from the proxy** — it serves the app and the API on one origin, `/api` is relative, and
+nothing in the server reads `X-Forwarded-*` or the `Host` header. Point the proxy at the
+port and it works.
+
+Three things will bite you, and only the first is really about Inkling:
+
+**`client_max_body_size`.** nginx defaults to **1 MB**. Image capture uploads the whole
+file as one blob, so a phone photo is rejected with a 413 before Inkling sees it, and the
+app reports a failed capture — which looks like a bug in Inkling. Set it to something
+like `64m`. Inkling itself imposes no limit; verified by pushing an 8 MB blob straight at
+it.
+
+**Timeouts.** A move asks a model, and a slow one takes longer than nginx's 60-second
+default. When it does, the card sits on "choosing a move…" and gives up, which reads as
+the model being broken. `proxy_read_timeout 180s`.
+
+**Where the proxy is.** The compose file binds to `127.0.0.1`, which is right when nginx
+runs on the same host. If nginx is itself in Docker or on another machine it cannot see
+that address:
+
+```bash
+INKLING_BIND=0.0.0.0 docker compose up -d     # or share a Docker network
+```
+
+**If your proxy insists on an `https://` upstream**, the container can speak TLS itself:
+
+```yaml
+    volumes:
+      - ./certs:/certs:ro
+    environment:
+      - INKLING_TLS_CERT=/certs/fullchain.pem
+      - INKLING_TLS_KEY=/certs/privkey.pem
+```
+
+Off by default, because terminating TLS in the container means managing the certificate
+there too. nginx terminating it and talking plain http to Inkling is simpler and is what
+the example config does.
+
 ### Two things to know
 
 **The vault has to move too, or promotion stops working.** "Promote to note" writes into

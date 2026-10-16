@@ -7,6 +7,7 @@ server/data/
 .env
 .env.*
 !.env.example
+certs/
 *.pem
 *.key
 *.p12

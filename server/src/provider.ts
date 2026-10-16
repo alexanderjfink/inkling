@@ -21,6 +21,43 @@ const REQUEST_TIMEOUT_MS = 60_000
  * `response_format`, which several local servers reject — so we ask for JSON, and
  * quietly ask again without it rather than failing the move.
  */
+/**
+ * The models an endpoint says it can serve, with a failure that says why.
+ *
+ * "could not list models: 401" is the least useful version of that sentence. It does not
+ * name the address, which is the thing most likely to be wrong and the thing someone just
+ * typed in, and it throws away the response body, which usually says "invalid api key".
+ * Both are in the message now, because this error is the whole diagnosis.
+ */
+async function listModelsFrom(
+  url: string,
+  headers: Record<string, string>,
+  name: string,
+): Promise<string[]> {
+  let res: Response
+  try {
+    res = await fetch(url, { headers })
+  } catch (error) {
+    // A wrong address, a closed port, DNS and certificates all land here.
+    throw new Error(
+      `could not reach ${url}: ${error instanceof Error ? error.message : 'the request failed'}`,
+    )
+  }
+
+  if (!res.ok) {
+    const detail = (await res.text().catch(() => '')).trim().slice(0, 200)
+    throw new Error(
+      `${name} could not list models at ${url}: ${res.status}${detail ? ` — ${detail}` : ''}`,
+    )
+  }
+
+  const body = (await res.json().catch(() => ({}))) as { data?: Array<{ id?: string }> }
+  return (body.data ?? [])
+    .map((entry) => entry.id)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+    .sort((a, b) => a.localeCompare(b))
+}
+
 export class OpenAiCompatibleProvider implements LLMProvider {
   readonly name: string
   #baseUrl: string
@@ -56,14 +93,7 @@ export class OpenAiCompatibleProvider implements LLMProvider {
 
   /** What this endpoint says it can serve. */
   async listModels(): Promise<string[]> {
-    const res = await fetch(`${this.#baseUrl}/models`, { headers: this.#headers() })
-    if (!res.ok) throw new Error(`${this.name} could not list models: ${res.status}`)
-
-    const body = (await res.json()) as { data?: Array<{ id?: string }> }
-    return (body.data ?? [])
-      .map((entry) => entry.id)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0)
-      .sort((a, b) => a.localeCompare(b))
+    return listModelsFrom(`${this.#baseUrl}/models`, this.#headers(), this.name)
   }
 
   async #post(path: string, body: unknown): Promise<Response> {
@@ -181,20 +211,15 @@ export class AnthropicProvider implements LLMProvider {
   }
 
   async listModels(): Promise<string[]> {
-    const res = await fetch(`${this.#baseUrl}/models`, {
-      headers: {
+    return listModelsFrom(
+      `${this.#baseUrl}/models`,
+      {
         'x-api-key': this.#apiKey ?? '',
         'anthropic-version': '2023-06-01',
         'user-agent': 'Inkling/0.1 (personal blip tool)',
       },
-    })
-    if (!res.ok) throw new Error(`anthropic could not list models: ${res.status}`)
-
-    const body = (await res.json()) as { data?: Array<{ id?: string }> }
-    return (body.data ?? [])
-      .map((entry) => entry.id)
-      .filter((id): id is string => typeof id === 'string' && id.length > 0)
-      .sort((a, b) => a.localeCompare(b))
+      'anthropic',
+    )
   }
 }
 
@@ -214,6 +239,15 @@ export interface ModelStatus {
   embedProviderName: string | null
   configured: boolean
   keySource: KeySource
+  /**
+   * The address actually being called, after any override.
+   *
+   * Worth reporting because it is the thing that is wrong when a self-hosted model does
+   * not answer, and it was previously invisible — the app showed the preset's name and
+   * nothing about where the request went.
+   */
+  baseUrl: string
+  embedBaseUrl: string | null
   /** Whether embeddings are available at all, from either provider. */
   embeddings: boolean
   /** Cosine floor above which two vectors count as similar. */
@@ -236,6 +270,8 @@ export function modelStatus(
     embedProviderName: embedSource ? embedSource.preset.name : null,
     configured: resolved.configured,
     keySource: resolved.keySource,
+    baseUrl: resolved.baseUrl,
+    embedBaseUrl: embedSource ? embedSource.baseUrl : null,
     embeddings: Boolean(embedSource?.embedModel),
     embedSimilarity: embedSimilarity ?? null,
     note: resolved.preset.note,

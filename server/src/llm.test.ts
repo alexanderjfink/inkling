@@ -222,6 +222,8 @@ describe('llm and fetch routes', () => {
       embedSimilarity: null,
       configured: true,
       keySource: 'opencode-auth' as const,
+      baseUrl: 'https://opencode.ai/inference/go/v1',
+      embedBaseUrl: null,
       embeddings: false,
     }
     const handle = createHandler(new FileStore(dir), { llm: fakeLlm(), model: status })

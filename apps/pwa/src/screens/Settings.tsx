@@ -270,6 +270,8 @@ export function Settings({
   const [provider, setProvider] = useState('')
   const [model, setModel] = useState('')
   const [apiKey, setApiKey] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [embedBaseUrl, setEmbedBaseUrl] = useState('')
   const [embedProvider, setEmbedProvider] = useState('')
   const [embedModel, setEmbedModel] = useState('')
   const [embedApiKey, setEmbedApiKey] = useState('')
@@ -286,6 +288,8 @@ export function Settings({
     setEmbedProvider(config.embedProvider ?? '')
     setEmbedModel(config.embedModel ?? '')
     setSimilarity(config.embedSimilarity === null ? '' : String(config.embedSimilarity))
+    setBaseUrl(config.baseUrl ?? '')
+    setEmbedBaseUrl(config.embedBaseUrl ?? '')
     setVault(config.vault)
     setFolder(config.folder)
     setTwaPackage(config.twaPackage ?? '')
@@ -340,6 +344,10 @@ export function Settings({
       embedProvider,
       embedModel,
       embedSimilarity: similarity.trim() === '' ? null : Number(similarity),
+      // An empty address means "use the preset's own", which mergeConfig reads as a
+      // request to clear the override.
+      baseUrl: baseUrl.trim(),
+      embedBaseUrl: embedBaseUrl.trim(),
     }
     // Only send a key when one was typed, so an empty box does not erase it.
     if (apiKey.trim()) patch.apiKey = apiKey.trim()
@@ -350,9 +358,10 @@ export function Settings({
       setEmbedApiKey('')
       setSaved('model')
       await syncState.refreshModel()
-      // A new provider or key means a new list of models.
-      void loadModels('chat', true)
-      void loadModels('embed', true)
+      // A new provider or key means a new list of models. Not quiet: if it fails, the
+      // reason is the whole point of having pressed Save.
+      void loadModels('chat')
+      void loadModels('embed')
     }
   }
 
@@ -390,6 +399,27 @@ export function Settings({
 
   const chatProviders = providers
   const embedProviders = providers.filter((option) => !option.noEmbeddings)
+
+  /**
+   * Whether an address is worth asking for.
+   *
+   * True for a preset whose own address is localhost — Ollama, oMLX, vLLM, LM Studio —
+   * because a remote one is the ordinary case there, and for a custom endpoint, which
+   * has no address of its own at all. False for the hosted providers, where changing
+   * the address is a mistake rather than a configuration.
+   */
+  const addressEditable = (id: string): boolean => {
+    if (!id) return false
+    const option = providers.find((entry) => entry.id === id)
+    if (!option) return false
+    if (option.id === 'custom') return true
+    return /^https?:\/\/(127\.0\.0\.1|localhost|\[::1\])/i.test(option.baseUrl)
+  }
+
+  const chatProviderOption = providers.find((entry) => entry.id === provider)
+  const embedProviderOption = providers.find((entry) => entry.id === embedProvider)
+  const chatAddressEditable = addressEditable(provider)
+  const embedAddressEditable = addressEditable(embedProvider)
 
   return (
     <div className="flex flex-1 flex-col gap-6">
@@ -625,6 +655,28 @@ export function Settings({
               </select>
             </Field>
 
+            {/* Shown when the preset's own address is localhost, or when there is no
+                preset at all — the two cases where pointing somewhere else is the
+                normal thing rather than a mistake. A remote Ollama lives here. */}
+            {chatAddressEditable ? (
+              <Field label="Model server address">
+                <input
+                  value={baseUrl}
+                  onChange={(event) => setBaseUrl(event.target.value)}
+                  placeholder={chatProviderOption?.baseUrl || 'https://example.com/v1'}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={inputClass}
+                />
+                <p className="text-xs text-ink-faint">
+                  {chatProviderOption?.baseUrl
+                    ? `Leave empty for ${chatProviderOption.baseUrl}`
+                    : 'The full base URL, including /v1 if the server uses it.'}
+                </p>
+              </Field>
+            ) : null}
+
             <ModelPicker
               label="Model"
               value={model}
@@ -662,6 +714,25 @@ export function Settings({
                 ))}
               </select>
             </Field>
+
+            {embedAddressEditable ? (
+              <Field label="Embedding server address">
+                <input
+                  value={embedBaseUrl}
+                  onChange={(event) => setEmbedBaseUrl(event.target.value)}
+                  placeholder={embedProviderOption?.baseUrl || 'https://example.com/v1'}
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className={inputClass}
+                />
+                <p className="text-xs text-ink-faint">
+                  {embedProviderOption?.baseUrl
+                    ? `Leave empty for ${embedProviderOption.baseUrl}`
+                    : 'The full base URL, including /v1 if the server uses it.'}
+                </p>
+              </Field>
+            ) : null}
 
             <ModelPicker
               label="Embedding model"
@@ -702,6 +773,17 @@ export function Settings({
                 ? ` · embeddings via ${config.embedProviderName ?? '?'}`
                 : ' · no embeddings'}
             </p>
+            {/* The address the server will actually call. It is the thing that is wrong
+                when a self-hosted model does not answer, and it used to be invisible. */}
+            {syncState.model?.baseUrl ? (
+              <p className="text-xs text-ink-faint">
+                calling {syncState.model.baseUrl}
+                {syncState.model.embedBaseUrl &&
+                syncState.model.embedBaseUrl !== syncState.model.baseUrl
+                  ? ` · embeddings at ${syncState.model.embedBaseUrl}`
+                  : ''}
+              </p>
+            ) : null}
 
             <div className="flex flex-wrap gap-2">
               <button

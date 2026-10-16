@@ -83,6 +83,7 @@ function providerList() {
     name: preset.name,
     kind: preset.kind,
     keyEnv: preset.keyEnv,
+    baseUrl: preset.baseUrl,
     defaultModel: preset.defaultModel,
     keyOptional: Boolean(preset.keyOptional),
     noEmbeddings: Boolean(preset.noEmbeddings),
@@ -101,6 +102,8 @@ function configPatch(body: Record<string, unknown>): ServerConfig {
     'embedModel',
     'vault',
     'folder',
+    'baseUrl',
+    'embedBaseUrl',
     'twaPackage',
     'twaFingerprint',
     'apiKey',
@@ -450,6 +453,8 @@ export function createHandler(
         embedSimilarity: live.status?.embedSimilarity ?? null,
         embeddings: live.status?.embeddings ?? false,
         keySource: live.status?.keySource ?? null,
+        baseUrl: live.status?.baseUrl ?? null,
+        embedBaseUrl: live.status?.embedBaseUrl ?? null,
         note: live.status?.note ?? null,
       })
     }

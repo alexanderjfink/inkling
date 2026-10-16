@@ -23,6 +23,16 @@ export interface ServerConfig {
   embedProvider?: string
   embedModel?: string
   embedSimilarity?: number | null
+  /**
+   * Where the model actually is, when it is not where the preset says.
+   *
+   * The presets cover the common case, but a local runner is often not local — Ollama
+   * on another box, vLLM on the LAN, a gateway behind a domain. Without this there was
+   * no way to say so from the app: the value was read from `INKLING_BASE_URL` and
+   * nothing could set it, so the "custom endpoint" preset had no endpoint to give it.
+   */
+  baseUrl?: string
+  embedBaseUrl?: string
   vault?: string
   folder?: string
   /**
@@ -85,6 +95,8 @@ function overlay(config: ServerConfig, env: Record<string, string | undefined>) 
     ...(config.embedProvider ? { INKLING_EMBED_PROVIDER: config.embedProvider } : {}),
     ...(config.embedModel ? { INKLING_EMBED_MODEL: config.embedModel } : {}),
     ...(config.embedApiKey ? { INKLING_EMBED_API_KEY: config.embedApiKey } : {}),
+    ...(config.baseUrl ? { INKLING_BASE_URL: config.baseUrl } : {}),
+    ...(config.embedBaseUrl ? { INKLING_EMBED_BASE_URL: config.embedBaseUrl } : {}),
     ...(typeof config.embedSimilarity === 'number'
       ? { INKLING_EMBED_SIMILARITY: String(config.embedSimilarity) }
       : {}),
@@ -124,6 +136,8 @@ export function publicConfig(config: ServerConfig, runtime: Runtime) {
     configured: runtime.status.configured,
     vault: runtime.vault.vault,
     folder: runtime.vault.folder,
+    baseUrl: config.baseUrl ?? null,
+    embedBaseUrl: config.embedBaseUrl ?? null,
     twaPackage: config.twaPackage ?? null,
     twaFingerprint: config.twaFingerprint ?? null,
     apiKeySet: Boolean(config.apiKey),
@@ -174,6 +188,24 @@ export function validateConfig(patch: ServerConfig): ConfigProblem[] {
   check('provider', patch.provider, 'provider')
   check('model', patch.model, 'model')
   check('vault', patch.vault, 'vault')
+
+  // A base URL is checked only when it holds something: an empty string is how you go
+  // back to the preset's own address, and mergeConfig reads it that way.
+  for (const [field, value, label] of [
+    ['baseUrl', patch.baseUrl, 'model server address'],
+    ['embedBaseUrl', patch.embedBaseUrl, 'embedding server address'],
+  ] as const) {
+    if (value === undefined || value.trim().length === 0) continue
+    let parsed: URL | null = null
+    try {
+      parsed = new URL(value.trim())
+    } catch {
+      parsed = null
+    }
+    if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) {
+      problems.push({ field, message: `${label} must be an http:// or https:// address` })
+    }
+  }
 
   // The two TWA fields are checked only when they hold something: an empty string is
   // how you clear them, and mergeConfig reads it that way. Sending "" to remove a
@@ -244,6 +276,8 @@ export function mergeConfig(current: ServerConfig, patch: ServerConfig): ServerC
       key === 'folder' ||
       key === 'apiKey' ||
       key === 'embedApiKey' ||
+      key === 'baseUrl' ||
+      key === 'embedBaseUrl' ||
       key === 'twaPackage' ||
       key === 'twaFingerprint' ||
       key === 'embedSimilarity'

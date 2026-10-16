@@ -14,6 +14,8 @@ export interface PublicConfig {
   configured: boolean
   vault: string
   folder: string
+  baseUrl: string | null
+  embedBaseUrl: string | null
   twaPackage: string | null
   twaFingerprint: string | null
   apiKeySet: boolean
@@ -25,6 +27,8 @@ export interface ProviderOption {
   name: string
   kind: string
   keyEnv: string[]
+  /** The preset's own address, shown as the placeholder. */
+  baseUrl: string
   defaultModel: string
   keyOptional: boolean
   noEmbeddings: boolean

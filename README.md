@@ -343,11 +343,21 @@ immediately, with no restart:
 |---|---|
 | **Theme** | light, dark, or match the system |
 | **Server** | the server URL, and a sync now button |
-| **Model** | provider, model, API key, embedding provider, embedding model, embedding key, similarity floor |
+| **Model** | provider, model, server address, API key, embedding provider, embedding model, embedding address, embedding key, similarity floor |
 | **Notes** | the vault path, and the folder inside it |
 | **Reminders** | the nudge toggle |
 | **Backup** | download the log |
 | **Storage** | the IndexedDB-vs-OPFS benchmark |
+
+**A model that is not where the preset says.** The **model server address** field appears
+when it is the thing you are likely to want: for the local runners (Ollama, oMLX, vLLM,
+LM Studio), whose presets point at `127.0.0.1`, and for a custom endpoint, which has no
+address of its own. Leave it empty to use the preset's own. A remote Ollama is just
+`https://ollama.yourdomain.com/v1` in that field, with the provider set to Ollama.
+
+The address actually in use is shown under the settings — *"calling https://…"* — and a
+failure to load the models now says which URL it tried and what came back, rather than
+only that it failed.
 
 Saved settings override the server's environment, which still supplies anything the
 settings do not mention. **Keys are write-only**: the server reports whether one is set

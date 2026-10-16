@@ -18,6 +18,9 @@ export interface ModelHealth {
   /** Cosine floor for "similar in meaning"; model-dependent. */
   embedSimilarity: number | null
   keySource: string | null
+  /** Where the request actually goes, after any override in Settings. */
+  baseUrl: string | null
+  embedBaseUrl: string | null
   note: string | null
 }
 
@@ -32,6 +35,8 @@ const UNKNOWN: ModelHealth = {
   embeddings: false,
   embedSimilarity: null,
   keySource: null,
+  baseUrl: null,
+  embedBaseUrl: null,
   note: null,
 }
 

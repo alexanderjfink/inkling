@@ -369,3 +369,125 @@ describe('Digital Asset Links (for a TWA APK)', () => {
     }
   })
 })
+
+describe('a model server that is not where the preset says', () => {
+  /**
+   * The "custom endpoint" preset had no endpoint to give it: the address was read from
+   * INKLING_BASE_URL and nothing in the app could set it. A remote Ollama had the same
+   * problem — its preset points at 127.0.0.1, and there was no way to say otherwise.
+   */
+  async function withServer(initial: ServerConfig = {}) {
+    const dir = await mkdtemp(join(tmpdir(), 'inkling-baseurl-'))
+    let config = initial
+    let runtime: Runtime = buildRuntime(config)
+    const handle = createHandler(new FileStore(dir), {
+      runtime: () => runtime,
+      settings: {
+        read: async () => ({ config, runtime }),
+        update: async (patch) => {
+          config = mergeConfig(config, patch)
+          // Persist, as the real bridge does — otherwise "survives a restart" would not
+          // actually be testing anything.
+          await saveConfig(dir, config)
+          runtime = buildRuntime(config)
+          return { config, runtime, problems: [] }
+        },
+      },
+    })
+    return { handle, dir, current: () => config }
+  }
+
+  const put = (handle: (r: Request) => Promise<Response>, body: unknown) =>
+    handle(new Request(`${BASE}/config`, { method: 'PUT', body: JSON.stringify(body) }))
+
+  test('a saved address is used, and reported back', async () => {
+    const { handle, dir } = await withServer()
+    try {
+      const saved = await put(handle, {
+        provider: 'ollama',
+        baseUrl: 'https://ollama.example.com/v1',
+      })
+      expect(saved.status).toBe(200)
+      expect((await saved.json()).config.baseUrl).toBe('https://ollama.example.com/v1')
+
+      // The provider is actually pointed at it, not merely storing the string.
+      const health = (await (await handle(new Request(`${BASE}/llm/health`))).json()) as {
+        baseUrl: string
+      }
+      expect(health.baseUrl).toBe('https://ollama.example.com/v1')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('with no address saved, the preset default is used', async () => {
+    const { handle, dir } = await withServer()
+    try {
+      await put(handle, { provider: 'ollama' })
+      const health = (await (await handle(new Request(`${BASE}/llm/health`))).json()) as {
+        baseUrl: string
+      }
+      expect(health.baseUrl).toBe('http://127.0.0.1:11434/v1')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('an empty address goes back to the preset default', async () => {
+    const { handle, dir } = await withServer()
+    try {
+      await put(handle, { provider: 'ollama', baseUrl: 'https://elsewhere.example.com/v1' })
+      await put(handle, { baseUrl: '' })
+      const health = (await (await handle(new Request(`${BASE}/llm/health`))).json()) as {
+        baseUrl: string
+      }
+      expect(health.baseUrl).toBe('http://127.0.0.1:11434/v1')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('the embeddings provider has its own address', async () => {
+    const { handle, dir } = await withServer()
+    try {
+      await put(handle, {
+        embedProvider: 'ollama',
+        embedBaseUrl: 'https://ollama.example.com/v1',
+      })
+      const health = (await (await handle(new Request(`${BASE}/llm/health`))).json()) as {
+        embedBaseUrl: string
+      }
+      expect(health.embedBaseUrl).toBe('https://ollama.example.com/v1')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('something that is not an address is refused, with a reason', async () => {
+    const { handle, dir } = await withServer()
+    try {
+      for (const bad of ['not a url', 'ftp://example.com', 'example.com/v1']) {
+        const res = await put(handle, { baseUrl: bad })
+        expect({ bad, status: res.status }).toEqual({ bad, status: 400 })
+        const body = (await res.json()) as { problems: Array<{ field: string }> }
+        expect(body.problems[0]?.field).toBe('baseUrl')
+      }
+      // A trailing slash is fine: it is stripped before use, not rejected.
+      expect((await put(handle, { baseUrl: 'https://example.com/v1/' })).status).toBe(200)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('the address survives a restart, because it is in the config file', async () => {
+    const { handle, dir } = await withServer()
+    try {
+      await put(handle, { provider: 'ollama', baseUrl: 'https://ollama.example.com/v1' })
+      const saved = await loadConfig(dir)
+      expect(saved.baseUrl).toBe('https://ollama.example.com/v1')
+      expect(buildRuntime(saved).status.baseUrl).toBe('https://ollama.example.com/v1')
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})

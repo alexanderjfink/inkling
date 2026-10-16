@@ -1625,40 +1625,13 @@ export function Review({
         </div>
       ) : null}
 
-      {/* Nothing is generated until you ask for one, so this is what an Inkling opens to:
-          two ways to get a move, and no spinner. It used to start a model call on open —
-          every card you glanced at cost a call and a few seconds of waiting, including the
-          ones you were about to put down. */}
-      {!composer && !friendMove && !move && !moveLoading ? (
-        <div className="mt-5 flex flex-col items-center gap-3">
-          <div className="flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              onClick={generateMove}
-              className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-surface"
-            >
-              Generate a Move
-            </button>
-            {socialOn && !current.demo ? (
-              <button
-                type="button"
-                onClick={() => setAskOpen((open) => !open)}
-                className="rounded-full border border-accent/50 px-5 py-3 text-sm font-medium text-accent"
-              >
-                Ask a Friend for a Move
-              </button>
-            ) : null}
-          </div>
-
-          {current.friendAsks.length > 0 ? (
-            <p className="text-[11px] text-ink-faint">
-              asked{' '}
-              {current.friendAsks
-                .map((ask) => `${ask.toUsername} ${formatWhen(ask.at, new Date())}`)
-                .join(', ')}
-            </p>
-          ) : null}
-        </div>
+      {current.friendAsks.length > 0 ? (
+        <p className="mt-3 text-center text-[11px] text-ink-faint">
+          asked{' '}
+          {current.friendAsks
+            .map((ask) => `${ask.toUsername} ${formatWhen(ask.at, new Date())}`)
+            .join(', ')}
+        </p>
       ) : null}
 
       {!composer && !friendMove && !move && moveLoading ? (

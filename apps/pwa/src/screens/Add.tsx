@@ -7,7 +7,7 @@ import {
   newBlock,
   type ShareDefault,
 } from '@inkling/domain'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { type CaptureDraft, findUrl, isOnlyALink } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { FriendsButton } from '../components/FriendsButton'
@@ -113,6 +113,8 @@ export function Add({
    * asked for.
    */
   const [started, setStarted] = useState(Boolean(initial?.text || initial?.url))
+  /** Whether that first focus has happened, so later renders leave the cursor alone. */
+  const focusedOnce = useRef(false)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(0)
 
@@ -274,8 +276,14 @@ export function Add({
           {started ? (
             <textarea
               ref={(node) => {
-                // Focused once, when it appears, so tapping the button leaves you writing.
-                if (node && document.activeElement !== node) node.focus()
+                // Focused **once**, when it appears. A callback ref runs on every render, so
+                // asking "is this focused" here pulled the cursor back out of whatever else
+                // you had started typing in — which made the checklist take one keystroke at
+                // a time, each one landing back up here.
+                if (node && !focusedOnce.current) {
+                  focusedOnce.current = true
+                  node.focus()
+                }
               }}
               value={text}
               onChange={(event) => setText(event.target.value)}

@@ -411,8 +411,8 @@ rather than quietly counted as empty.
 
 | | |
 |---|---|
-| **↑ Promote to note** | drafts next steps and writes the note into your vault. The Inkling is done |
-| **＋ Add entry** | write something down, free-form |
+| **↑ Export to note** | renders the note and hands it over — download, copy or share |
+| **＋ Make a Move** | write something down, free-form, with a link or a picture if there is one |
 | **✓ until Saturday** | put it down; the label is the date it comes back |
 
 A suggested **move** sits above them with a **Do this** button: it opens the same
@@ -420,6 +420,19 @@ composer, bound to that move, and records the move as done when you keep the res
 Under it: **save for later** (keeps that move and puts the Inkling down, so it returns
 with the move you liked) and **help me with the next step** (a short list of what to
 look for, specific to the move and to whatever material was found).
+
+**Structure is added where you are writing**, not on the card you are reading: a button in
+the field that starts an Inkling and in the field that adds to one. It used to be a section on
+every card, with an underline and a line explaining what structure could be, on cards that had
+none — which is a thing you do while thinking about what this is becoming, not something you
+do to a card. The blocks themselves still live on the card, because that is where you tick
+them.
+
+**Entries take what came with them.** An entry was text and only text, so the things people
+actually collect — a photograph of what they meant, a page they found — had nowhere to go after
+the first capture. Now they take a link or a picture the same way the first capture does, and
+the card shows everything written down in the order it was written rather than in two lists
+where a picture and the sentence about it could end up apart.
 
 **moves so far** lists what has been put in front of you and when — behind a tap, so
 the card stays clean. Related Inklings are listed and open on tap.
@@ -539,8 +552,13 @@ the server will pass on, not only of what a button will let you press.
 
 ### Answering
 
-Everything a friend asked for lands in **Notifications** — their Inkling, with the context
-above and their note — and you suggest something: a title, a goal, how long it takes, and
+Everything a friend asked for lands in **Notifications**, where **the friend leads the card** —
+their initial, their name, and *"asked for a move"* — followed by their Inkling, the context
+above, and their note. **Suggest a move for Priya** is a button that says whose it is: the
+action used to be the words "suggest a move" underlined beside a timestamp, findable only if
+you already knew it was there, and never saying who you would be helping.
+
+You suggest something: a title, a goal, how long it takes, and
 optionally something to look up. That is the same shape a move has always had, because a
 friend is making the same kind of thing.
 

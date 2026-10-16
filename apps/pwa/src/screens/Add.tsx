@@ -1,5 +1,6 @@
 import {
   BLIP_TYPES,
+  type BlockKind,
   type Blip,
   type BlipType,
   type FeedbackContext,
@@ -9,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { type CaptureDraft, findUrl, isOnlyALink } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { FriendsButton } from '../components/FriendsButton'
+import { BlockPicker } from '../components/Blocks'
 import { ButtonLabel } from '../components/Spinner'
 import type { ReceivedAsk } from '../state/useSocial'
 import { useSpeech } from '../state/useSpeech'
@@ -46,8 +48,11 @@ export function Add({
   onFriends,
   onNotifications,
   friendsWaiting,
+  onAddBlock,
 }: {
-  onCapture: (draft: CaptureDraft) => Promise<unknown>
+  onCapture: (draft: CaptureDraft) => Promise<{ id: string }>
+  /** Attach structure to the Inkling that was just made, once it exists. */
+  onAddBlock: (id: string, kind: BlockKind) => Promise<unknown>
   /** Content handed over by the OS share sheet. */
   initial?: { text?: string; url?: string } | null
   onConsumed?: () => void
@@ -87,6 +92,13 @@ export function Add({
    */
   const [file, setFile] = useState<File | undefined>()
   const [type, setType] = useState<BlipType | 'auto'>('auto')
+  /**
+   * Structure chosen before there is anything to attach it to.
+   *
+   * A block belongs to an Inkling, and while you are writing one there is not one yet — so
+   * this is the intention, applied the moment the Inkling exists.
+   */
+  const [block, setBlock] = useState<BlockKind | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(0)
 
@@ -120,7 +132,7 @@ export function Add({
     const kind: CaptureDraft['kind'] = file ? 'image' : onlyLink ? 'url' : 'text'
     setBusy(true)
     try {
-      await onCapture({
+      const captured = await onCapture({
         kind,
         // A capture that is nothing but a link has no words of its own, so nothing is kept
         // as text: storing the address there as well would make the address the title, when
@@ -134,9 +146,11 @@ export function Add({
         // re-share things written under a different one.
         visibility: socialOn && shareDefault === 'friends' ? 'friends' : undefined,
       })
+      if (block) await onAddBlock(captured.id, block)
       setText('')
       setFile(undefined)
       setType('auto')
+      setBlock(null)
       setSaved((count) => count + 1)
     } finally {
       setBusy(false)
@@ -308,6 +322,7 @@ export function Add({
             </option>
           ))}
         </select>
+        <BlockPicker count={block ? 1 : 0} onAdd={async (kind) => setBlock(kind)} />
 
         <button
           type="button"

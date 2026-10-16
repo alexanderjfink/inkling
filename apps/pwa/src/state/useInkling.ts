@@ -6,6 +6,7 @@ import type {
   CaptureInput,
   AskContext,
   EntryContext,
+  EntryKind,
   FeedbackContext,
   FriendNote,
   MoveSpec,
@@ -14,7 +15,7 @@ import type {
 } from '@inkling/domain'
 import { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE, newId, project, snoozeUntil } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
-import { type CaptureDraft, extractTopics, guessType, inferBody } from '../capture'
+import { type CaptureDraft, type EntryDraft, extractTopics, guessType, inferBody } from '../capture'
 import { AppendOnlyLog } from '../storage/appendOnlyLog'
 
 let singleton: AppendOnlyLog | null = null
@@ -101,7 +102,14 @@ export interface InklingActions {
   }): Promise<BlipEvent>
   /** A note from a friend, or one sent to one. */
   addFriendNote(id: string, note: FriendNote): Promise<BlipEvent>
-  addNote(id: string, text: string): Promise<BlipEvent>
+  /**
+   * Something written down.
+   *
+   * Takes whatever came with it as well as the words: a link, a picture, or both. An entry
+   * used to be text and only text, so the things people actually collect — a photograph of
+   * what they meant, a page they found — had nowhere to go after the first capture.
+   */
+  addEntry(id: string, draft: EntryDraft): Promise<BlipEvent>
   snooze(id: string, until?: string, triggers?: string[]): Promise<BlipEvent>
   snoozeAfter(id: string, reason: SnoozeReason, streak?: number): Promise<BlipEvent>
   retire(id: string, reason?: string): Promise<BlipEvent>
@@ -159,13 +167,25 @@ export interface InklingActions {
   completeMove(
     id: string,
     moveSpec: MoveSpec,
-    text: string,
+    draft: EntryDraft,
     context?: EntryContext,
   ): Promise<BlipEvent>
   /** A blip has been written out as a note; the path is where it landed. */
   promote(id: string, notePath: string): Promise<BlipEvent>
   classify(id: string, type: BlipType): Promise<BlipEvent>
   link(id: string, otherId: string, reason?: string): Promise<BlipEvent>
+}
+
+/**
+ * What an entry is, from what came with it.
+ *
+ * The kinds already existed; nothing ever produced anything but `note`. A picture is
+ * `media` so the card can lay it out as one, and a link on its own is `link`.
+ */
+function entryKind(draft: EntryDraft): EntryKind {
+  if (draft.file) return 'media'
+  if (draft.url && !draft.text?.trim()) return 'link'
+  return 'note'
 }
 
 export function useInkling(accountId: string | null = null) {
@@ -280,11 +300,18 @@ export function useInkling(accountId: string | null = null) {
         // seen, which is exactly right for something that is not about an Inkling.
         return storage().append({ t: 'feedback', id: newId(), text, context })
       },
-      addNote(id, text) {
+      async addEntry(id, draft) {
         return storage().append({
           t: 'entry',
           id,
-          entry: { id: newId(), kind: 'note', text, at: new Date().toISOString() },
+          entry: {
+            id: newId(),
+            kind: entryKind(draft),
+            text: draft.text?.trim() || undefined,
+            url: draft.url,
+            mediaId: draft.file ? (await storage().putBlob(draft.file)).hash : undefined,
+            at: new Date().toISOString(),
+          },
         })
       },
       snooze(id, until, triggers) {
@@ -357,7 +384,7 @@ export function useInkling(accountId: string | null = null) {
       editBlip(id, patch) {
         return storage().append({ t: 'edited', id, ...patch })
       },
-      async completeMove(id, moveSpec, text, context) {
+      async completeMove(id, moveSpec, draft, context) {
         const store = storage()
         const before = project(await store.allEvents()).find((blip) => blip.id === id)
         const streak = before?.schedule.timesEngaged ?? 0
@@ -369,15 +396,18 @@ export function useInkling(accountId: string | null = null) {
           await store.append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
         }
 
-        if (text.trim()) {
+        const text = draft.text?.trim() ?? ''
+        if (text || draft.url || draft.file) {
           await store.append({
             t: 'entry',
             id,
             moveId: moveSpec.id,
             entry: {
               id: newId(),
-              kind: 'note',
-              text: text.trim(),
+              kind: entryKind(draft),
+              text: text || undefined,
+              url: draft.url,
+              mediaId: draft.file ? (await store.putBlob(draft.file)).hash : undefined,
               at: new Date().toISOString(),
               // The prompt and the material that surrounded this, kept with it. Nothing
               // else in the log has them: they were fetched, shown once, and dropped.

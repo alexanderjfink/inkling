@@ -18,17 +18,20 @@ import {
   deferUntil,
   entryContext,
   rankBlips,
+  newBlock,
   REJECTION_REASONS,
   requestGuidance,
   roundQueue,
   unansweredFriendMove,
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Blocks } from '../components/Blocks'
+import { BlockPicker, Blocks } from '../components/Blocks'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { EntryContextPanel } from '../components/EntryContext'
 import { ExportNote } from '../components/ExportNote'
 import { PROMOTE_ENABLED } from '../features'
+import { imageFrom, isOnlyALink, findUrl } from '../capture'
+import type { EntryDraft } from '../capture'
 import { Markdown } from '../components/Markdown'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 import { StoredImage } from '../components/StoredImage'
@@ -505,6 +508,8 @@ export function Review({
   /** Open when non-null. A move means "doing that move"; null means a free note. */
   const [composer, setComposer] = useState<{ move: MoveSpec | null } | null>(null)
   const [entry, setEntry] = useState('')
+  /** Whatever came with what is being written: a picture, pasted, dropped or picked. */
+  const [entryFile, setEntryFile] = useState<File | undefined>()
   const [editing, setEditing] = useState(false)
   const [draftTitle, setDraftTitle] = useState('')
   const [draftBody, setDraftBody] = useState('')
@@ -661,6 +666,7 @@ export function Review({
     setNoteProblem(null)
     setAskOpen(false)
     setExporting(false)
+    setEntryFile(undefined)
   }
 
   /**
@@ -755,6 +761,14 @@ export function Review({
     if (!current || !composer || busy) return
     setBusy(true)
     try {
+      const url = findUrl(entry)
+      const draft: EntryDraft = {
+        // A link in what was written is the link as well as the words, so an entry can be
+        // a page somebody found and not only the sentence about it.
+        text: url && isOnlyALink(entry) ? undefined : entry,
+        url: url ?? undefined,
+        file: entryFile,
+      }
       if (composer.move) {
         // Keep what surrounded the answer with the answer: the move, the material it
         // turned up, and whatever "help me with the next step" suggested. None of it
@@ -762,11 +776,11 @@ export function Review({
         await actions.completeMove(
           current.id,
           composer.move,
-          entry,
+          draft,
           entryContext({ material, guidance }),
         )
       } else {
-        if (entry.trim()) await actions.addNote(current.id, entry.trim())
+        if (draft.text || draft.url || draft.file) await actions.addEntry(current.id, draft)
         await actions.snoozeAfter(current.id, 'engaged', current.schedule.timesEngaged)
       }
       settle('advanced')
@@ -868,8 +882,8 @@ export function Review({
     )
   }
 
-  const notes = current.entries.filter((entry_) => entry_.kind === 'note')
-  const images = current.entries.filter((entry_) => entry_.kind === 'media')
+  /** Entries that have something to show: words, a link, a picture, or a few of those. */
+  const written = current.entries.filter((entry_) => entry_.text || entry_.url || entry_.mediaId)
   /** The move that prompted an entry, from the one place a move spec lives. */
   const moveForEntry = (moveId?: string): MoveSpec | undefined =>
     moveId ? current.moves.find((entry_) => entry_.moveId === moveId)?.spec : undefined
@@ -1015,31 +1029,40 @@ export function Review({
             {current.input.url}
           </a>
         ) : null}
-        {images.length > 0 ? (
-          <ul className="mt-3 flex flex-wrap gap-2">
-            {images.map((image) => (
-              <li key={image.id}>
-                {image.mediaId ? (
-                  <StoredImage
-                    hash={image.mediaId}
-                    className="h-28 w-28 rounded-xl border border-line object-cover"
-                  />
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        {notes.length > 0 ? (
-          <ul className="mt-3 flex flex-col gap-2">
-            {notes.map((note) => (
-              <li key={note.id} className="flex items-start gap-2">
+
+        {/* Everything written down, in the order it was written, each showing whatever came
+            with it. This used to be two lists — pictures here, words there — which meant a
+            photograph and the sentence about it could end up in different places on the
+            card. */}
+        {written.length > 0 ? (
+          <ul className="mt-3 flex flex-col gap-3">
+            {written.map((entry_) => (
+              <li key={entry_.id} className="flex items-start gap-2">
                 <div className="min-w-0 flex-1">
-                  <Markdown text={note.text ?? ''} className="text-sm text-ink-soft" />
-                  <EntryContextPanel entry={note} move={moveForEntry(note.moveId)} />
+                  {entry_.mediaId ? (
+                    <StoredImage
+                      hash={entry_.mediaId}
+                      className="mb-2 max-h-64 rounded-xl border border-line object-cover"
+                    />
+                  ) : null}
+                  {entry_.text ? (
+                    <Markdown text={entry_.text} className="text-sm text-ink-soft" />
+                  ) : null}
+                  {entry_.url ? (
+                    <a
+                      href={entry_.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 block truncate text-xs text-accent underline"
+                    >
+                      {entry_.url}
+                    </a>
+                  ) : null}
+                  <EntryContextPanel entry={entry_} move={moveForEntry(entry_.moveId)} />
                 </div>
                 <button
                   type="button"
-                  onClick={() => void actions.removeEntry(current.id, note.id)}
+                  onClick={() => void actions.removeEntry(current.id, entry_.id)}
                   aria-label="Remove this entry"
                   className="quiet px-1 text-xs leading-none"
                 >
@@ -1171,13 +1194,70 @@ export function Review({
             {composer.move && material ? (
               <Material loading={materialLoading} material={material} className="" />
             ) : null}
-            <textarea
-              value={entry}
-              onChange={(event) => setEntry(event.target.value)}
-              rows={6}
-              placeholder={composer.move ? composer.move.goal : 'What did you get?'}
-              className="w-full resize-none rounded-2xl border border-line p-4 text-sm outline-none focus:border-accent"
-            />
+            <div
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => {
+                const image = imageFrom(event.dataTransfer)
+                if (!image) return
+                event.preventDefault()
+                setEntryFile(image)
+              }}
+              className="flex flex-col gap-2"
+            >
+              <textarea
+                value={entry}
+                onChange={(event) => setEntry(event.target.value)}
+                onPaste={(event) => {
+                  const image = imageFrom(event.clipboardData)
+                  if (image) setEntryFile(image)
+                }}
+                onKeyDown={(event) => {
+                  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                    event.preventDefault()
+                    void saveEntry()
+                  }
+                }}
+                rows={6}
+                placeholder={composer.move ? composer.move.goal : 'What did you get?'}
+                className="w-full resize-none rounded-2xl border border-line p-4 text-sm outline-none focus:border-accent"
+              />
+              {entryFile ? (
+                <span className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-2 pl-3 text-xs">
+                  <span className="text-ink-soft">🖼</span>
+                  <span className="min-w-0 flex-1 truncate">{entryFile.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => setEntryFile(undefined)}
+                    className="quiet underline"
+                    aria-label="Remove the image"
+                  >
+                    remove
+                  </button>
+                </span>
+              ) : null}
+            </div>
+
+            {/* Adding structure belongs where you are writing, not on the card you are
+                reading — so the picker is here, and the blocks it makes show up on the
+                card. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                className="circle h-10 w-10 shrink-0 cursor-pointer text-base"
+                title="Add an image"
+              >
+                📎
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => setEntryFile(event.target.files?.[0] ?? undefined)}
+                />
+              </label>
+              <BlockPicker
+                count={current.blocks.length}
+                onAdd={(kind) => actions.addBlock(current.id, newBlock(kind))}
+              />
+            </div>
             {composer.move ? (
               <div className="flex flex-wrap items-center gap-4 text-xs">
                 <button
@@ -1451,7 +1531,7 @@ export function Review({
         )}
         <ActionButton
           icon="+"
-          label="Add entry"
+          label="Make a Move"
           accent
           onClick={() => setComposer({ move: null })}
         />

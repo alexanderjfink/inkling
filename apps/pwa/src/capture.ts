@@ -135,3 +135,22 @@ export function extractTopics(text: string, url?: string): string[] {
   }
   return [...new Set(topics.filter(Boolean))].slice(0, 4)
 }
+
+/**
+ * The first image in a paste or a drop, if there is one.
+ *
+ * Shared because both places that take writing take pictures the same way — the field that
+ * starts an Inkling, and the field that adds to one — and a second copy of this would be a
+ * second place for "it worked when I started one but not when I added to it" to live.
+ */
+export function imageFrom(data: DataTransfer | null): File | null {
+  if (!data) return null
+  return [...data.files].find((file) => file.type.startsWith('image/')) ?? null
+}
+
+/** What was written, as opposed to what it was written into. */
+export interface EntryDraft {
+  text?: string
+  url?: string
+  file?: File
+}

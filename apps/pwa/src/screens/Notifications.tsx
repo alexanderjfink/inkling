@@ -29,10 +29,22 @@ function Ask({
 }) {
   return (
     <div className="rounded-2xl border border-line bg-surface/60 p-3">
-      <p className="text-[11px] tracking-wide text-ink-faint uppercase">
-        {context.type} · {username}
-      </p>
-      <p className="mt-1 text-sm font-medium">{context.title}</p>
+      {/* The friend is the first thing on it, with their initial and their name, because
+          the whole point of this screen is that a person asked you — not that a card
+          appeared. It used to open with the type and the name in small grey capitals, which
+          reads as metadata rather than as somebody. */}
+      <div className="flex items-center gap-2.5">
+        <span className="circle circle--accent h-8 w-8 shrink-0 text-sm font-semibold">
+          {username.slice(0, 1).toUpperCase()}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{username}</span>
+          <span className="block text-[11px] tracking-wide text-ink-faint uppercase">
+            asked for a move · {context.type}
+          </span>
+        </span>
+      </div>
+      <p className="mt-2 text-sm font-medium">{context.title}</p>
       {context.body ? <p className="mt-1 text-xs text-ink-soft">{context.body}</p> : null}
       {context.topics.length > 0 ? (
         <p className="mt-1 text-[11px] text-ink-faint">{context.topics.join(' · ')}</p>
@@ -247,21 +259,21 @@ export function Notifications({
             return (
               <div key={ask.messageId} className="flex flex-col">
                 <Ask context={ask.context} note={ask.note} username={ask.username} />
-                <p className="mt-1 text-[11px] text-ink-faint">
-                  asked {when(ask.at)}
-                  {openFor !== ask.messageId ? (
-                    <>
-                      {' · '}
-                      <button
-                        type="button"
-                        onClick={() => setOpenFor(ask.messageId)}
-                        className="underline"
-                      >
-                        suggest a move
-                      </button>
-                    </>
-                  ) : null}
-                </p>
+                {openFor !== ask.messageId ? (
+                  <div className="mt-2 flex flex-wrap items-center gap-3">
+                    {/* A button, and it says whose it is. "suggest a move" as an underline
+                      beside a timestamp was findable only if you already knew it was there,
+                      and it never said who you would be helping. */}
+                    <button
+                      type="button"
+                      onClick={() => setOpenFor(ask.messageId)}
+                      className="rounded-full bg-ink px-4 py-2.5 text-xs font-semibold text-surface"
+                    >
+                      Suggest a move for {ask.username}
+                    </button>
+                    <span className="text-[11px] text-ink-faint">asked {when(ask.at)}</span>
+                  </div>
+                ) : null}
                 {openFor === ask.messageId ? (
                   <Suggest
                     context={ask.context}

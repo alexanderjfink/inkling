@@ -4,7 +4,6 @@ import {
   blockKindInfo,
   blockSummary,
   checklistCounts,
-  newBlock,
   pollLeader,
   progressFraction,
   withItemAdded,
@@ -26,44 +25,44 @@ import { StoredImage } from './StoredImage'
  * that turns out to be a project gets a checklist, a link that turns out to be long
  * gets a reading tracker. Everything here writes an event, so it all syncs.
  */
-export function Blocks({ blip, actions }: { blip: Blip; actions: InklingActions }) {
+/**
+ * Adding structure.
+ *
+ * A button rather than a section, and it lives where you are writing: the field that starts
+ * an Inkling, and the field that adds to one. Adding a checklist is something you do while
+ * thinking about what this is becoming — not something you do to a card you are reading,
+ * where it was a section with an underline in it and a line explaining what structure could
+ * be, on every card that had none.
+ *
+ * The blocks themselves still belong to the card, because that is where you tick them.
+ */
+export function BlockPicker({
+  count,
+  onAdd,
+}: {
+  /** How many there are already, for the label. Nothing to do with where they are going. */
+  count: number
+  /** Somewhere to put it. On an existing Inkling that is immediate; on a new one it waits
+   *  until there is an Inkling to attach it to, because a block belongs to one. */
+  onAdd: (kind: BlockKind) => Promise<unknown>
+}) {
   const [picking, setPicking] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
 
   async function add(kind: BlockKind) {
     setBusy(`add:${kind}`)
     try {
-      await actions.addBlock(blip.id, newBlock(kind))
+      await onAdd(kind)
       setPicking(false)
     } finally {
       setBusy(null)
     }
   }
 
-  async function patch(blockId: string, change: Partial<Omit<Block, 'id'>>, key: string) {
-    setBusy(key)
-    try {
-      await actions.updateBlock(blip.id, blockId, change)
-    } finally {
-      setBusy(null)
-    }
-  }
-
   return (
-    <div className="mt-4 border-t border-line pt-3">
-      <div className="flex items-center gap-3">
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">structure</p>
-        <button
-          type="button"
-          onClick={() => setPicking((open) => !open)}
-          className="quiet ml-auto text-[11px] underline"
-        >
-          {picking ? 'cancel' : blip.blocks.length > 0 ? 'add another' : 'add one'}
-        </button>
-      </div>
-
+    <div className="flex flex-col gap-2">
       {picking ? (
-        <ul className="mt-2 flex flex-col gap-1">
+        <ul className="flex flex-col gap-1">
           {BLOCK_KINDS.map((info) => (
             <li key={info.kind}>
               <button
@@ -80,25 +79,45 @@ export function Blocks({ blip, actions }: { blip: Blip; actions: InklingActions 
         </ul>
       ) : null}
 
-      {blip.blocks.length === 0 && !picking ? (
-        <p className="mt-2 text-xs text-ink-faint">
-          nothing yet — a checklist, a reading tracker, a poll, or a grid of images
-        </p>
-      ) : null}
-
-      <ul className="mt-2 flex flex-col gap-3">
-        {blip.blocks.map((block) => (
-          <BlockCard
-            key={block.id}
-            block={block}
-            busy={busy}
-            onPatch={(change, key) => void patch(block.id, change, key)}
-            onRemoveBlock={() => void actions.removeBlock(blip.id, block.id)}
-            onStoreImage={(file) => actions.storeImage(file)}
-          />
-        ))}
-      </ul>
+      <button
+        type="button"
+        onClick={() => setPicking((open) => !open)}
+        className="self-start rounded-full border border-line px-3.5 py-2 text-xs font-medium text-ink-soft"
+      >
+        {picking ? 'cancel' : count > 0 ? 'add more structure' : 'add structure'}
+      </button>
     </div>
+  )
+}
+
+/** The blocks themselves. Renders nothing at all when there are none. */
+export function Blocks({ blip, actions }: { blip: Blip; actions: InklingActions }) {
+  const [busy, setBusy] = useState<string | null>(null)
+
+  async function patch(blockId: string, change: Partial<Omit<Block, 'id'>>, key: string) {
+    setBusy(key)
+    try {
+      await actions.updateBlock(blip.id, blockId, change)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  if (blip.blocks.length === 0) return null
+
+  return (
+    <ul className="mt-4 flex flex-col gap-3 border-t border-line pt-3">
+      {blip.blocks.map((block) => (
+        <BlockCard
+          key={block.id}
+          block={block}
+          busy={busy}
+          onPatch={(change, key) => void patch(block.id, change, key)}
+          onRemoveBlock={() => void actions.removeBlock(blip.id, block.id)}
+          onStoreImage={(file) => actions.storeImage(file)}
+        />
+      ))}
+    </ul>
   )
 }
 

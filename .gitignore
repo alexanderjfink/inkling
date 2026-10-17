@@ -32,6 +32,11 @@ apps/pwa/android/capacitor-cordova-android-plugins/
 *.apk
 *.aab
 
+# The data a throwaway development stack writes, from `bun run probe`. Fake accounts and
+# made-up Inklings, and never the real thing — it exists so a change can be looked at without
+# setting up an account again every time.
+.probe/
+
 # Dependencies and build output.
 node_modules/
 dist/

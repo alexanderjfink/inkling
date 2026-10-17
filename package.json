@@ -11,11 +11,13 @@
     "dev": "bun run --filter '*' dev",
     "dev:pwa": "bun run --filter @inkling/pwa dev",
     "server": "bun run --filter @inkling/server dev",
+    "probe": "bun scripts/probe.ts",
     "build": "bun run --filter @inkling/pwa build",
     "test": "bun test",
     "typecheck": "bun run --workspaces typecheck",
     "check": "biome check .",
-    "check:fix": "biome check --write ."
+    "check:fix": "biome check --write .",
+    "verify": "bun run check && bun run typecheck && bun test && bun run build"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",

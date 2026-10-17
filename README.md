@@ -111,7 +111,9 @@ that case, not as a step you are expected to complete.
 ## Commands
 
 ```bash
-bun run dev                        # server + app together (the usual one)
+bun run probe                      # a dev stack with its own throwaway data — see AGENTS.md
+bun run verify                     # biome, every typecheck, every test, and a build
+bun run dev                        # server + app together, against server/data
 bun run server                     # just the sync server, on :8787
 bun run dev:pwa                    # just the app, on :5173
 bun test                           # domain + server unit tests
@@ -119,6 +121,10 @@ bun run typecheck                  # all packages
 bun run check                      # biome
 bun run build                      # build the app the server serves
 ```
+
+**If you are changing the app rather than using it, read `AGENTS.md` first.** It is about the
+working loop rather than the code — `bun run probe` gives you a stack that hot-reloads and
+remembers its account, so a change is a save and a reload rather than a build and a sign-in.
 
 ## Try it
 

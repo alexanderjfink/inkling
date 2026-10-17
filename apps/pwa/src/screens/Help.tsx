@@ -90,7 +90,7 @@ export function Help({ onStartTour }: { onStartTour: () => void }) {
         <ul className="flex flex-col gap-2">
           {KINDS.map((kind) => (
             <li key={kind.type} className="rounded-xl border border-line bg-surface/60 p-3">
-              <p className="text-[11px] tracking-wide text-ink-faint uppercase">{kind.type}</p>
+              <p className="text-xs tracking-wide text-ink-faint uppercase">{kind.type}</p>
               <p className="mt-1 text-sm">{kind.input}</p>
               <p className="mt-1.5 text-xs text-ink-faint">
                 a move like: <span className="text-ink-soft">{kind.move}</span>

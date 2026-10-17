@@ -90,7 +90,7 @@ export function Tour({ steps, onDone }: { steps: TourStep[]; onDone: () => void 
             : { top: '50%', transform: 'translateY(-50%)' }
         }
       >
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+        <p className="text-xs tracking-wide text-ink-faint uppercase">
           {index + 1} of {steps.length}
         </p>
         <h2 className="mt-1 text-base font-semibold">{step.title}</h2>

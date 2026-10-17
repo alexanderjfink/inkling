@@ -32,7 +32,7 @@ export function StoredImage({ hash, className }: { hash: string; className?: str
   }, [hash])
 
   if (missing) {
-    return <span className="text-[11px] text-ink-faint">image not here yet</span>
+    return <span className="text-xs text-ink-faint">image not here yet</span>
   }
   if (!url) return <Spinner className="h-3.5 w-3.5" />
   return <img src={url} alt="" className={className} />

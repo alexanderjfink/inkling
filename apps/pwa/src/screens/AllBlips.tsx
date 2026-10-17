@@ -26,7 +26,7 @@ function Row({
         onClick={() => onOpen(blip.id)}
         className="flex flex-col gap-2 text-left"
       >
-        <span className="flex flex-wrap items-center gap-2 text-[11px] tracking-wide text-ink-faint uppercase">
+        <span className="flex flex-wrap items-center gap-2 text-xs tracking-wide text-ink-faint uppercase">
           <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">{blip.type}</span>
           <span>{formatShortDate(blip.created)}</span>
           <span>{blip.entries.length} entries</span>
@@ -114,7 +114,7 @@ export function AllBlips({
         .filter((group) => group.items.length > 0)
         .map((group) => (
           <section key={group.label} className="flex flex-col gap-2">
-            <h2 className="text-[11px] tracking-wide text-ink-faint uppercase">
+            <h2 className="text-xs tracking-wide text-ink-faint uppercase">
               {group.label} · {group.items.length}
             </h2>
             {group.items.map((blip) => (

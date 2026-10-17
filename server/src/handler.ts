@@ -29,6 +29,7 @@ import {
   sanitizeFriendMove,
 } from './social'
 import type { ModelStatus } from './provider'
+import { listModelsFrom } from './provider'
 import { PRESETS } from './providerConfig'
 import { notBuiltPage, serveStatic } from './static'
 import { type Store, isSafeDeviceId, isSafeHash } from './store'
@@ -618,7 +619,42 @@ export function createHandler(
 
     // What the provider says it can serve, so the model field can offer a list.
     if (parts.length === 2 && parts[0] === 'llm' && parts[1] === 'models') {
-      const kind = url.searchParams.get('kind') === 'embed' ? 'embed' : 'chat'
+      const asked = url.searchParams.get('kind')
+      const kind = asked === 'embed' ? 'embed' : asked === 'transcribe' ? 'transcribe' : 'chat'
+
+      /**
+       * The transcription server is a different machine, and its own question.
+       *
+       * Whisper and Parakeet servers are not chat servers: Ollama has no audio endpoint at
+       * all. Asking the chat provider for the list of models you can transcribe with is why
+       * there was no whisper in the dropdown — it was never asked the right server.
+       */
+      if (kind === 'transcribe') {
+        // The transcriber describes the server, not the person asking about it, so it is read
+        // from the server's own settings — the same place the chat model's are read from —
+        // rather than from the account's copy, which is why the address was saved and still
+        // not seen here.
+        const serverBridge = options.serverSettings ?? options.settings
+        const serverConfig = serverBridge ? (await serverBridge.read()).config : liveConfig
+        const base = (serverConfig.transcribeBaseUrl ?? '').trim().replace(/\/+$/, '')
+        if (!base) {
+          return json({ error: 'no transcription server set — put its address in first' }, 503)
+        }
+        const headers: Record<string, string> = serverConfig.transcribeApiKey
+          ? { authorization: `Bearer ${serverConfig.transcribeApiKey}` }
+          : {}
+        try {
+          return json({
+            models: await listModelsFrom(`${base}/models`, headers, 'the transcriber'),
+          })
+        } catch (error) {
+          return json(
+            { error: error instanceof Error ? error.message : 'could not list models' },
+            502,
+          )
+        }
+      }
+
       const provider = kind === 'embed' ? (live.embed ?? live.llm) : live.llm
       if (!provider) return json({ error: 'no model configured' }, 503)
       if (!provider.listModels) return json({ error: 'this provider cannot list models' }, 501)

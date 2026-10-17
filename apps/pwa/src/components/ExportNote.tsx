@@ -95,7 +95,7 @@ export function ExportNote({
   return (
     <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-line bg-surface/60 p-3">
       <div className="flex items-center gap-3">
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">export to note</p>
+        <p className="text-xs tracking-wide text-ink-faint uppercase">export to note</p>
         <button type="button" onClick={onClose} className="quiet ml-auto text-xs underline">
           close
         </button>
@@ -113,7 +113,7 @@ export function ExportNote({
         </p>
       ) : (
         <>
-          <pre className="max-h-72 overflow-auto rounded-xl border border-line bg-surface p-3 text-[11px] leading-relaxed whitespace-pre-wrap">
+          <pre className="max-h-72 overflow-auto rounded-xl border border-line bg-surface p-3 text-xs leading-relaxed whitespace-pre-wrap">
             {markdown}
           </pre>
 

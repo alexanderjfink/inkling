@@ -48,7 +48,7 @@ function Ask({
         <Avatar username={username} color={color} userId={userId} hash={hash} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold">{username}</span>
-          <span className="block text-[11px] tracking-wide text-ink-faint uppercase">
+          <span className="block text-xs tracking-wide text-ink-faint uppercase">
             asked for a move · {context.type}
           </span>
         </span>
@@ -56,7 +56,7 @@ function Ask({
       <p className="mt-2 text-sm font-medium">{context.title}</p>
       {context.body ? <p className="mt-1 text-xs text-ink-soft">{context.body}</p> : null}
       {context.topics.length > 0 ? (
-        <p className="mt-1 text-[11px] text-ink-faint">{context.topics.join(' · ')}</p>
+        <p className="mt-1 text-xs text-ink-faint">{context.topics.join(' · ')}</p>
       ) : null}
       {context.entries.length > 0 ? (
         <p className="mt-1.5 text-xs text-ink-soft">
@@ -65,7 +65,7 @@ function Ask({
         </p>
       ) : null}
       {context.offered.length > 0 ? (
-        <p className="mt-1 text-[11px] text-ink-faint">
+        <p className="mt-1 text-xs text-ink-faint">
           already suggested: {context.offered.join(' / ')}
         </p>
       ) : null}
@@ -130,7 +130,7 @@ function Suggest({
 
   return (
     <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-line bg-surface/40 p-3">
-      <p className="text-[11px] tracking-wide text-ink-faint uppercase">suggest a move</p>
+      <p className="text-xs tracking-wide text-ink-faint uppercase">suggest a move</p>
       <input
         value={title}
         onChange={(event) => setTitle(event.target.value)}
@@ -180,7 +180,7 @@ function Suggest({
           <ButtonLabel busy={busy}>{busy ? 'Sending…' : 'Send the move'}</ButtonLabel>
         </button>
       </div>
-      <p className="text-[11px] text-ink-faint">
+      <p className="text-xs text-ink-faint">
         It arrives on “{context.title}” as coming from you, and pops to the top of their stack until
         they have done something with it.
       </p>
@@ -232,7 +232,7 @@ export function Notifications({
 
       {picked ? (
         <section className="flex flex-col gap-2">
-          <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+          <p className="text-xs tracking-wide text-ink-faint uppercase">
             suggesting for {picked.friend.username}
           </p>
           <Ask
@@ -259,7 +259,7 @@ export function Notifications({
       ) : null}
 
       <section className="flex flex-col gap-2">
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+        <p className="text-xs tracking-wide text-ink-faint uppercase">
           asked for a move · {social.asks.length}
         </p>
 
@@ -295,7 +295,7 @@ export function Notifications({
                       >
                         Suggest a move for {ask.username}
                       </button>
-                      <span className="text-[11px] text-ink-faint">asked {when(ask.at)}</span>
+                      <span className="text-xs text-ink-faint">asked {when(ask.at)}</span>
                     </div>
                   ) : null}
                   {openFor === ask.messageId ? (

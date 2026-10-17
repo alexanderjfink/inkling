@@ -125,9 +125,9 @@ export function Feedback({
               className="w-full resize-none rounded-2xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent"
             />
 
-            <details className="text-[11px] text-ink-faint">
+            <details className="text-xs text-ink-faint">
               <summary className="cursor-pointer">what gets sent with it</summary>
-              <pre className="mt-1.5 max-h-40 overflow-auto rounded-xl border border-line bg-surface p-2 text-[10px] whitespace-pre-wrap">
+              <pre className="mt-1.5 max-h-40 overflow-auto rounded-xl border border-line bg-surface p-2 text-xs whitespace-pre-wrap">
                 {JSON.stringify(context, null, 2)}
               </pre>
               <p className="mt-1.5">
@@ -137,7 +137,7 @@ export function Feedback({
             </details>
 
             <div className="flex items-center gap-3">
-              <span className="text-[11px] text-ink-faint">⌘↵ or Ctrl+↵ to send</span>
+              <span className="text-xs text-ink-faint">⌘↵ or Ctrl+↵ to send</span>
               <button
                 type="button"
                 onClick={() => void send()}

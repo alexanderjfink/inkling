@@ -285,20 +285,34 @@ typing. There is no home screen — a screen whose only job is to ask which of t
 you wanted is a screen you have to get past.
 
 ```
-Add an Inkling ─┬─ ◷ Review · N waiting   the other thing you might have come to do
-                ├─ ⚙ Settings            theme, sync, model, notes, reminders, backup, storage
-                └─ all N Inklings        everything, and the attic
+Inkling ──── ☺ ⇧ P ─┬─ ◷ Review · N waiting   the other thing you might have come to do
+                    ├─ ⚙ Settings            friends, About, Admin
+                    ├─ P You                 your picture, your colour, your password
+                    └─ all N Inklings        everything, and the attic
 ```
+
+Everything that belongs to the box — the paperclip, the type, the microphone, **Keep it** —
+sits directly under it rather than at the bottom of the screen, so it is the thing beside
+what you are writing rather than a toolbar you have to go looking for.
 
 **Review sits above the field, not below it**, because with the keyboard up anything under
 the field is gone. It carries a **preview of the first Inkling you would be shown**, so
 you can decide whether now is the moment without opening it — and it only appears when
 something is actually waiting, so the screen stays a place to write.
 
+**The screen is centred on a phone**, as a group: the slogan, the Review card and the field
+sit in the middle rather than all in the upper third with the keyboard over the rest. The
+header stays at the top, because it is the one thing that should not move — and the slogan
+lives with the centred group rather than in the header, where at 390px it truncated to "Make
+Moves on your Inkli…", which is worse than not saying it.
+
 **Entry opens as a button.** "What did you notice?" is a button, not a placeholder — it is an
 invitation rather than a form, and tapping it opens the field with the cursor in it. That is
 also the only way a phone will raise the keyboard, since it will not do it for a focus nobody
-asked for.
+asked for. The line describing what can go in it sits *inside* the box until you have started
+writing, and moves below it once the box has something in it. **"add structure" appears only
+then too** — it used to be on an empty screen, asking about a shape for something that did
+not exist.
 
 It is one field. It takes words, a link, or a picture — pasted, dropped, or picked
 with the paperclip — and works out what it was given rather than asking. **Structure goes in
@@ -313,6 +327,18 @@ title and an address reads as both. A capture that is **nothing but** a link is 
 site rather than by the address, and tagged with it: `en.wikipedia.org` rather than
 `https://en.wikipedia.org/wiki/Sourdough`, and `#wikipedia` rather than `#en` — a leading
 two-letter label is a locale, not a name.
+
+**The type scale is a step up, from the tokens rather than the call sites.** `--text-xs`
+through `--text-xl` are redefined in `index.css`, so a label is 13px instead of 11 and a
+caption is 15 instead of 12 — and the next thing added is the right size without anyone
+remembering to make it so. The old 9–11px arbitrary sizes across the app were folded into the
+smallest named step in the same pass. The smallest text on a screen you read at arm's length
+was too small to read; that is a token problem, not a per-component one.
+
+**Dark mode's accent is lighter** — `#a48fff` rather than `#8f74ff`, 6.9:1 on the card instead
+of 5.2:1. It is the colour of every label you are meant to press, and an accent nobody can
+read is decoration. The faintest text went up with it, in both themes: `#6f6f7a` on white
+rather than `#9797a2` at 2.9:1.
 
 Alongside it: a type (`auto` by default, overrulable) and voice. `⌘↵` / `Ctrl+↵` keeps it.
 Nothing blocks on the network, so a capture is never lost to a bad connection.
@@ -424,18 +450,24 @@ rather than quietly counted as empty.
 
 | | |
 |---|---|
-**Three ways to get a move, on one line** — *Generate a Move*, *New Move* (write your own),
-and *Ask a Friend* — and below them the two things you can do with the Inkling itself:
-**export** and **put it down until Monday**, which says the date it picked. They used to be
-circles with a word under each, mixed in with the move actions, which made one row of five
-things where three were a question and two were an answer.
+**Four things on one line, and the fourth is putting it down.** *Generate*, *New Move* (write
+your own), *Ask a Friend*, and **till Tuesday** — which is the deferral, labelled with the day
+it picked, so "later" is never a date you cannot see. Putting it down belongs with the ways to
+get a move, because it is one of the things you do with a card rather than a footnote to it.
+**Export** is a quiet link under them. The row used to be five things where three were a
+question and two were an answer, and the outer buttons were grey enough to read as disabled
+next to the one filled one — the three that ask for something now carry the accent, and only
+the one you press most is filled.
 
 **The Wikipedia extract is behind a "read it."** It is four or five lines of somebody else's
 prose — the most text on the card by a distance — and the title and description are enough to
 decide whether to read it.
 
-**Nothing is generated until you ask.** An Inkling opens with two buttons — **Generate a
-Move** and **Ask a Friend for a Move** — and no spinner.
+**Nothing is generated until you ask.** An Inkling opens with the row of ways to get a move
+and no spinner — and while it is thinking, *nothing appears on the card at all*. There used to
+be a line saying so, which grew the card by a line and then shrank it again: a blank space
+appearing and leaving, on the Inkling, right where the move was about to be. The button
+already says "thinking", and it is where you pressed.
 
 **Asking closes the suggestion.** They are two ways of getting one answer, so the app's move
 goes when you ask a person, and the two buttons come back for whenever the answer arrives.
@@ -674,6 +706,12 @@ Per Inkling, on its card: **private** or **friends**. What you noticed on Tuesda
 same as what you noticed on Friday, and one setting for both is a setting nobody can answer
 honestly.
 
+**Who can see it is answered with faces.** When it is shared, the faces of the friends who can
+be shown it sit beside the switch, overlapping, ringed in the card's colour so a stack reads
+as two people rather than one blur. The word had to be decoded; a row of faces is read. When it
+is private there is nothing there at all — the absence is the message, and a row of greyed-out
+faces would be saying something louder than the thing itself.
+
 Settings decides what new Inklings *start* as — shared with friends, or private — and that
 is decided when the Inkling is written rather than by the fold, because a preference applied
 later would silently re-share things written under a different one. Everything written
@@ -708,6 +746,14 @@ column of twelve sections is a screen you scroll past rather than read.
 | **Friends** | the social half, and who you can ask |
 | **About** | help, feedback, the app and the build |
 | **Admin** | how it is going, the model, and accounts — **admins only** |
+
+**Two of them are reachable two different ways.** The face in the top right of the entry
+screen opens **You** — your picture, your colour, your password — and the gear opens
+**Settings**: friends, About, Admin. They are the same component drawn with different tabs
+(`only`), because two screens that share everything except their headings are two things to
+keep in step. The split is the point: *who you are* is not the same question as *how the app
+behaves*, and the header had four identical circles and a wordmark being squeezed to fit
+them.
 
 **Sync and Notes are hidden for now.** Their sections are still there, still gated on the
 same names, so bringing either back is one line in `TABS` in `Settings.tsx`. Two things
@@ -1008,6 +1054,10 @@ The back button and the Android back gesture go back a screen, because every scr
 history entry. Without that the gesture leaves the app entirely — from a card you were reading
 — and the entry screen is the one with nothing behind it.
 
+On the entry screen it now does nothing at all. That is the screen you land on, so back there
+was the app closing when you meant to dismiss a keyboard. It puts the guard entry back and
+stays where it is.
+
 ## Voice
 
 Two ways to ramble, and it picks whichever is available.
@@ -1023,6 +1073,15 @@ It is set up in **Settings → Admin**, next to the model, because it is the ser
 configure and it is usually a different machine from the one doing the thinking.
 
 With neither, the microphone button says so and nothing else pretends to work.
+
+**Ollama cannot do this, and that is why there was no whisper to choose.** Ollama serves chat
+models; it has no audio endpoint at all, so asking it for a transcription model is asking the
+wrong machine. The address field takes anything that speaks OpenAI's `/v1/audio/transcriptions`
+— `whisper.cpp`'s server, faster-whisper, a Parakeet server — and the **load the models**
+button beside the field asks *that* server what it can serve, which is where a whisper name
+comes from. It reads the address you have saved, so put the address in first and then load the
+list. Nothing answering there says which address was tried and what it means when a loopback
+one cannot be reached, because a container cannot see the host's `127.0.0.1`.
 
 ## Admin
 

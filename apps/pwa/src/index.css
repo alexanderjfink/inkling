@@ -7,11 +7,30 @@
  * [data-theme='dark'] re-themes every surface without a component changing.
  */
 @theme {
+  /*
+   * One step up, everywhere.
+   *
+   * The whole scale was a size too small on a phone — 11px labels and 12px captions on the
+   * screen you read at arm's length. Raising the tokens rather than the 200-odd call sites
+   * means the next thing added is the right size without anyone remembering to make it so.
+   */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: 1.15rem;
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: 1.35rem;
+  --text-base: 1.0625rem;
+  --text-base--line-height: 1.6rem;
+  --text-lg: 1.1875rem;
+  --text-lg--line-height: 1.75rem;
+  --text-xl: 1.3125rem;
+  --text-xl--line-height: 1.85rem;
+
   --color-canvas: #f1f1f4;
   --color-surface: #ffffff;
   --color-ink: #17171b;
   --color-ink-soft: #5b5b66;
-  --color-ink-faint: #9797a2;
+  /* Was #9797a2, which is 2.9:1 on white: too faint to be read, only to be seen. */
+  --color-ink-faint: #6f6f7a;
   --color-line: #e6e6ea;
   --color-accent: #7c5cff;
   --color-accent-soft: #efeaff;
@@ -25,11 +44,17 @@
   --color-canvas: #0b0b0f;
   --color-surface: #17171c;
   --color-ink: #f4f4f5;
-  --color-ink-soft: #a6a6b0;
-  --color-ink-faint: #74747f;
+  --color-ink-soft: #b4b4bf;
+  /* Was #74747f — 3.9:1 on the card, on text that is mostly 11px. */
+  --color-ink-faint: #9a9aa6;
   --color-line: #2a2a31;
-  --color-accent: #8f74ff;
-  --color-accent-soft: #241d3d;
+  /*
+   * Lifted from #8f74ff, which is the accent at 5.2:1 and reads muddy against near-black
+   * at small sizes. This is 6.9:1, and it is the colour of every label you are meant to
+   * press — an accent nobody can read is decoration.
+   */
+  --color-accent: #a48fff;
+  --color-accent-soft: #2a2148;
   --color-good: #3ecf9a;
   --color-warn: #e0a44a;
   /* Shadows read as depth on light and as mud on dark, so they go deeper. */

@@ -68,7 +68,7 @@ export async function loopbackHint(url: string, container = inContainer()): Prom
  * typed in, and it throws away the response body, which usually says "invalid api key".
  * Both are in the message now, because this error is the whole diagnosis.
  */
-async function listModelsFrom(
+export async function listModelsFrom(
   url: string,
   headers: Record<string, string>,
   name: string,

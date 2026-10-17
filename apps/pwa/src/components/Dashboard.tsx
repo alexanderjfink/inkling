@@ -6,7 +6,7 @@ function Stat({ label, value, note }: { label: string; value: number | string; n
     <div className="flex items-baseline gap-2">
       <span className="w-40 shrink-0 text-xs text-ink-faint">{label}</span>
       <span className="text-sm font-medium">{value}</span>
-      {note ? <span className="text-[11px] text-ink-faint">{note}</span> : null}
+      {note ? <span className="text-xs text-ink-faint">{note}</span> : null}
     </div>
   )
 }
@@ -52,7 +52,7 @@ export function Dashboard({
     return (
       <div className="flex flex-col gap-3 border-b border-line pb-5">
         <div className="flex items-center gap-3">
-          <p className="text-[11px] tracking-wide text-ink-faint uppercase">how it is going</p>
+          <p className="text-xs tracking-wide text-ink-faint uppercase">how it is going</p>
           <button
             type="button"
             onClick={onRefresh}
@@ -82,7 +82,7 @@ export function Dashboard({
   return (
     <div className="flex flex-col gap-4 border-b border-line pb-5">
       <div className="flex items-center gap-3">
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">how it is going</p>
+        <p className="text-xs tracking-wide text-ink-faint uppercase">how it is going</p>
         <button
           type="button"
           onClick={onRefresh}
@@ -157,14 +157,14 @@ export function Dashboard({
         />
         <Stat label="moves from friends" value={social.moves} />
         <Stat label="notes between them" value={social.notes} />
-        <p className="mt-1 text-[11px] text-ink-faint">
+        <p className="mt-1 text-xs text-ink-faint">
           The unanswered number is the one worth watching: a question nobody answered is somebody
           who asked for help and did not get it.
         </p>
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+        <p className="text-xs tracking-wide text-ink-faint uppercase">
           events, last {activity.length} days
         </p>
         {/* Stretch, not items-end: a percentage height needs a parent with a definite one,
@@ -183,13 +183,13 @@ export function Dashboard({
             </div>
           ))}
         </div>
-        <p className="text-[11px] text-ink-faint">
+        <p className="text-xs text-ink-faint">
           {activity.reduce((sum, day) => sum + day.captures, 0)} captured in this window
         </p>
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+        <p className="text-xs tracking-wide text-ink-faint uppercase">
           marked bad · {badMoves.length}
         </p>
         {badMoves.length === 0 ? (
@@ -202,11 +202,11 @@ export function Dashboard({
                 className="rounded-2xl border border-line bg-surface/60 p-3"
               >
                 <p className="text-xs font-medium">{row.move}</p>
-                <p className="mt-0.5 text-[11px] text-warn">{row.reason ?? 'no reason given'}</p>
+                <p className="mt-0.5 text-xs text-warn">{row.reason ?? 'no reason given'}</p>
                 {row.note ? (
-                  <p className="mt-1 text-[11px] text-ink-soft italic">“{row.note}”</p>
+                  <p className="mt-1 text-xs text-ink-soft italic">“{row.note}”</p>
                 ) : null}
-                <p className="mt-1 text-[11px] text-ink-faint">
+                <p className="mt-1 text-xs text-ink-faint">
                   {row.blipTitle ? `on “${row.blipTitle}”` : 'on an Inkling since deleted'}
                   {row.blipType ? ` (${row.blipType})` : ''} · {row.user} · {when(row.at)}
                 </p>
@@ -217,7 +217,7 @@ export function Dashboard({
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+        <p className="text-xs tracking-wide text-ink-faint uppercase">
           feedback · {feedback.length}
         </p>
         {feedback.length === 0 ? (
@@ -230,12 +230,12 @@ export function Dashboard({
                 className="rounded-2xl border border-line bg-surface/60 p-3"
               >
                 <p className="text-xs leading-relaxed text-ink">{row.text}</p>
-                <p className="mt-1.5 text-[11px] text-ink-faint">
+                <p className="mt-1.5 text-xs text-ink-faint">
                   from {row.screen}
                   {row.blipTitle ? ` · on “${row.blipTitle}”` : ''}
                   {row.move ? ` · move: “${row.move}”` : ''}
                 </p>
-                <p className="mt-0.5 text-[11px] text-ink-faint">
+                <p className="mt-0.5 text-xs text-ink-faint">
                   {row.user} · {when(row.at)} · app {row.app} · server {row.server}
                 </p>
               </li>
@@ -244,7 +244,7 @@ export function Dashboard({
         )}
       </div>
 
-      <p className="text-[11px] text-ink-faint">
+      <p className="text-xs text-ink-faint">
         Read from the logs on demand, not from a running tally — so these numbers cannot drift from
         what is actually there. An Inkling&apos;s text is never included; feedback carries a title
         only, so a report can be recognised.

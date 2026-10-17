@@ -247,9 +247,18 @@ export interface ModelsResult {
  * Both are the difference between "saved" and "actually works" — a key can be
  * present and still wrong, and the model name can be a typo.
  */
+/**
+ * Which model a question is about.
+ *
+ * `transcribe` is its own kind because it is usually its own server — Whisper on a laptop,
+ * Parakeet on a spare GPU — and because Ollama has no audio endpoint, so asking the chat
+ * provider about it was never going to find anything.
+ */
+export type ModelKind = 'chat' | 'embed' | 'transcribe'
+
 export function useModelTools(baseUrl: string) {
   const [testing, setTesting] = useState<'chat' | 'embed' | null>(null)
-  const [listing, setListing] = useState<'chat' | 'embed' | null>(null)
+  const [listing, setListing] = useState<ModelKind | null>(null)
 
   const testConnection = useCallback(
     async (kind: 'chat' | 'embed' = 'chat'): Promise<TestResult> => {
@@ -271,7 +280,7 @@ export function useModelTools(baseUrl: string) {
   )
 
   const loadModels = useCallback(
-    async (kind: 'chat' | 'embed' = 'chat'): Promise<ModelsResult> => {
+    async (kind: ModelKind = 'chat'): Promise<ModelsResult> => {
       setListing(kind)
       try {
         const res = await apiFetch(join(baseUrl, `/llm/models?kind=${kind}`))

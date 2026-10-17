@@ -26,7 +26,7 @@ export function Section({
 }) {
   return (
     <section className="flex flex-col gap-3 border-t border-line pt-6 first:border-t-0 first:pt-0">
-      <h2 className="text-[11px] tracking-wide text-ink-faint uppercase">{title}</h2>
+      <h2 className="text-xs tracking-wide text-ink-faint uppercase">{title}</h2>
       {children}
       {hint ? <p className="text-xs text-ink-faint">{hint}</p> : null}
     </section>
@@ -36,7 +36,7 @@ export function Section({
 export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-[11px] tracking-wide text-ink-faint uppercase">{label}</span>
+      <span className="text-xs tracking-wide text-ink-faint uppercase">{label}</span>
       {children}
     </label>
   )
@@ -108,7 +108,7 @@ export function ModelPicker({
         />
       )}
 
-      <span className="flex gap-3 text-[11px] text-ink-faint">
+      <span className="flex gap-3 text-xs text-ink-faint">
         <button
           type="button"
           onClick={onLoad}

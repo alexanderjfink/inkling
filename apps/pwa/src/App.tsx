@@ -27,13 +27,14 @@ import { useTheme } from './state/useTheme'
 import { TOUR_KEY, TOUR_STEPS } from './tour'
 
 /** No home screen: the app opens on entry, which is what you came to do. */
-type Screen = 'add' | 'review' | 'all' | 'settings' | 'help' | 'friends' | 'notifications'
+type Screen = 'add' | 'review' | 'all' | 'settings' | 'you' | 'help' | 'friends' | 'notifications'
 
 const TITLES: Record<Screen, string> = {
   add: 'Add an Inkling',
   review: 'Review',
   all: 'All Inklings',
   settings: 'Settings',
+  you: 'You',
   help: 'Help',
   friends: 'Friends',
   notifications: 'Notifications',
@@ -55,9 +56,23 @@ export default function App() {
   useEffect(() => {
     const onPop = (event: PopStateEvent) => {
       const wanted = (event.state as { screen?: Screen } | null)?.screen
-      setScreen(wanted ?? 'add')
+      if (!wanted) {
+        /**
+         * Nothing of ours behind: back was pressed on the entry screen, which is the bottom
+         * of the app. It used to leave — from the screen you land on, so the app closed when
+         * you meant to dismiss a keyboard. It stays put and puts the guard back, so back from
+         * here never does anything at all.
+         */
+        window.history.pushState({ screen: 'add' }, '')
+        setScreen('add')
+        setFocusId(null)
+        return
+      }
+      setScreen(wanted)
       setFocusId(null)
     }
+    // A screen of our own to stand on, so the first back does not leave the app either.
+    window.history.pushState({ screen: 'add' }, '')
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
   }, [])
@@ -302,7 +317,11 @@ export default function App() {
           onReview={() => go('review')}
           onAttic={() => go('all')}
           onSettings={() => go('settings')}
-          onHelp={() => go('help')}
+          onYou={() => go('you')}
+          userId={auth.user?.id}
+          username={auth.user?.username ?? 'you'}
+          userColor={auth.user?.color}
+          userAvatar={auth.user?.avatar}
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
           socialOn={socialOn}
@@ -376,6 +395,28 @@ export default function App() {
         />
       ) : null}
 
+      {ready && screen === 'you' ? (
+        <Settings
+          syncState={syncState}
+          events={events}
+          blips={blips}
+          serverConfig={serverConfig}
+          theme={theme}
+          serverUrl={server.serverUrl}
+          onSaveServerUrl={server.save}
+          auth={auth}
+          onOpenHelp={() => go('help')}
+          feedbackEnv={feedbackEnv}
+          onFeedback={actions.giveFeedback}
+          social={social}
+          onOpenFriends={() => go('friends')}
+          adminServerConfig={serverConfig}
+          adminModelStatus={syncState.model}
+          onRefreshAdminModel={syncState.refreshModel}
+          only={['you']}
+        />
+      ) : null}
+
       {ready && screen === 'help' ? (
         <Help
           onStartTour={() => {
@@ -402,6 +443,7 @@ export default function App() {
           onFeedback={actions.giveFeedback}
           social={social}
           onOpenFriends={() => go('friends')}
+          only={['friends', 'about', 'admin']}
         />
       ) : null}
 

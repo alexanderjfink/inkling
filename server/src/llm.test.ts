@@ -4,7 +4,9 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { LLMProvider } from '@inkling/domain'
 import { fetchPage, isFetchableUrl } from './fetchPage'
+import type { ServerConfig } from './config'
 import { createHandler } from './handler'
+import type { Runtime } from './config'
 import { FileStore } from './store'
 
 const BASE = 'http://localhost/api'
@@ -274,6 +276,63 @@ describe('llm and fetch routes', () => {
     )
     expect(chat.models).toEqual(['chat-model'])
     expect(embed.models).toEqual(['embed-model'])
+  })
+
+  test('the transcription model list comes from the transcription server', async () => {
+    const asked: string[] = []
+    const realFetch = globalThis.fetch
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      asked.push(String(input))
+      return new Response(
+        JSON.stringify({ data: [{ id: 'whisper-large-v3' }, { id: 'parakeet-tdt' }] }),
+        {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        },
+      )
+    }) as unknown as typeof fetch
+
+    try {
+      const handle = createHandler(new FileStore(dir), {
+        llm: fakeLlm({ listModels: async () => ['a-chat-model'] }),
+        // The server's own settings, not the account's: the transcriber describes the
+        // machine. Read from the account's copy, an address that was saved is never seen.
+        serverSettings: {
+          read: async () => ({
+            config: { transcribeBaseUrl: 'http://127.0.0.1:9000/v1/' } as ServerConfig,
+            runtime: {} as Runtime,
+          }),
+          update: async () => ({
+            config: {},
+            runtime: {} as Runtime,
+            problems: [],
+          }),
+        },
+      })
+
+      const body = await handle(new Request(`${BASE}/llm/models?kind=transcribe`)).then((res) =>
+        res.json(),
+      )
+      // The trailing slash is dropped and /models appended, which is where every Whisper and
+      // Parakeet server that copied OpenAI keeps its list.
+      expect(asked[0]).toBe('http://127.0.0.1:9000/v1/models')
+      expect(body.models).toEqual(['parakeet-tdt', 'whisper-large-v3'])
+    } finally {
+      globalThis.fetch = realFetch
+    }
+  })
+
+  test('asking for transcription models without an address says which thing is missing', async () => {
+    // The chat provider can list models perfectly well — and not one of them can hear.
+    const handle = createHandler(new FileStore(dir), {
+      llm: fakeLlm({ listModels: async () => ['a-chat-model'] }),
+    })
+    const chat = await handle(new Request(`${BASE}/llm/models`)).then((res) => res.json())
+    expect(chat.models).toEqual(['a-chat-model'])
+
+    const transcribe = await handle(new Request(`${BASE}/llm/models?kind=transcribe`))
+    expect(transcribe.status).toBe(503)
+    expect((await transcribe.json()).error).toContain('transcription server')
   })
 
   test('a test call reports success, timing and a sample', async () => {

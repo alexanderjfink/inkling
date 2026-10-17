@@ -156,7 +156,7 @@ export function Admin({
         />
       </Section>
 
-      <p className="text-[11px] tracking-wide text-ink-faint uppercase">accounts</p>
+      <p className="text-xs tracking-wide text-ink-faint uppercase">accounts</p>
       <p className="text-xs text-ink-soft">
         Everyone here has their own Inklings, their own model settings and their own vault. Nothing
         is shared between accounts — not even between friends, who only ever see what has been
@@ -186,9 +186,9 @@ export function Admin({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">
                       {user.username}
-                      {isMe ? <span className="ml-2 text-[11px] text-ink-faint">you</span> : null}
+                      {isMe ? <span className="ml-2 text-xs text-ink-faint">you</span> : null}
                     </p>
-                    <p className="mt-0.5 text-[11px] text-ink-faint">
+                    <p className="mt-0.5 text-xs text-ink-faint">
                       <span
                         className={
                           user.role === 'admin' ? 'font-medium text-accent' : 'text-ink-faint'
@@ -211,7 +211,7 @@ export function Admin({
                       autoComplete="new-password"
                       className={field}
                     />
-                    <p className="text-[11px] text-ink-faint">
+                    <p className="text-xs text-ink-faint">
                       Their other devices will be signed out. This one keeps working.
                     </p>
                     <div className="flex items-center gap-3">
@@ -251,7 +251,7 @@ export function Admin({
                 ) : confirming === user.id ? (
                   <div className="mt-3 flex flex-col gap-2">
                     <p className="text-xs text-warn">Delete {user.username}?</p>
-                    <p className="text-[11px] text-ink-faint">
+                    <p className="text-xs text-ink-faint">
                       They lose access straight away. Their Inklings are left on disk, not erased —
                       deleting an account should not be able to destroy years of notes in one tap.
                     </p>
@@ -333,7 +333,7 @@ export function Admin({
         onSubmit={(event) => void add(event)}
         className="flex flex-col gap-3 border-t border-line pt-4"
       >
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">add someone</p>
+        <p className="text-xs tracking-wide text-ink-faint uppercase">add someone</p>
         <input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
@@ -357,7 +357,7 @@ export function Admin({
               key={option}
               type="button"
               onClick={() => setRole(option)}
-              className={`rounded-full px-3 py-1.5 text-[11px] capitalize ${
+              className={`rounded-full px-3 py-1.5 text-xs capitalize ${
                 role === option ? 'bg-accent text-surface' : 'border border-line text-ink-faint'
               }`}
             >
@@ -374,7 +374,7 @@ export function Admin({
             {busy === 'add' ? 'Adding…' : 'Add account'}
           </ButtonLabel>
         </button>
-        <p className="text-[11px] text-ink-faint">
+        <p className="text-xs text-ink-faint">
           They will start with their own settings, and their own Inklings. Give them the password
           yourself — there is no email here.
         </p>

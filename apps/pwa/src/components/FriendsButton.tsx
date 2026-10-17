@@ -24,7 +24,7 @@ export function FriendsButton({
     >
       ☺
       {count > 0 ? (
-        <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-[10px] font-semibold text-surface">
+        <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-accent px-1 text-xs font-semibold text-surface">
           {count}
         </span>
       ) : null}

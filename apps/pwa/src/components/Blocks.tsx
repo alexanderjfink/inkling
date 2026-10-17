@@ -72,7 +72,7 @@ export function BlockPicker({
                 className="w-full rounded-xl border border-line p-2.5 text-left disabled:opacity-50"
               >
                 <span className="text-xs font-medium">{info.label}</span>
-                <span className="ml-2 text-[11px] text-ink-faint">{info.hint}</span>
+                <span className="ml-2 text-xs text-ink-faint">{info.hint}</span>
               </button>
             </li>
           ))}
@@ -176,7 +176,7 @@ export function BlockCard({
     <li className="rounded-2xl border border-line bg-surface/60 p-3">
       <div className="flex items-start gap-2">
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+          <p className="text-xs tracking-wide text-ink-faint uppercase">
             {info?.label ?? block.kind}
           </p>
           {block.title ? (
@@ -211,7 +211,7 @@ export function BlockCard({
           type="button"
           onClick={() => onPatch({ items: withItemAdded(rows) }, `add:${block.id}`)}
           disabled={busy !== null}
-          className="quiet mt-2 text-[11px] underline disabled:opacity-50"
+          className="quiet mt-2 text-xs underline disabled:opacity-50"
         >
           add {info?.itemNoun ?? 'item'}
         </button>
@@ -229,7 +229,7 @@ function Row({ children, onRemove }: { children: React.ReactNode; onRemove?: () 
           type="button"
           onClick={onRemove}
           aria-label="Remove this row"
-          className="quiet px-1 text-[11px] leading-none"
+          className="quiet px-1 text-xs leading-none"
         >
           ×
         </button>
@@ -258,7 +258,7 @@ function Checklist({
               style={{ width: `${(counts.done / counts.total) * 100}%` }}
             />
           </div>
-          <span className="text-[11px] text-ink-faint">
+          <span className="text-xs text-ink-faint">
             {counts.done}/{counts.total}
           </span>
         </div>
@@ -280,7 +280,7 @@ function Checklist({
               }
               disabled={busy !== null}
               aria-label={item.done ? 'Untick' : 'Tick'}
-              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-[10px] ${
+              className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border text-xs ${
                 item.done ? 'border-accent bg-accent text-surface' : 'border-line'
               }`}
             >
@@ -327,7 +327,7 @@ function ReadingProgress({
         />
       </div>
       <div className="mt-2 flex items-center gap-3">
-        <label className="flex items-center gap-1 text-[11px] text-ink-faint">
+        <label className="flex items-center gap-1 text-xs text-ink-faint">
           at
           <input
             type="number"
@@ -339,7 +339,7 @@ function ReadingProgress({
             className="w-14 rounded-lg border border-line bg-surface px-1.5 py-0.5 text-center text-xs text-ink outline-none focus:border-accent"
           />
         </label>
-        <label className="flex items-center gap-1 text-[11px] text-ink-faint">
+        <label className="flex items-center gap-1 text-xs text-ink-faint">
           of
           <input
             type="number"
@@ -356,13 +356,13 @@ function ReadingProgress({
           type="button"
           onClick={() => onPatch({ progress: withProgress(block, current + 1) }, 'next')}
           disabled={busy !== null || (total > 0 && current >= total)}
-          className="quiet ml-auto text-[11px] underline disabled:opacity-40"
+          className="quiet ml-auto text-xs underline disabled:opacity-40"
         >
           +1
         </button>
       </div>
       {fraction === null ? (
-        <p className="mt-1 text-[11px] text-ink-faint">set how long it is to get a bar</p>
+        <p className="mt-1 text-xs text-ink-faint">set how long it is to get a bar</p>
       ) : null}
     </div>
   )
@@ -420,16 +420,16 @@ function Poll({
                   placeholder="an option"
                   className="min-w-0 flex-1 bg-transparent text-xs text-ink-soft outline-none"
                 />
-                <span className="shrink-0 text-[11px] text-ink-faint">{votes || ''}</span>
+                <span className="shrink-0 text-xs text-ink-faint">{votes || ''}</span>
               </span>
             </button>
           </Row>
         )
       })}
       {totalVotes === 0 ? (
-        <p className="text-[11px] text-ink-faint">tap an option to vote</p>
+        <p className="text-xs text-ink-faint">tap an option to vote</p>
       ) : leader ? null : (
-        <p className="text-[11px] text-ink-faint">tied — no leader yet</p>
+        <p className="text-xs text-ink-faint">tied — no leader yet</p>
       )}
     </ul>
   )
@@ -462,7 +462,7 @@ function Grid({
             {item.mediaId ? (
               <StoredImage hash={item.mediaId} className="h-full w-full object-cover" />
             ) : (
-              <span className="text-[11px] text-ink-faint">add image</span>
+              <span className="text-xs text-ink-faint">add image</span>
             )}
             <input
               type="file"
@@ -484,7 +484,7 @@ function Grid({
                 )
               }
               placeholder="caption"
-              className="min-w-0 flex-1 bg-transparent text-[11px] text-ink-soft outline-none"
+              className="min-w-0 flex-1 bg-transparent text-xs text-ink-soft outline-none"
             />
             {block.items.length > 1 ? (
               <button
@@ -493,7 +493,7 @@ function Grid({
                   onPatch({ items: withItemRemoved(block.items, item.id) }, `rm:${item.id}`)
                 }
                 aria-label="Remove this image"
-                className="quiet px-1 text-[11px] leading-none"
+                className="quiet px-1 text-xs leading-none"
               >
                 ×
               </button>
@@ -506,7 +506,7 @@ function Grid({
           type="button"
           onClick={() => onPatch({ items: withItemAdded(block.items) }, `add:${block.id}`)}
           disabled={busy !== null}
-          className="quiet text-[11px] underline disabled:opacity-50"
+          className="quiet text-xs underline disabled:opacity-50"
         >
           add image slot
         </button>

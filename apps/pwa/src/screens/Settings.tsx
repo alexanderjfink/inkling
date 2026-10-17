@@ -81,6 +81,7 @@ export function Settings({
   onOpenFriends,
   feedbackEnv,
   onFeedback,
+  only,
 }: {
   syncState: ReturnType<typeof useSync>
   events: BlipEvent[]
@@ -98,6 +99,13 @@ export function Settings({
   onOpenFriends: () => void
   feedbackEnv: FeedbackEnv
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
+  /**
+   * Which tabs this screen is for.
+   *
+   * The same component twice: once for who you are, once for how the app behaves. Two
+   * screens that share everything except their headings would be two things to keep in step.
+   */
+  only?: Tab[]
 }) {
   const { report, syncing, sync } = syncState
   const { config, saving, save, load, status } = serverConfig
@@ -163,7 +171,8 @@ export function Settings({
   const [folder, setFolder] = useState('')
   const [socialEnabled, setSocialEnabled] = useState(true)
   const [shareDefault, setShareDefault] = useState<ShareDefault>('friends')
-  const [tab, setTab] = useState<Tab>('you')
+  const visible = only ? TABS.filter((entry) => only.includes(entry.id)) : TABS
+  const [tab, setTab] = useState<Tab>(only?.[0] ?? 'you')
   const [color, setColor] = useState<string | undefined>()
   const [savingColor, setSavingColor] = useState(false)
   const [colorSaved, setColorSaved] = useState(false)
@@ -304,7 +313,10 @@ export function Settings({
       {/* Tabs, because there is genuinely more than one kind of thing on this screen and a
           single column of twelve sections is a screen you scroll past rather than read. */}
       <div className="flex flex-wrap gap-1.5">
-        {[...TABS, ...(auth.user?.role === 'admin' ? [ADMIN_TAB] : [])].map((entry) => (
+        {[
+          ...visible,
+          ...(auth.user?.role === 'admin' && (!only || only.includes('admin')) ? [ADMIN_TAB] : []),
+        ].map((entry) => (
           <button
             key={entry.id}
             type="button"
@@ -669,7 +681,7 @@ export function Settings({
                     key={option}
                     type="button"
                     onClick={() => setShareDefault(option)}
-                    className={`rounded-full px-3 py-1.5 text-[11px] ${
+                    className={`rounded-full px-3 py-1.5 text-xs ${
                       shareDefault === option
                         ? 'bg-accent text-surface'
                         : 'border border-line text-ink-soft'
@@ -679,7 +691,7 @@ export function Settings({
                   </button>
                 ))}
               </div>
-              <p className="text-[11px] text-ink-faint">
+              <p className="text-xs text-ink-faint">
                 Every Inkling keeps its own switch, on its card, whichever this is — this only
                 decides what they start as.
               </p>
@@ -691,14 +703,14 @@ export function Settings({
                 Friends — add one, or see who asked
               </button>
               {social.asks.length > 0 ? (
-                <p className="text-[11px] text-accent">
+                <p className="text-xs text-accent">
                   {social.asks.length} friend{social.asks.length === 1 ? '' : 's'} waiting on a move
                   from you
                 </p>
               ) : null}
             </>
           ) : (
-            <p className="text-[11px] text-ink-faint">
+            <p className="text-xs text-ink-faint">
               Nothing is sent or received, and the friends screen is closed. Existing friendships
               are kept, so turning it back on restores them.
             </p>
@@ -881,12 +893,12 @@ export function Settings({
               </Field>
               <p className="text-xs text-ink-faint">
                 Get it from your keystore:{' '}
-                <code className="text-[11px]">
+                <code className="text-xs">
                   keytool -list -v -keystore android.keystore -alias inkling
                 </code>
                 . This server then serves it at{' '}
-                <code className="text-[11px]">/.well-known/assetlinks.json</code>, so it cannot
-                drift from what you saved here.
+                <code className="text-xs">/.well-known/assetlinks.json</code>, so it cannot drift
+                from what you saved here.
               </p>
               <button
                 type="button"

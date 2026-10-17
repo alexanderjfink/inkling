@@ -87,7 +87,7 @@ export function SignIn({
 
       <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] tracking-wide text-ink-faint uppercase">username</span>
+          <span className="text-xs tracking-wide text-ink-faint uppercase">username</span>
           <input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
@@ -100,7 +100,7 @@ export function SignIn({
         </label>
 
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] tracking-wide text-ink-faint uppercase">password</span>
+          <span className="text-xs tracking-wide text-ink-faint uppercase">password</span>
           <input
             type="password"
             value={password}
@@ -112,9 +112,7 @@ export function SignIn({
 
         {first ? (
           <label className="flex flex-col gap-1">
-            <span className="text-[11px] tracking-wide text-ink-faint uppercase">
-              password again
-            </span>
+            <span className="text-xs tracking-wide text-ink-faint uppercase">password again</span>
             <input
               type="password"
               value={confirm}
@@ -139,7 +137,7 @@ export function SignIn({
       </form>
 
       {first ? (
-        <p className="text-center text-[11px] text-ink-faint">
+        <p className="text-center text-xs text-ink-faint">
           {USERNAME_MIN}–{USERNAME_MAX} characters, letters and digits, dot, dash or underscore. A
           password needs {PASSWORD_MIN} or more — length is the only rule.
         </p>
@@ -148,7 +146,7 @@ export function SignIn({
       <div className="mt-4 border-t border-line pt-3">
         {editingServer ? (
           <div className="flex flex-col gap-2">
-            <span className="text-[11px] tracking-wide text-ink-faint uppercase">server</span>
+            <span className="text-xs tracking-wide text-ink-faint uppercase">server</span>
             <input
               value={draftServer}
               onChange={(event) => setDraftServer(event.target.value)}

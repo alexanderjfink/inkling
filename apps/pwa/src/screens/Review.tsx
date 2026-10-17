@@ -26,6 +26,7 @@ import {
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Avatar } from '../components/Avatar'
+import { FriendFaces } from '../components/FriendFaces'
 import { BlockPicker, Blocks } from '../components/Blocks'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { EntryContextPanel } from '../components/EntryContext'
@@ -77,7 +78,7 @@ function LookUps({ links, loading }: { links: MoveLink[]; loading: boolean }) {
 
   return (
     <div className="mt-3 flex flex-col gap-1.5">
-      <p className="text-[11px] tracking-wide text-ink-faint uppercase">where to look</p>
+      <p className="text-xs tracking-wide text-ink-faint uppercase">where to look</p>
       {links.map((link) => (
         <a
           key={link.url}
@@ -89,7 +90,7 @@ function LookUps({ links, loading }: { links: MoveLink[]; loading: boolean }) {
           <span className="min-w-0 flex-1 truncate text-accent">
             {link.kind === 'search' ? `search for “${link.label}”` : link.label}
           </span>
-          <span className="shrink-0 text-[10px] text-ink-faint">
+          <span className="shrink-0 text-xs text-ink-faint">
             {link.kind === 'search' ? 'search' : 'page'}
           </span>
         </a>
@@ -126,7 +127,7 @@ function Note({
 
   return (
     <div className="mt-3 flex flex-col gap-2">
-      <p className="text-[11px] text-ink-faint">
+      <p className="text-xs text-ink-faint">
         {kind === 'kudos'
           ? `tell ${username} the move worked`
           : `thank ${username} for “${moveTitle}”`}
@@ -219,7 +220,7 @@ function AskPanel({
 
   return (
     <div className="flex w-full flex-col gap-2 rounded-2xl border border-line bg-surface/60 p-3">
-      <p className="text-[11px] tracking-wide text-ink-faint uppercase">ask a friend for a move</p>
+      <p className="text-xs tracking-wide text-ink-faint uppercase">ask a friend for a move</p>
 
       {blip.visibility !== 'friends' ? (
         <p className="text-xs text-ink-soft">
@@ -241,7 +242,7 @@ function AskPanel({
                 key={friend.userId}
                 type="button"
                 onClick={() => setTo(friend.userId)}
-                className={`rounded-full px-3 py-1.5 text-[11px] ${
+                className={`rounded-full px-3 py-1.5 text-xs ${
                   to === friend.userId
                     ? 'bg-accent text-surface'
                     : 'border border-line text-ink-soft'
@@ -338,7 +339,7 @@ function Material({
       <button
         type="button"
         onClick={() => setOpen((shown) => !shown)}
-        className="quiet ml-2 text-[11px] underline"
+        className="quiet ml-2 text-xs underline"
       >
         {open ? 'hide' : 'read it'}
       </button>
@@ -363,7 +364,7 @@ function Guidance({ items, className = 'mt-3' }: { items: string[] | null; class
         </p>
       ) : (
         <>
-          <p className="text-[11px] tracking-wide text-ink-faint uppercase">what to look for</p>
+          <p className="text-xs tracking-wide text-ink-faint uppercase">what to look for</p>
           <ul className="mt-1 flex flex-col gap-1.5">
             {items.map((item) => (
               <li key={item} className="text-xs leading-relaxed text-ink-soft">
@@ -390,7 +391,7 @@ function MoveLog({
   const offered = moves.filter((entry) => entry.outcome === 'shown').length
   return (
     <details className="mt-5 border-t border-line pt-3">
-      <summary className="cursor-pointer text-[11px] tracking-wide text-ink-faint uppercase">
+      <summary className="cursor-pointer text-xs tracking-wide text-ink-faint uppercase">
         moves so far · {moves.length}
       </summary>
       <ul className="mt-2 flex flex-col gap-1.5">
@@ -423,10 +424,10 @@ function MoveLog({
       </ul>
       {onForget && offered > 0 ? (
         <div className="mt-3">
-          <button type="button" onClick={onForget} className="quiet text-[11px] underline">
+          <button type="button" onClick={onForget} className="quiet text-xs underline">
             forget the {offered} we only offered
           </button>
-          <p className="mt-1 text-[11px] text-ink-faint">
+          <p className="mt-1 text-xs text-ink-faint">
             This list is what stops the same prompt coming back. If it is wrong — moves here you
             never saw — the app thinks you have tried everything and starts reaching for stranger
             angles. Forgetting the offers lets it suggest the obvious ones again. What you actually
@@ -578,6 +579,8 @@ export function Review({
   )
 
   const deferLabel = formatDeferral(deferUntil(DEFAULT_DEFERRAL, new Date()))
+  /** Just the day, for the label under a round button: "till Monday", not "until Monday". */
+  const deferDay = deferLabel.replace(/^(until|in)\s+/, '')
 
   // Advice belongs to the move it was asked about. A different move means different
   // advice, so clear it rather than show something that no longer applies.
@@ -908,7 +911,7 @@ export function Review({
       </div>
 
       <div className="card flex flex-1 flex-col overflow-y-auto p-6">
-        <div className="flex items-center gap-2 text-[11px] tracking-wide uppercase">
+        <div className="flex items-center gap-2 text-xs tracking-wide uppercase">
           <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">
             {current.type}
           </span>
@@ -920,29 +923,37 @@ export function Review({
           {/* Per Inkling, and always changeable. What you noticed on Tuesday is not the
               same as what you noticed on Friday, and one setting for both is a setting
               nobody can answer honestly. */}
+          {/* Who can see it, as faces rather than as a word. The word had to be decoded;
+              a row of faces is read. Nothing at all when it is private — the absence is the
+              message, and greyed-out faces would say something louder than the thing itself. */}
           {socialOn ? (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() =>
-                void actions.share(
-                  current.id,
-                  current.visibility === 'friends' ? 'private' : 'friends',
-                )
-              }
-              title={
-                current.visibility === 'friends'
-                  ? 'A friend you ask will see this. Tap to keep it private.'
-                  : 'Nobody can be shown this. Tap to share it with friends.'
-              }
-              className={`rounded-full border px-2 py-0.5 disabled:opacity-50 ${
-                current.visibility === 'friends'
-                  ? 'border-accent/50 text-accent'
-                  : 'border-line text-ink-faint'
-              }`}
-            >
-              {current.visibility === 'friends' ? 'friends' : 'private'}
-            </button>
+            <>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void actions.share(
+                    current.id,
+                    current.visibility === 'friends' ? 'private' : 'friends',
+                  )
+                }
+                title={
+                  current.visibility === 'friends'
+                    ? 'Your friends can see this. Tap to keep it private.'
+                    : 'Nobody can be shown this. Tap to share it with friends.'
+                }
+                className={`rounded-full border px-2 py-0.5 disabled:opacity-50 ${
+                  current.visibility === 'friends'
+                    ? 'border-accent/50 font-medium text-accent'
+                    : 'border-line text-ink-faint'
+                }`}
+              >
+                {current.visibility === 'friends' ? 'Friends' : 'Private'}
+              </button>
+              {current.visibility === 'friends' ? (
+                <FriendFaces friends={social.friends.filter((f) => f.status === 'accepted')} />
+              ) : null}
+            </>
           ) : null}
           {current.schedule.timesSkipped > 0 ? (
             <span className="text-ink-faint">put down {current.schedule.timesSkipped}×</span>
@@ -955,7 +966,7 @@ export function Review({
               setDraftType(current.type)
               setEditing(true)
             }}
-            className="quiet ml-auto text-[11px] underline"
+            className="quiet ml-auto text-xs underline"
           >
             edit
           </button>
@@ -981,7 +992,7 @@ export function Review({
                   key={option}
                   type="button"
                   onClick={() => setDraftType(option)}
-                  className={`rounded-full px-2.5 py-1 text-[11px] capitalize ${
+                  className={`rounded-full px-2.5 py-1 text-xs capitalize ${
                     draftType === option
                       ? 'bg-accent text-surface'
                       : 'border border-line text-ink-faint'
@@ -1079,7 +1090,7 @@ export function Review({
                 hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
                 size={28}
               />
-              <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+              <p className="text-xs tracking-wide text-ink-faint uppercase">
                 a move from {friendMove.fromUsername}
               </p>
             </div>
@@ -1173,7 +1184,7 @@ export function Review({
             {current.friendNotes.length > 0 ? (
               <ul className="mt-3 flex flex-col gap-1">
                 {current.friendNotes.map((note) => (
-                  <li key={note.id} className="text-[11px] text-ink-soft">
+                  <li key={note.id} className="text-xs text-ink-soft">
                     <span className="text-ink-faint">
                       {note.direction === 'in' ? note.username : `you → ${note.username}`}
                       {note.kind === 'kudos' ? ' · kudos' : ' · thanks'}:{' '}
@@ -1211,7 +1222,7 @@ export function Review({
         {composer ? (
           <div className="mt-5 flex flex-col gap-3">
             {composer.move ? (
-              <p className="text-[11px] tracking-wide text-accent uppercase">
+              <p className="text-xs tracking-wide text-accent uppercase">
                 doing: {composer.move.title}
               </p>
             ) : null}
@@ -1326,13 +1337,11 @@ export function Review({
               moveLoading ? 'opacity-60' : ''
             }`}
           >
-            <p className="text-[11px] tracking-wide text-accent uppercase">
-              a move, if you want one
-            </p>
+            <p className="text-xs tracking-wide text-accent uppercase">a move, if you want one</p>
             <p className="mt-1 text-sm font-medium">{move.title}</p>
             <p className="mt-1 text-xs text-ink-soft">goal: {move.goal}</p>
             {current.savedMove ? (
-              <p className="mt-1 text-[11px] text-good">
+              <p className="mt-1 text-xs text-good">
                 {current.demo
                   ? 'the move that comes with the example'
                   : 'saved — this is the move you kept'}
@@ -1417,7 +1426,7 @@ export function Review({
                       ask a friend for a move
                     </button>
                     {social.friends.some((friend) => friend.status === 'accepted') ? null : (
-                      <span className="text-[11px] text-ink-faint">
+                      <span className="text-xs text-ink-faint">
                         add one by username first — they have to say yes
                       </span>
                     )}
@@ -1428,7 +1437,7 @@ export function Review({
 
             {rejecting ? (
               <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line bg-surface/60 p-3">
-                <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+                <p className="text-xs tracking-wide text-ink-faint uppercase">
                   what is wrong with it?
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -1440,7 +1449,7 @@ export function Review({
                       onClick={() =>
                         setRejectionReason((chosen) => (chosen === reason ? null : reason))
                       }
-                      className={`rounded-full px-2.5 py-1 text-[11px] disabled:opacity-50 ${
+                      className={`rounded-full px-2.5 py-1 text-xs disabled:opacity-50 ${
                         rejectionReason === reason
                           ? 'bg-accent text-surface'
                           : 'border border-line text-ink-soft'
@@ -1480,7 +1489,7 @@ export function Review({
                     cancel
                   </button>
                 </div>
-                <p className="text-[11px] text-ink-faint">
+                <p className="text-xs text-ink-faint">
                   Another move will be suggested for this Inkling, and this one goes into the prompt
                   as a correction — kept with what it was working from, so it can be looked at
                   later.
@@ -1502,7 +1511,7 @@ export function Review({
 
         {currentRelated.length > 0 ? (
           <div className="mt-5 border-t border-line pt-3">
-            <p className="text-[11px] tracking-wide text-ink-faint uppercase">related</p>
+            <p className="text-xs tracking-wide text-ink-faint uppercase">related</p>
             <ul className="mt-1 flex flex-col gap-1">
               {currentRelated.map((entry_) => (
                 <li key={entry_.blip.id}>
@@ -1541,12 +1550,12 @@ export function Review({
         ) : null}
       </div>
 
-      {/* Three ways to get a move, on one line, then the two things you can do with the
-          Inkling itself. They used to be circles with a word under each, mixed in with the
-          move actions, which made one row of five things where three were a question and two
-          were an answer. */}
+      {/* Four things you do to a card, on one line: three ways to get a move, and putting it
+          down till the day named on the button. The outer three are outlined in the accent and
+          the middle one is filled, so the one you press most is also the one you see first.
+          They were all grey once, which read as three disabled buttons and one live one. */}
       {!composer ? (
-        <div className="mt-6 flex flex-wrap items-end justify-center gap-5">
+        <div className="mt-6 flex flex-wrap items-end justify-center gap-4">
           {move && !friendMove ? null : (
             <button
               type="button"
@@ -1554,8 +1563,10 @@ export function Review({
               disabled={moveLoading}
               className="flex flex-col items-center gap-1.5 disabled:opacity-40"
             >
-              <span className="circle h-12 w-12 text-lg">✦</span>
-              <span className="text-[11px] text-ink-soft">
+              <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
+                ✦
+              </span>
+              <span className="text-xs font-medium text-ink">
                 <ButtonLabel busy={moveLoading}>
                   {moveLoading ? 'thinking…' : 'Generate'}
                 </ButtonLabel>
@@ -1571,7 +1582,7 @@ export function Review({
             className="flex flex-col items-center gap-1.5"
           >
             <span className="circle circle--accent h-16 w-16 text-2xl">+</span>
-            <span className="text-[11px] font-medium text-ink">New Move</span>
+            <span className="text-xs font-medium text-ink">New Move</span>
           </button>
 
           {socialOn && !current.demo ? (
@@ -1580,10 +1591,25 @@ export function Review({
               onClick={() => setAskOpen((open) => !open)}
               className="flex flex-col items-center gap-1.5"
             >
-              <span className="circle h-12 w-12 text-lg">☺</span>
-              <span className="text-[11px] text-accent">Ask a Friend</span>
+              <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
+                ☺
+              </span>
+              <span className="text-xs font-medium text-accent">Ask a Friend</span>
             </button>
           ) : null}
+
+          {/* Putting it down belongs with the ways to get a move, because it is one of the
+              things you do with a card rather than a footnote to it. Its label is the date it
+              picked, so "later" is never a date you cannot see. */}
+          <button
+            type="button"
+            onClick={() => void defer(DEFAULT_DEFERRAL)}
+            title="Put it down, and have it come back then"
+            className="flex flex-col items-center gap-1.5"
+          >
+            <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">✓</span>
+            <span className="text-xs font-medium text-ink">till {deferDay}</span>
+          </button>
         </div>
       ) : null}
 
@@ -1601,13 +1627,6 @@ export function Review({
             export
           </button>
         )}
-        <button
-          type="button"
-          onClick={() => void defer(DEFAULT_DEFERRAL)}
-          className="quiet underline"
-        >
-          put it down {deferLabel}
-        </button>
       </div>
 
       <div className="mt-3 flex justify-center gap-4 text-xs">
@@ -1626,7 +1645,7 @@ export function Review({
       ) : null}
 
       {current.friendAsks.length > 0 ? (
-        <p className="mt-3 text-center text-[11px] text-ink-faint">
+        <p className="mt-3 text-center text-xs text-ink-faint">
           asked{' '}
           {current.friendAsks
             .map((ask) => `${ask.toUsername} ${formatWhen(ask.at, new Date())}`)
@@ -1634,12 +1653,9 @@ export function Review({
         </p>
       ) : null}
 
-      {!composer && !friendMove && !move && moveLoading ? (
-        <p className="mt-5 flex items-center justify-center gap-2 text-xs text-ink-faint">
-          <Spinner className="h-3.5 w-3.5" />
-          thinking of something…
-        </p>
-      ) : null}
+      {/* Deliberately nothing here while it thinks. There used to be a line saying so, which
+          grew the card by a line and then shrank it again — a blank space appearing and
+          leaving. The button is already saying "thinking", and it is where you pressed. */}
 
       {/* Here as well as on the entry screen, because this is where a suggestion is
           judged — and "the moves are bad" is worth hearing from the card that showed one. */}
@@ -1650,7 +1666,7 @@ export function Review({
           blip={current}
           move={move}
           onSend={onFeedback}
-          className="text-[11px] text-ink-faint"
+          className="text-xs text-ink-faint"
         />
       </div>
 
@@ -1694,7 +1710,7 @@ export function Review({
       </div>
 
       {confirmingDelete ? (
-        <p className="mt-2 text-center text-[11px] text-ink-faint">
+        <p className="mt-2 text-center text-xs text-ink-faint">
           retire means “not now” — it goes to the attic and can come back. delete means “not this”:
           it leaves the app. Neither is a hard erase from the log.
         </p>

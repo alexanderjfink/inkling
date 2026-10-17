@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { PublicConfig } from '../state/useServerConfig'
-import { type ConfigPatch, useModelTools } from '../state/useServerConfig'
+import { type ConfigPatch, type ModelKind, useModelTools } from '../state/useServerConfig'
 import { ButtonLabel } from './Spinner'
 import { Field, ModelPicker, buttonClass, inputClass, primaryButtonClass } from './SettingsBits'
 
@@ -61,8 +61,10 @@ export function ModelSettings({
 
   const [chatModels, setChatModels] = useState<string[]>([])
   const [embedModels, setEmbedModels] = useState<string[]>([])
+  const [transcribeModels, setTranscribeModels] = useState<string[]>([])
   const [customChat, setCustomChat] = useState(false)
   const [customEmbed, setCustomEmbed] = useState(false)
+  const [customTranscribe, setCustomTranscribe] = useState(false)
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
   const [saved, setSaved] = useState(false)
 
@@ -80,10 +82,11 @@ export function ModelSettings({
     setTranscribeBaseUrl(config.transcribeBaseUrl ?? '')
   }, [config])
 
-  async function loadModels(kind: 'chat' | 'embed', quiet = false) {
+  async function loadModels(kind: ModelKind, quiet = false) {
     const result = await modelTools.loadModels(kind)
     if (result.ok && result.models) {
       if (kind === 'chat') setChatModels(result.models)
+      else if (kind === 'transcribe') setTranscribeModels(result.models)
       else setEmbedModels(result.models)
       if (!quiet) {
         setNote({
@@ -106,6 +109,7 @@ export function ModelSettings({
     if (!config) return
     void loadModels('chat', true)
     if (config.embedProvider) void loadModels('embed', true)
+    if (config.transcribeModel) void loadModels('transcribe', true)
     // loadModels is stable enough; keyed on the saved providers on purpose.
   }, [providerKey])
 
@@ -329,53 +333,54 @@ export function ModelSettings({
       </Field>
 
       {/* Its own provider, because chat models cannot hear: Whisper on a laptop, Parakeet on
-          a spare GPU, a hosted service. Empty means the browser does the listening, which is
-          what a phone does anyway. */}
-      <Field label="Voice transcription model">
+          a spare GPU, a hosted service. Ollama has no audio endpoint at all, and the chat
+          model's list has no whisper in it — which is why this asks its own server.
+          The address comes first, because that is what the model list is read from. */}
+      <Field label="Transcription server address">
         <input
-          value={transcribeModel}
-          onChange={(event) => setTranscribeModel(event.target.value)}
-          placeholder="whisper-1, parakeet-tdt, or whatever yours is called"
+          value={transcribeBaseUrl}
+          onChange={(event) => setTranscribeBaseUrl(event.target.value)}
+          placeholder="http://127.0.0.1:9000/v1"
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
           className={inputClass}
         />
         <p className="text-xs text-ink-faint">
-          Leave empty to use the browser&apos;s own speech recognition, which is instant and costs
-          nothing but is not on every phone.
+          The recording is uploaded here. Anything speaking OpenAI&apos;s audio endpoint —
+          whisper.cpp, faster-whisper, Parakeet — and nothing else: a chat server cannot transcribe,
+          not even a local one.
         </p>
       </Field>
-
-      {transcribeModel.trim() ? (
-        <>
-          <Field label="Transcription server address">
-            <input
-              value={transcribeBaseUrl}
-              onChange={(event) => setTranscribeBaseUrl(event.target.value)}
-              placeholder="http://127.0.0.1:9000/v1"
-              autoCapitalize="none"
-              autoCorrect="off"
-              spellCheck={false}
-              className={inputClass}
-            />
-            <p className="text-xs text-ink-faint">
-              The recording is uploaded here. Anything speaking OpenAI&apos;s audio endpoint,
-              including whisper.cpp and Parakeet servers.
-            </p>
-          </Field>
-          <Field label={`Transcription key ${config.transcribeApiKeySet ? '(set)' : '(not set)'}`}>
-            <input
-              value={transcribeApiKey}
-              onChange={(event) => setTranscribeApiKey(event.target.value)}
-              type="password"
-              placeholder={config.transcribeApiKeySet ? 'type to replace' : 'usually not needed'}
-              autoComplete="off"
-              className={inputClass}
-            />
-          </Field>
-        </>
-      ) : null}
+      <ModelPicker
+        label="Voice transcription model"
+        value={transcribeModel}
+        options={transcribeModels}
+        onChange={setTranscribeModel}
+        custom={customTranscribe}
+        onCustomChange={setCustomTranscribe}
+        loading={modelTools.listing === 'transcribe'}
+        onLoad={() =>
+          void persist().then((ok) => {
+            if (ok) void loadModels('transcribe')
+          })
+        }
+        placeholder="whisper-1, parakeet-tdt, or whatever yours is called"
+      />
+      <p className="text-xs text-ink-faint">
+        Leave empty to use the browser&apos;s own speech recognition, which is instant and costs
+        nothing but is not on every phone.
+      </p>
+      <Field label={`Transcription key ${config.transcribeApiKeySet ? '(set)' : '(not set)'}`}>
+        <input
+          value={transcribeApiKey}
+          onChange={(event) => setTranscribeApiKey(event.target.value)}
+          type="password"
+          placeholder={config.transcribeApiKeySet ? 'type to replace' : 'usually not needed'}
+          autoComplete="off"
+          className={inputClass}
+        />
+      </Field>
 
       <p className="text-xs text-ink-soft">
         in use now: {config.configured ? `${config.providerName} · ${config.model}` : 'none'}

@@ -138,7 +138,7 @@ export function Spike() {
       </button>
 
       {env.length > 0 ? (
-        <pre className="overflow-x-auto rounded-2xl bg-canvas p-3 text-[11px] whitespace-pre-wrap text-ink-faint">
+        <pre className="overflow-x-auto rounded-2xl bg-canvas p-3 text-xs whitespace-pre-wrap text-ink-faint">
           {env.join('\n')}
         </pre>
       ) : null}

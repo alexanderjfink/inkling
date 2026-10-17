@@ -10,6 +10,7 @@ import {
 import { useEffect, useRef, useState } from 'react'
 import { type CaptureDraft, findUrl, isOnlyALink } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
+import { Avatar } from '../components/Avatar'
 import { FriendsButton } from '../components/FriendsButton'
 import { BlockPicker, DraftBlocks } from '../components/Blocks'
 import { ButtonLabel } from '../components/Spinner'
@@ -37,7 +38,11 @@ export function Add({
   onReview,
   onAttic,
   onSettings,
-  onHelp,
+  onYou,
+  userId,
+  username,
+  userColor,
+  userAvatar,
   feedbackEnv,
   onFeedback,
   socialOn,
@@ -66,7 +71,12 @@ export function Add({
   onReview: () => void
   onAttic: () => void
   onSettings: () => void
-  onHelp: () => void
+  /** Who you are: your picture, your colour, your password. */
+  onYou: () => void
+  userId?: string
+  username: string
+  userColor?: string
+  userAvatar?: string
   feedbackEnv: FeedbackEnv
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
   socialOn: boolean
@@ -179,238 +189,275 @@ export function Add({
 
   return (
     <div className="flex flex-1 flex-col gap-3">
-      <div className="mb-1 flex items-center gap-3">
-        <img src="/icon-192.png" alt="" width={36} height={36} className="h-9 w-9 rounded-xl" />
+      <div className="mb-1 flex items-center gap-2">
+        <img
+          src="/icon-192.png"
+          alt=""
+          width={36}
+          height={36}
+          className="h-9 w-9 shrink-0 rounded-xl"
+        />
         <div className="min-w-0 flex-1">
-          <p className="text-base leading-tight font-semibold">Inkling</p>
-          <p className="text-[11px] text-ink-faint">Make Moves on your Inklings</p>
+          <p className="truncate text-base leading-tight font-semibold">Inkling</p>
         </div>
         <span data-tour="friends">
           <FriendsButton count={friendsWaiting} onClick={onFriends} />
         </span>
         <button
           type="button"
-          onClick={onHelp}
-          aria-label="Help"
-          className="circle h-10 w-10 text-base"
-        >
-          ?
-        </button>
-        <button
-          type="button"
           onClick={onSettings}
           aria-label="Settings"
-          className="circle h-10 w-10 text-lg"
+          className="circle h-10 w-10 shrink-0 text-lg"
           data-tour="settings"
         >
           ⚙
         </button>
+        {/* Your own face, at the far right, because it is you. It goes to you — your picture,
+            your colour, your password — which is not the same place as the app's settings, and
+            used to be the fourth of four identical circles. Help moved into Settings with it:
+            five did not fit on a phone, and the name was what got squeezed. */}
+        <button type="button" onClick={onYou} aria-label="You" className="shrink-0">
+          <Avatar
+            userId={userId}
+            username={username}
+            color={userColor}
+            hash={userAvatar}
+            size={40}
+          />
+        </button>
       </div>
 
-      {/* Above the field on purpose: with the keyboard up, anything below it is gone. */}
-      {socialOn && asking.length > 0 ? (
-        <button
-          type="button"
-          onClick={onNotifications}
-          className="card flex items-center gap-3 border border-accent/40 p-4 text-left transition active:scale-[0.99]"
-        >
-          <span className="circle h-10 w-10 shrink-0 text-lg leading-none">✎</span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">
-              {asking.length === 1
-                ? `${asking[0]?.username} asked for a move`
-                : `${asking.length} friends asked for a move`}
+      {/* Centred as a group: what you came for is the Review card and the field, and a
+            screen that starts at the top of a phone leaves them both in its upper third, with
+            the keyboard covering the rest. The header stays where it is — it is the one thing
+            that should not move. */}
+      <div className="flex flex-1 flex-col justify-center gap-3">
+        {/* The slogan has room here. In the header at 390px it truncated to "Make Moves on
+            your Inkli…", which is worse than not saying it — and this is the screen it is
+            about. */}
+        <p className="mb-1 text-center text-sm text-ink-faint">Make Moves on your Inklings</p>
+        {/* Above the field on purpose: with the keyboard up, anything below it is gone. */}
+        {socialOn && asking.length > 0 ? (
+          <button
+            type="button"
+            onClick={onNotifications}
+            className="card flex items-center gap-3 border border-accent/40 p-4 text-left transition active:scale-[0.99]"
+          >
+            <span className="circle h-10 w-10 shrink-0 text-lg leading-none">✎</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">
+                {asking.length === 1
+                  ? `${asking[0]?.username} asked for a move`
+                  : `${asking.length} friends asked for a move`}
+              </span>
+              <span className="block truncate text-xs text-ink-soft">
+                {asking[0]?.context.title}
+              </span>
             </span>
-            <span className="block truncate text-xs text-ink-soft">{asking[0]?.context.title}</span>
-          </span>
-        </button>
-      ) : null}
+          </button>
+        ) : null}
 
-      {waiting > 0 ? (
-        <button
-          type="button"
-          onClick={onReview}
-          className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
-          data-tour="review"
-        >
-          <span className="circle circle--accent h-10 w-10 shrink-0 text-lg leading-none">◷</span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">Review · {waiting} waiting</span>
-            {next ? (
-              <span className="block truncate text-xs text-ink-soft">{next.title}</span>
-            ) : null}
-          </span>
-        </button>
-      ) : null}
+        {waiting > 0 ? (
+          <button
+            type="button"
+            onClick={onReview}
+            className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
+            data-tour="review"
+          >
+            <span className="circle circle--accent h-10 w-10 shrink-0 text-lg leading-none">◷</span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold">Review · {waiting} waiting</span>
+              {next ? (
+                <span className="block truncate text-xs text-ink-soft">{next.title}</span>
+              ) : null}
+            </span>
+          </button>
+        ) : null}
 
-      {serverWarning ? (
-        <button
-          type="button"
-          onClick={onSettings}
-          className="rounded-2xl border border-line bg-surface/70 p-3 text-left text-xs text-warn"
-        >
-          ⚠ {serverWarning} — tap to fix
-        </button>
-      ) : null}
+        {serverWarning ? (
+          <button
+            type="button"
+            onClick={onSettings}
+            className="rounded-2xl border border-line bg-surface/70 p-3 text-left text-xs text-warn"
+          >
+            ⚠ {serverWarning} — tap to fix
+          </button>
+        ) : null}
 
-      {/* One field for everything: words, a link, or a picture pasted or dropped into it.
+        {/* One field for everything: words, a link, or a picture pasted or dropped into it.
           It used to be three — a box for the text, a box for the address, a box for the
           image — which asked you to decide what you had noticed before you had written it
           down, and made the common case (writing a sentence) look like paperwork. */}
-      <div
-        onDragOver={(event) => {
-          // Without this the browser refuses the drop and navigates to the image instead,
-          // which is a memorable way to lose a capture.
-          event.preventDefault()
-        }}
-        onDrop={(event) => {
-          if (!takeImage(event.dataTransfer)) return
-          event.preventDefault()
-        }}
-        className="flex flex-col gap-2"
-      >
-        {/* One box, holding the words and the structure chosen for them. A chip under the
+        <div
+          onDragOver={(event) => {
+            // Without this the browser refuses the drop and navigates to the image instead,
+            // which is a memorable way to lose a capture.
+            event.preventDefault()
+          }}
+          onDrop={(event) => {
+            if (!takeImage(event.dataTransfer)) return
+            event.preventDefault()
+          }}
+          className="flex flex-col gap-2"
+        >
+          {/* One box, holding the words and the structure chosen for them. A chip under the
             field is attached to nothing in particular; a chip inside the box is part of what
             you are writing, which is what it is. */}
-        <div className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent">
-          {started ? (
-            <textarea
-              ref={(node) => {
-                // Focused **once**, when it appears. A callback ref runs on every render, so
-                // asking "is this focused" here pulled the cursor back out of whatever else
-                // you had started typing in — which made the checklist take one keystroke at
-                // a time, each one landing back up here.
-                if (node && !focusedOnce.current) {
-                  focusedOnce.current = true
-                  node.focus()
-                }
-              }}
-              value={text}
-              onChange={(event) => setText(event.target.value)}
-              onPaste={(event) => {
-                // A copied image attaches; copied words paste as words, which may include a
-                // link — that is found when it is kept.
-                takeImage(event.clipboardData)
-              }}
-              onKeyDown={(event) => {
-                // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
-                if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                  event.preventDefault()
-                  void submit()
-                }
-              }}
-              placeholder="What did you notice?"
-              rows={6}
-              data-tour="field"
-              className="w-full resize-none bg-transparent text-lg text-ink outline-none"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => setStarted(true)}
-              data-tour="field"
-              className="flex w-full items-center gap-3 py-8 text-left text-lg text-ink-faint"
-            >
-              <span className="circle h-10 w-10 shrink-0 text-base">✎</span>
-              What did you notice?
-            </button>
-          )}
+          <div className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent">
+            {!started ? (
+              <span className="text-xs text-ink-faint">
+                a photo, a link, an idea, a question, or a quest — paste one in, or just write
+              </span>
+            ) : null}
 
-          {file ? (
-            <span className="flex items-center gap-3 rounded-xl border border-line bg-surface/60 p-2 pl-3 text-xs">
-              <span className="text-ink-soft">🖼</span>
-              <span className="min-w-0 flex-1 truncate">{file.name}</span>
+            {started ? (
+              <textarea
+                ref={(node) => {
+                  // Focused **once**, when it appears. A callback ref runs on every render, so
+                  // asking "is this focused" here pulled the cursor back out of whatever else
+                  // you had started typing in — which made the checklist take one keystroke at
+                  // a time, each one landing back up here.
+                  if (node && !focusedOnce.current) {
+                    focusedOnce.current = true
+                    node.focus()
+                  }
+                }}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                onPaste={(event) => {
+                  // A copied image attaches; copied words paste as words, which may include a
+                  // link — that is found when it is kept.
+                  takeImage(event.clipboardData)
+                }}
+                onKeyDown={(event) => {
+                  // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
+                  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                    event.preventDefault()
+                    void submit()
+                  }
+                }}
+                placeholder="What did you notice?"
+                rows={6}
+                data-tour="field"
+                className="w-full resize-none bg-transparent text-lg text-ink outline-none"
+              />
+            ) : (
               <button
                 type="button"
-                onClick={() => setFile(undefined)}
-                className="quiet underline"
-                aria-label="Remove the image"
+                onClick={() => setStarted(true)}
+                data-tour="field"
+                className="flex w-full items-center gap-3 py-8 text-left text-lg text-ink-faint"
               >
-                remove
+                <span className="circle h-10 w-10 shrink-0 text-base">✎</span>
+                What did you notice?
               </button>
-            </span>
-          ) : null}
+            )}
 
-          {/* The structure itself, and usable: a checklist you cannot tick is a drawing of
+            {file ? (
+              <span className="flex items-center gap-3 rounded-xl border border-line bg-surface/60 p-2 pl-3 text-xs">
+                <span className="text-ink-soft">🖼</span>
+                <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                <button
+                  type="button"
+                  onClick={() => setFile(undefined)}
+                  className="quiet underline"
+                  aria-label="Remove the image"
+                >
+                  remove
+                </button>
+              </span>
+            ) : null}
+
+            {/* The structure itself, and usable: a checklist you cannot tick is a drawing of
               a checklist, and the point of adding one while you write is to put the parts
               down as you think of them. It is attached when the Inkling is made. */}
-          <DraftBlocks blocks={blocks} onChange={setBlocks} onStoreImage={onStoreImage} />
+            <DraftBlocks blocks={blocks} onChange={setBlocks} onStoreImage={onStoreImage} />
+          </div>
         </div>
-      </div>
 
-      <p className="text-xs text-ink-faint">
-        a photo, a link, an idea, a question, or a quest — paste one in, or just write
-      </p>
+        {started ? (
+          <p className="text-xs text-ink-faint">
+            a photo, a link, an idea, a question, or a quest — paste one in, or just write
+          </p>
+        ) : null}
 
-      {/* Stacked, not beside the hint: side by side, the picker squeezed the sentence into
+        {/* Stacked, not beside the hint: side by side, the picker squeezed the sentence into
           one word a line, which is how it looked broken while it was working. */}
-      <div className="self-start">
-        <BlockPicker
-          count={blocks.length}
-          onAdd={async (kind) => setBlocks((list) => [...list, newBlock(kind)])}
-        />
-      </div>
+        {/* Only once there is something to give structure to. It was there from the first
+          moment, on an empty screen, asking about a shape for something that did not exist. */}
+        {started ? (
+          <div className="self-start">
+            <BlockPicker
+              count={blocks.length}
+              onAdd={async (kind) => setBlocks((list) => [...list, newBlock(kind)])}
+            />
+          </div>
+        ) : null}
 
-      {/* One row, and everything in it shrinks but the two things you press: the field above
+        {/* One row, and everything in it shrinks but the two things you press: the field above
           takes the room, and this takes what is left. The label in the middle is the part
           that gives way, so "Keep it" never wraps. */}
-      <div className="mt-auto flex items-center gap-2 pt-2">
-        {/* The only thing left that is not the field: a way in for a picture that cannot be
+        <div className="flex items-center gap-2">
+          {/* The only thing left that is not the field: a way in for a picture that cannot be
             pasted, and a type you can overrule if the guess is wrong. */}
-        <label className="circle h-11 w-11 shrink-0 cursor-pointer text-base" title="Add an image">
-          📎
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(event) => setFile(event.target.files?.[0] ?? undefined)}
-          />
-        </label>
-        <select
-          value={type}
-          onChange={(event) => setType(event.target.value as BlipType | 'auto')}
-          aria-label="Kind of Inkling"
-          className="shrink-0 rounded-2xl border border-line bg-surface px-2 py-2.5 text-xs text-ink-soft outline-none"
-        >
-          <option value="auto">auto</option>
-          {BLIP_TYPES.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+          <label
+            className="circle h-11 w-11 shrink-0 cursor-pointer text-base"
+            title="Add an image"
+          >
+            📎
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => setFile(event.target.files?.[0] ?? undefined)}
+            />
+          </label>
+          <select
+            value={type}
+            onChange={(event) => setType(event.target.value as BlipType | 'auto')}
+            aria-label="Kind of Inkling"
+            className="shrink-0 rounded-2xl border border-line bg-surface px-2 py-2.5 text-xs text-ink-soft outline-none"
+          >
+            <option value="auto">auto</option>
+            {BLIP_TYPES.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
 
-        <button
-          type="button"
-          onClick={() => (speech.listening ? speech.stop() : speech.start())}
-          disabled={!speech.supported}
-          className={`circle h-12 w-12 shrink-0 ${speech.listening ? 'circle--accent' : ''}`}
-          title={speech.supported ? 'Ramble, and it transcribes as you talk' : ''}
-        >
-          <span>🎙</span>
-        </button>
-        <span className="min-w-0 flex-1 truncate text-xs text-ink-faint">
-          {!speech.supported
-            ? 'no microphone here'
-            : speech.thinking
-              ? 'writing it down…'
-              : speech.listening
-                ? 'listening…'
-                : 'or ramble'}
-        </span>
+          <button
+            type="button"
+            onClick={() => (speech.listening ? speech.stop() : speech.start())}
+            disabled={!speech.supported}
+            className={`circle h-12 w-12 shrink-0 ${speech.listening ? 'circle--accent' : ''}`}
+            title={speech.supported ? 'Ramble, and it transcribes as you talk' : ''}
+          >
+            <span>🎙</span>
+          </button>
+          <span className="min-w-0 flex-1 truncate text-xs text-ink-faint">
+            {!speech.supported
+              ? 'no mic here'
+              : speech.thinking
+                ? 'writing…'
+                : speech.listening
+                  ? 'listening…'
+                  : 'ramble'}
+          </span>
 
-        <button
-          type="button"
-          onClick={() => void submit()}
-          disabled={!canSubmit || busy}
-          className="shrink-0 rounded-full bg-ink px-5 py-3.5 text-sm font-semibold whitespace-nowrap text-surface disabled:opacity-40"
-          data-tour="keep"
-        >
-          <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
-        </button>
+          <button
+            type="button"
+            onClick={() => void submit()}
+            disabled={!canSubmit || busy}
+            className="shrink-0 rounded-full bg-ink px-5 py-3.5 text-sm font-semibold whitespace-nowrap text-surface disabled:opacity-40"
+            data-tour="keep"
+          >
+            <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
+          </button>
+        </div>
+
+        {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
       </div>
-
-      {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
 
       {saved > 0 ? <p className="text-center text-xs text-ink-faint">{saved} captured.</p> : null}
 

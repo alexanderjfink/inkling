@@ -76,7 +76,7 @@ export function Friends({
 
       {incoming.length > 0 ? (
         <section className="flex flex-col gap-2">
-          <p className="text-[11px] tracking-wide text-ink-faint uppercase">asked you</p>
+          <p className="text-xs tracking-wide text-ink-faint uppercase">asked you</p>
           {incoming.map((friend) => (
             <div
               key={friend.userId}
@@ -90,7 +90,7 @@ export function Friends({
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{friend.username}</span>
-                <span className="block text-[11px] text-ink-faint">
+                <span className="block text-xs text-ink-faint">
                   would like to be friends · {when(friend.at)}
                 </span>
               </span>
@@ -116,7 +116,7 @@ export function Friends({
       ) : null}
 
       <section className="flex flex-col gap-2">
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">
+        <p className="text-xs tracking-wide text-ink-faint uppercase">
           friends · {accepted.length}
         </p>
         {accepted.length === 0 ? (
@@ -138,7 +138,7 @@ export function Friends({
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{friend.username}</span>
-                <span className="block text-[11px] text-ink-faint">since {when(friend.at)}</span>
+                <span className="block text-xs text-ink-faint">since {when(friend.at)}</span>
               </span>
               <button
                 type="button"
@@ -165,14 +165,14 @@ export function Friends({
 
       {outgoing.length > 0 ? (
         <section className="flex flex-col gap-2">
-          <p className="text-[11px] tracking-wide text-ink-faint uppercase">waiting on them</p>
+          <p className="text-xs tracking-wide text-ink-faint uppercase">waiting on them</p>
           {outgoing.map((friend) => (
             <div
               key={friend.userId}
               className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-3"
             >
               <span className="min-w-0 flex-1 text-sm">{friend.username}</span>
-              <span className="text-[11px] text-ink-faint">asked {when(friend.at)}</span>
+              <span className="text-xs text-ink-faint">asked {when(friend.at)}</span>
               <button
                 type="button"
                 disabled={busy !== null}
@@ -199,7 +199,7 @@ export function Friends({
         }}
         className="flex flex-col gap-3 border-t border-line pt-4"
       >
-        <p className="text-[11px] tracking-wide text-ink-faint uppercase">add a friend</p>
+        <p className="text-xs tracking-wide text-ink-faint uppercase">add a friend</p>
         <input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
@@ -218,7 +218,7 @@ export function Friends({
             {busy === 'add' ? 'Asking…' : 'Ask to be friends'}
           </ButtonLabel>
         </button>
-        <p className="text-[11px] text-ink-faint">
+        <p className="text-xs text-ink-faint">
           They will see the request next time they open Inkling, and nothing of yours is visible
           until they accept.
         </p>

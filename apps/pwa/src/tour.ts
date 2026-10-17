@@ -28,7 +28,7 @@ export const TOUR_KEY = 'tour:done'
 export const TOUR_STEPS: TourStep[] = [
   {
     title: 'Inkling is for what you notice',
-    body: 'A photo, a link, an idea, a question, a quest. Not a to-do list — you are not supposed to finish it. What you notice comes back to you later, a couple of minutes at a time, and you decide each time whether it still matters.',
+    body: 'An Inkling is more than a to-do list item and less than a project — an idea, a question, or a problem you do not have the time, the energy, or the know-how to get moving.\n\nA photo, a link, an idea, a question, a quest. Not a to-do list — you are not supposed to finish it. What you notice comes back to you later, a couple of minutes at a time, and you decide each time whether it still matters.',
   },
   {
     anchor: 'field',

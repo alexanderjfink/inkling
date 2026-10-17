@@ -207,6 +207,19 @@ const SWIPE_TRAVEL = 460
 
 type SwipeDirection = 'left' | 'right'
 
+/**
+ * Moves waved past on this device, for as long as the app is open.
+ *
+ * Module state, not component state, because the Review screen unmounts when you go to the
+ * list and back — so a swipe past a move, or a "do this later", came back the moment you
+ * returned to the card. A move that has been acted on is done with, and swiping should not
+ * walk back over it.
+ *
+ * Nothing is written down: this is about this sitting, not about the move. What somebody
+ * suggested is never lost — it is in the log and in the history with them either way.
+ */
+const passedThisSession = new Set<string>()
+
 function useMoveSwipe(onSwipe: (direction: SwipeDirection) => void) {
   const [dx, setDx] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -616,8 +629,15 @@ export function Review({
   const [material, setMaterial] = useState<LookupResult | null>(null)
   const [links, setLinks] = useState<MoveLink[]>([])
   const [noting, setNoting] = useState<'kudos' | 'thanks' | null>(null)
-  /** Moves from friends put off until a later round, by message id. */
-  const [setAside, setSetAside] = useState<string[]>([])
+  /**
+   * Moves from friends waved past, seeded from what was waved past earlier in the sitting:
+   * "do this later" and a swipe both mean "not this one, not now".
+   */
+  const [setAside, setSetAside] = useState<string[]>(() => [...passedThisSession])
+  const wavePast = (messageId: string) => {
+    passedThisSession.add(messageId)
+    setSetAside([...passedThisSession])
+  }
   const [noteProblem, setNoteProblem] = useState<string | null>(null)
   /** Open while the note is being rendered and handed over. */
   const [exporting, setExporting] = useState(false)
@@ -789,7 +809,7 @@ export function Review({
         setSlot('friend')
         return
       }
-      if (friendMove) setSetAside((list) => [...list, friendMove.messageId])
+      if (friendMove) wavePast(friendMove.messageId)
       return
     }
     setSlot('ai')
@@ -1040,7 +1060,8 @@ export function Review({
             onClick={() => {
               setDecisions({})
               setSession(null)
-              // "Later" meant "not in this round", so a new round is exactly when it comes back.
+              // A new round is a fresh look at everything.
+              passedThisSession.clear()
               setSetAside([])
             }}
             className="rounded-full border border-line bg-surface px-5 py-3 text-sm font-medium"
@@ -1361,7 +1382,7 @@ export function Review({
             <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
               <button
                 type="button"
-                onClick={() => setSetAside((list) => [...list, friendMove.messageId])}
+                onClick={() => wavePast(friendMove.messageId)}
                 className="quiet underline"
               >
                 do this later
@@ -1579,6 +1600,14 @@ export function Review({
                 <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
               </button>
             </div>
+          </div>
+        ) : slotNow === 'ai' && moveLoading && !askOpen ? (
+          /* While a new one is being found, show that rather than the one you just swiped
+             away: a suggestion sitting there unchanged is indistinguishable from a swipe that
+             did not register, which is exactly how "not this one" used to look broken. */
+          <div className="mt-5 flex items-center gap-3 rounded-2xl bg-accent-soft/70 p-4">
+            <Spinner className="h-4 w-4 text-accent" />
+            <span className="text-sm text-ink-soft">finding something else…</span>
           </div>
         ) : slotNow === 'ai' && move && !askOpen ? (
           <div

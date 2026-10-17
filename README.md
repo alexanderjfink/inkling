@@ -316,6 +316,12 @@ The card for somebody waiting on you says **"priya wants your help"** — one pe
 *Friends want your help!* for more than one. It used to say "2 friends asked for a move", which
 describes a queue rather than a person who is stuck.
 
+**The closed box is the same card as the Review one above it**: an icon, what it is for, and a
+line under that. It used to be a large empty box with a question in it, which read as a different
+kind of thing from the card beside it — two boxes, one to understand and one to use. Everything
+that acts on what you write — *Keep it*, the paperclip, the type, the microphone — appears **with
+the field**, when you tap, rather than waiting under an empty form.
+
 **And the running total is gone.** "4 captured today — all saved" sat at the bottom of the entry
 screen saying something that was never in doubt, counting up and never down. The green tick says
 a thing was saved at the moment it is worth saying; a tally of them says nothing at all.
@@ -348,6 +354,11 @@ site rather than by the address, and tagged with it: `en.wikipedia.org` rather t
 `https://en.wikipedia.org/wiki/Sourdough`, and `#wikipedia` rather than `#en` — a leading
 two-letter label is a locale, not a name.
 
+**The eight profile colours sit on a row of their own**, never wrapped. Sharing a row with the
+picture and the word "remove" put two of them on the first line and six on the second, which
+reads as a broken layout rather than a set of choices; eight at 32px with an 8px gap come to
+312, which fits a 390px phone as a palette.
+
 **The type scale is a step up, from the tokens rather than the call sites.** `--text-xs`
 through `--text-xl` are redefined in `index.css`, so a label is 13px instead of 11 and a
 caption is 15 instead of 12 — and the next thing added is the right size without anyone
@@ -364,6 +375,11 @@ Alongside it: a type (`auto` by default, overrulable) and voice. `⌘↵` / `Ctr
 Nothing blocks on the network, so a capture is never lost to a bad connection.
 
 ### Being shown how it works, and finding out later
+
+The first thing the walkthrough says is what an Inkling *is*: **more than a to-do list item and
+less than a project — an idea, a question, or a problem you do not have the time, the energy, or
+the know-how to get moving.** Everything else in the walkthrough is about how, and this is the
+only place that says why.
 
 Someone opening Inkling for the first time gets a five-step **walkthrough** that points at
 the actual controls — the field, the button that keeps it, the Review card, Settings — with
@@ -492,6 +508,15 @@ typing the next thing.
 words, but pressing one raises "Retire?" or "Delete?" with the question large and two large
 answers — and the one that does the thing is not where your thumb already is. Deleting used to
 be a small word beside a small word, and retiring did not ask at all.
+
+**A move that has been acted on is done with.** Swiping does not walk back over one you have
+already passed, answered or waved away — and the memory of that is module state rather than screen
+state, because the Review screen unmounts when you go to the list and back, so a swipe past a move
+came back the moment you returned. Nothing is written down: it is about this sitting, not about
+the move, which is in the log and in the history with them either way.
+
+**And while a new suggestion is being found, that is what you see** — not the one you just swiped
+away sitting there unchanged, which is indistinguishable from a swipe that did not register.
 
 **The Wikipedia extract is behind a "read it."** It is four or five lines of somebody else's
 prose — the most text on the card by a distance — and the title and description are enough to
@@ -824,6 +849,9 @@ lands — a fold that depends on arrival order is not a fold.
 with "offered" entries for moves nobody was offered.
 
 ### Interactions first, friends second
+
+Both halves are one area with **two tabs** — notifications and friends — and notifications is the
+one you land on. Landing on the list of names made the second half look like the whole of it.
 
 The smiling face opens a **timeline of everything that has passed with anyone** — newest first,
 with the person on each line, filtered by person and by direction (*help you gave* / *help you

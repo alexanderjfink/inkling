@@ -492,6 +492,12 @@ export function Settings({
                 remove
               </button>
             ) : null}
+          </div>
+          {/* Its own row, and never wrapped: eight swatches at 32px and a 8px gap come to 312,
+              which fits a 390px phone on one line and looks like a palette. Sharing the row
+              with the picture and the word "remove" put two of them on the first line and six
+              on the second, which reads as a broken layout rather than a set of choices. */}
+          <div className="flex items-center gap-2">
             {PROFILE_COLORS.map((option) => (
               <button
                 key={option}

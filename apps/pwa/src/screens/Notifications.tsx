@@ -9,6 +9,7 @@ import type {
 import { buildSocialTimeline } from '@inkling/domain'
 import { useMemo, useState } from 'react'
 import { Avatar } from '../components/Avatar'
+import { SocialTabs } from '../components/SocialTabs'
 import { Suggest } from '../components/Suggest'
 import { formatAgo } from '../format'
 import type { ReceivedAsk, SocialState } from '../state/useSocial'
@@ -109,6 +110,8 @@ export function Notifications({
 
   return (
     <div className="flex flex-col gap-5 pb-8">
+      <SocialTabs view="notifications" onNotifications={() => {}} onFriends={onOpenFriends} />
+
       {social.off ? (
         <p className="rounded-2xl border border-line bg-surface/70 p-4 text-sm text-ink-soft">
           Social features are off for this account, so nothing is arriving from friends.
@@ -327,25 +330,22 @@ export function Notifications({
           })}
         </ul>
       )}
-
-      <button type="button" onClick={onOpenFriends} className="quiet self-start text-xs underline">
-        friends — who you can ask, and who can ask you
-      </button>
     </div>
   )
 }
 
 /** The words for one thing that happened, with the person's name where one is needed. */
 function say(entry: FriendTimelineEntry, name: string): string {
+  // Every line names the person, because this list has more than one of them in it.
   switch (entry.kind) {
     case 'you-asked':
-      return 'you asked them for a move on'
+      return `you asked ${name} for a move on`
     case 'they-asked':
-      return 'they asked you for a move on'
+      return `${name} asked you for a move on`
     case 'you-sent-move':
-      return `you suggested “${entry.moveTitle}” for`
+      return `you suggested “${entry.moveTitle}” for their`
     case 'they-sent-move':
-      return 'sent you a move for'
+      return `${name} sent you a move for`
     case 'you-thanked':
       return `you thanked ${name}`
     case 'they-thanked':

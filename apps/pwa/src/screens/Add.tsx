@@ -304,14 +304,12 @@ export function Add({
             you are writing, which is what it is. */}
           <div
             ref={boxRef}
-            className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent"
+            className={
+              started
+                ? 'flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent'
+                : ''
+            }
           >
-            {!started ? (
-              <span className="text-xs text-ink-faint">
-                a photo, a link, an idea, a question, or a quest — paste one in, or just write
-              </span>
-            ) : null}
-
             {started ? (
               <textarea
                 ref={(node) => {
@@ -357,14 +355,23 @@ export function Add({
                 className="w-full resize-none bg-transparent text-lg text-ink outline-none"
               />
             ) : (
+              /* The same shape as the Review card it sits under: a card with an icon, what it
+                 is for, and a line under that. It used to be a large empty box with a question
+                 in it, which read as a different kind of thing from the card beside it — two
+                 boxes, one of which you were supposed to understand and the other to use. */
               <button
                 type="button"
                 onClick={() => setStarted(true)}
                 data-tour="field"
-                className="flex w-full items-center gap-3 py-8 text-left text-lg text-ink-faint"
+                className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
               >
-                <span className="circle h-10 w-10 shrink-0 text-base">✎</span>
-                What did you notice?
+                <span className="circle h-10 w-10 shrink-0 text-base leading-none">✎</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">What did you notice?</span>
+                  <span className="block text-xs text-ink-soft">
+                    a photo, a link, an idea, a question, or a quest — paste one in, or just write
+                  </span>
+                </span>
               </button>
             )}
 
@@ -409,10 +416,10 @@ export function Add({
           </div>
         ) : null}
 
-        {/* One row, and everything in it shrinks but the two things you press: the field above
-          takes the room, and this takes what is left. The label in the middle is the part
-          that gives way, so "Keep it" never wraps. */}
-        <div className="flex items-center gap-2">
+        {/* Kept and attached: everything that acts on what you have written appears with the
+            field rather than before it, so the screen you land on is one card and a question
+            rather than a form waiting to be filled in. */}
+        <div className={`flex items-center gap-2 ${started ? '' : 'hidden'}`}>
           {/* The only thing left that is not the field: a way in for a picture that cannot be
             pasted, and a type you can overrule if the guess is wrong. */}
           <label

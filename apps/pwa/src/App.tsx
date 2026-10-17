@@ -414,6 +414,7 @@ export default function App() {
       {ready && screen === 'friends' ? (
         <Friends
           social={social}
+          onNotifications={() => go('notifications')}
           onOpen={(friend) => {
             setFriendId(friend.userId)
             go('friend')

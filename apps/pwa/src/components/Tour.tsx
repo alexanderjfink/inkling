@@ -94,7 +94,13 @@ export function Tour({ steps, onDone }: { steps: TourStep[]; onDone: () => void 
           {index + 1} of {steps.length}
         </p>
         <h2 className="mt-1 text-base font-semibold">{step.title}</h2>
-        <p className="mt-1.5 text-sm text-ink-soft">{step.body}</p>
+        {/* A blank line in the body is a paragraph break: the first step defines the thing
+            before it describes it. */}
+        {step.body.split('\n\n').map((paragraph) => (
+          <p key={paragraph.slice(0, 24)} className="mt-1.5 text-sm text-ink-soft">
+            {paragraph}
+          </p>
+        ))}
 
         <div className="mt-4 flex items-center gap-3">
           <button type="button" onClick={onDone} className="quiet text-xs underline">

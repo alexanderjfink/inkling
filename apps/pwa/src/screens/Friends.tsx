@@ -1,6 +1,7 @@
 import type { Friend } from '@inkling/domain'
 import { useState } from 'react'
 import { Avatar } from '../components/Avatar'
+import { SocialTabs } from '../components/SocialTabs'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 import type { SocialState } from '../state/useSocial'
 
@@ -23,10 +24,12 @@ function when(value: string): string {
 export function Friends({
   social,
   onOpen,
+  onNotifications,
 }: {
   social: SocialState
   /** Open one friend's history: what you have asked them, and what they have asked you. */
   onOpen: (friend: Friend) => void
+  onNotifications: () => void
 }) {
   const [username, setUsername] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
@@ -59,6 +62,8 @@ export function Friends({
 
   return (
     <div className="flex flex-col gap-5 pb-8">
+      <SocialTabs view="friends" onNotifications={onNotifications} onFriends={() => {}} />
+
       {social.error || problem ? (
         <p className="rounded-2xl border border-line bg-surface/70 p-3 text-xs text-warn">
           {problem ?? social.error}

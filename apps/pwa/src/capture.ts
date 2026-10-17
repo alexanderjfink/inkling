@@ -153,4 +153,11 @@ export interface EntryDraft {
   text?: string
   url?: string
   file?: File
+  /**
+   * The move from a friend this answers, by the message it arrived in.
+   *
+   * On the draft rather than passed alongside it because it is part of what is being written,
+   * not part of how: "this is the one I did" is the same kind of fact as the words are.
+   */
+  fromMessageId?: string
 }

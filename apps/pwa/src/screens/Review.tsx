@@ -19,10 +19,10 @@ import {
   entryContext,
   rankBlips,
   newBlock,
+  pendingFriendMoves,
   REJECTION_REASONS,
   requestGuidance,
   roundQueue,
-  unansweredFriendMove,
 } from '@inkling/domain'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Avatar } from '../components/Avatar'
@@ -38,7 +38,7 @@ import type { EntryDraft } from '../capture'
 import { Markdown } from '../components/Markdown'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 import { StoredImage } from '../components/StoredImage'
-import { formatDeferral, formatWhen } from '../format'
+import { formatDeferral, formatShortWeekday, formatWhen } from '../format'
 import { type LookupResult, lookupVia } from '../llm/proxy'
 import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
@@ -126,6 +126,18 @@ function Note({
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
 
+  /** The whole of a thank-you, most of the time. */
+  const QUICK = kind === 'kudos' ? ['🎉', '💡', '👏', '🙌'] : ['🙏', '❤️', '😄', '✨']
+
+  async function send(value: string) {
+    setSending(true)
+    try {
+      await onSend(value)
+    } finally {
+      setSending(false)
+    }
+  }
+
   return (
     <div className="mt-3 flex flex-col gap-2">
       <p className="text-xs text-ink-faint">
@@ -133,6 +145,24 @@ function Note({
           ? `tell ${username} the move worked`
           : `thank ${username} for “${moveTitle}”`}
       </p>
+      {/* An emoji is a thank-you. Asking somebody to write a sentence in order to say "thank
+          you" is how the sentence does not get written — so the four that cover almost every
+          case send on the tap, and the field underneath is for the times it is more than that. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {QUICK.map((emoji) => (
+          <button
+            key={emoji}
+            type="button"
+            disabled={busy || sending}
+            onClick={() => void send(emoji)}
+            className="rounded-full border border-line bg-surface px-3.5 py-2 text-lg leading-none disabled:opacity-40"
+            title={`send ${emoji}`}
+          >
+            {emoji}
+          </button>
+        ))}
+        <span className="text-xs text-ink-faint">or write it</span>
+      </div>
       <input
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -190,7 +220,9 @@ function AskPanel({
   onAsked?: () => void
   onShare: () => void
 }) {
-  const [to, setTo] = useState<string | null>(null)
+  /** Everybody being asked. More than one is the ordinary case: you are stuck, and you know
+   *  two people who might have an idea. */
+  const [to, setTo] = useState<string[]>([])
   const [note, setNote] = useState('')
   const [problem, setProblem] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
@@ -198,22 +230,36 @@ function AskPanel({
   const accepted = social.friends.filter((friend) => friend.status === 'accepted')
   /** There is somebody to ask, and something that may be shown to them. */
   const canAsk = blip.visibility === 'friends' && accepted.length > 0
+  const chosen = accepted.filter((friend) => to.includes(friend.userId))
+
+  function toggle(userId: string) {
+    setTo((list) =>
+      list.includes(userId) ? list.filter((id) => id !== userId) : [...list, userId],
+    )
+  }
 
   async function send() {
-    const friend = accepted.find((candidate) => candidate.userId === to)
-    if (!friend || sending) return
+    if (chosen.length === 0 || sending) return
     setSending(true)
     try {
-      const problemText = await social.ask({
-        to: friend,
-        context: askContextFor(blip),
-        note: note.trim() || undefined,
-      })
-      setProblem(problemText)
-      if (!problemText) {
-        if (onAsked) onAsked()
-        else onClose()
+      // One message each, because an ask is one person's to answer: a single message with two
+      // recipients would let the first answer look like it answered for both of them.
+      const context = askContextFor(blip)
+      const problems: string[] = []
+      for (const friend of chosen) {
+        const problemText = await social.ask({
+          to: friend,
+          context,
+          note: note.trim() || undefined,
+        })
+        if (problemText) problems.push(`${friend.username}: ${problemText}`)
       }
+      if (problems.length > 0) {
+        setProblem(problems.join(' · '))
+        return
+      }
+      if (onAsked) onAsked()
+      else onClose()
     } finally {
       setSending(false)
     }
@@ -237,18 +283,25 @@ function AskPanel({
         </p>
       ) : (
         <>
+          <p className="text-xs text-ink-soft">
+            {chosen.length === 0
+              ? 'pick who to ask — as many as you like'
+              : `asking ${chosen.map((friend) => friend.username).join(', ')}`}
+          </p>
           <div className="flex flex-wrap gap-1.5">
             {accepted.map((friend) => (
               <button
                 key={friend.userId}
                 type="button"
-                onClick={() => setTo(friend.userId)}
+                aria-pressed={to.includes(friend.userId)}
+                onClick={() => toggle(friend.userId)}
                 className={`rounded-full px-3 py-1.5 text-xs ${
-                  to === friend.userId
+                  to.includes(friend.userId)
                     ? 'bg-accent text-surface'
                     : 'border border-line text-ink-soft'
                 }`}
               >
+                {to.includes(friend.userId) ? '✓ ' : ''}
                 {friend.username}
               </button>
             ))}
@@ -276,16 +329,18 @@ function AskPanel({
         {canAsk ? (
           <button
             type="button"
-            disabled={!to || sending}
+            disabled={chosen.length === 0 || sending}
             onClick={() => void send()}
             className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
           >
             <ButtonLabel busy={sending}>
               {sending
                 ? 'Asking…'
-                : to
-                  ? `Ask ${accepted.find((friend) => friend.userId === to)?.username ?? 'them'}`
-                  : 'Ask'}
+                : chosen.length === 0
+                  ? 'Ask'
+                  : chosen.length === 1
+                    ? `Ask ${chosen[0]?.username ?? 'them'}`
+                    : `Ask ${chosen.length} friends`}
             </ButtonLabel>
           </button>
         ) : null}
@@ -481,6 +536,8 @@ export function Review({
   const [material, setMaterial] = useState<LookupResult | null>(null)
   const [links, setLinks] = useState<MoveLink[]>([])
   const [noting, setNoting] = useState<'kudos' | 'thanks' | null>(null)
+  /** Moves from friends put off until a later round, by message id. */
+  const [setAside, setSetAside] = useState<string[]>([])
   const [noteProblem, setNoteProblem] = useState<string | null>(null)
   /** Open while the note is being rendered and handed over. */
   const [exporting, setExporting] = useState(false)
@@ -488,7 +545,11 @@ export function Review({
   const [askOpen, setAskOpen] = useState(false)
   const [materialLoading, setMaterialLoading] = useState(false)
   /** Open when non-null. A move means "doing that move"; null means a free note. */
-  const [composer, setComposer] = useState<{ move: MoveSpec | null } | null>(null)
+  const [composer, setComposer] = useState<{
+    move: MoveSpec | null
+    /** Set when the move came from a friend, so the entry can name which one it answers. */
+    fromMessageId?: string
+  } | null>(null)
   const [entry, setEntry] = useState('')
   /** Whatever came with what is being written: a picture, pasted, dropped or picked. */
   const [entryFile, setEntryFile] = useState<File | undefined>()
@@ -584,6 +645,8 @@ export function Review({
   const deferLabel = formatDeferral(deferUntil(DEFAULT_DEFERRAL, new Date()))
   /** Just the day, for the label under a round button: "till Monday", not "until Monday". */
   const deferDay = deferLabel.replace(/^(until|in)\s+/, '')
+  /** "till Tue" — the same day, in the width the row has for it. The full name is the title. */
+  const deferShort = `till ${formatShortWeekday(deferUntil(DEFAULT_DEFERRAL, new Date()))}`
 
   // Advice belongs to the move it was asked about. A different move means different
   // advice, so clear it rather than show something that no longer applies.
@@ -617,7 +680,15 @@ export function Review({
    * their behalf, and burying it under the app's own suggestion would be answering the
    * wrong question. Once something is written against it, the suggestion returns.
    */
-  const friendMove = current ? unansweredFriendMove(current) : undefined
+  /**
+   * Whose move is on the card.
+   *
+   * Sequential: whoever has been waiting longest goes first, and answering it — or waving it
+   * away — brings the next one. "Later" is this round only, kept here rather than in the log
+   * because it is about when, not about what happened: it comes back next time.
+   */
+  const pendingMoves = current ? pendingFriendMoves(current) : []
+  const friendMove = pendingMoves.find((candidate) => !setAside.includes(candidate.messageId))
   const shownMove = composer?.move ?? friendMove?.spec ?? move
 
   // Where this move sends you. Resolved together, because they are independent and a
@@ -763,6 +834,9 @@ export function Review({
         text: url && isOnlyALink(entry) ? undefined : entry,
         url: url ?? undefined,
         file: entryFile,
+        // Which friend's move this answers. Without it the move stays on the card and the
+        // next one never arrives.
+        fromMessageId: composer.fromMessageId,
       }
       if (composer.move) {
         // Keep what surrounded the answer with the answer: the move, the material it
@@ -858,6 +932,8 @@ export function Review({
             onClick={() => {
               setDecisions({})
               setSession(null)
+              // "Later" meant "not in this round", so a new round is exactly when it comes back.
+              setSetAside([])
             }}
             className="rounded-full border border-line bg-surface px-5 py-3 text-sm font-medium"
           >
@@ -901,7 +977,9 @@ export function Review({
             key={option.id}
             type="button"
             onClick={() => setScope(option.id)}
-            className={`rounded-full px-3 py-1 text-xs transition ${
+            /* `whitespace-nowrap`, because "Today · 1" is now wider than the chip and wraps
+               into "Today ·" over "1", which reads as a broken chip rather than a tight one. */
+            className={`rounded-full px-3 py-1 text-xs whitespace-nowrap transition ${
               scope === option.id
                 ? 'bg-ink font-medium text-surface'
                 : 'border border-line text-ink-soft'
@@ -1118,7 +1196,9 @@ export function Review({
               <div className="mt-3 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
-                  onClick={() => setComposer({ move: friendMove.spec })}
+                  onClick={() =>
+                    setComposer({ move: friendMove.spec, fromMessageId: friendMove.messageId })
+                  }
                   className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface"
                 >
                   Do this
@@ -1135,6 +1215,29 @@ export function Review({
                 </button>
               </div>
             ) : null}
+
+            {/* Two ways past a move from a friend, and they mean different things.
+                "Later" puts it back in the pile: the card shows whoever is next, or the app's
+                own suggestion if nobody else has sent one, and this comes round again in a
+                later round. "Not this move" is about the suggestion itself — it leaves the
+                card for good and stays in the log and in the history with them. */}
+            <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
+              <button
+                type="button"
+                onClick={() => setSetAside((list) => [...list, friendMove.messageId])}
+                className="quiet underline"
+              >
+                do this later
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void actions.dismissFriendMove(current.id, friendMove.messageId)}
+                className="quiet underline disabled:opacity-40"
+              >
+                not this move
+              </button>
+            </div>
 
             {!composer && socialOn ? (
               <div className="mt-3 flex flex-col gap-2">
@@ -1570,63 +1673,63 @@ export function Review({
            edge of the row rather than sitting in the middle of the choice. Centring the three
            in what is left, rather than on the screen, is what keeps "Ask a Friend" and "till
            Tuesday" from touching at 390px: there is room for one or the other. */
-        <div className="mt-6 flex items-end gap-3">
-          <div className="flex flex-1 flex-wrap items-end justify-center gap-3">
-            {move && !friendMove ? null : (
-              <button
-                type="button"
-                onClick={generateMove}
-                disabled={moveLoading}
-                className="flex flex-col items-center gap-1.5 disabled:opacity-40"
-              >
-                <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
-                  ✦
-                </span>
-                <span className="text-xs font-medium text-ink">
-                  <ButtonLabel busy={moveLoading}>
-                    {moveLoading ? 'thinking…' : 'Generate'}
-                  </ButtonLabel>
-                </span>
-              </button>
-            )}
-
-            {/* The one you press most, and it looks like it: the only filled, round thing in
-              the row, and bigger than the others, so the thumb finds it without looking. */}
+        <div className="relative mt-6 flex flex-wrap items-end justify-center gap-2.5">
+          {move && !friendMove ? null : (
             <button
               type="button"
-              onClick={() => setComposer({ move: null })}
+              onClick={generateMove}
+              disabled={moveLoading}
+              className="flex flex-col items-center gap-1.5 disabled:opacity-40"
+            >
+              <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
+                ✦
+              </span>
+              <span className="text-xs font-medium text-ink">
+                <ButtonLabel busy={moveLoading}>
+                  {moveLoading ? 'thinking…' : 'Generate'}
+                </ButtonLabel>
+              </span>
+            </button>
+          )}
+
+          {/* The one you press most, and it looks like it: the only filled, round thing in
+              the row, and bigger than the others, so the thumb finds it without looking. */}
+          <button
+            type="button"
+            onClick={() => setComposer({ move: null })}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <span className="circle circle--accent h-16 w-16 text-2xl">+</span>
+            <span className="text-xs font-medium text-ink">New Move</span>
+          </button>
+
+          {socialOn && !current.demo ? (
+            <button
+              type="button"
+              onClick={() => setAskOpen((open) => !open)}
               className="flex flex-col items-center gap-1.5"
             >
-              <span className="circle circle--accent h-16 w-16 text-2xl">+</span>
-              <span className="text-xs font-medium text-ink">New Move</span>
+              <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
+                ☺
+              </span>
+              <span className="text-xs font-medium text-accent">Ask a Friend</span>
             </button>
-
-            {socialOn && !current.demo ? (
-              <button
-                type="button"
-                onClick={() => setAskOpen((open) => !open)}
-                className="flex flex-col items-center gap-1.5"
-              >
-                <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
-                  ☺
-                </span>
-                <span className="text-xs font-medium text-accent">Ask a Friend</span>
-              </button>
-            ) : null}
-          </div>
-
+          ) : null}
           {/* Putting it down belongs with the ways to get a move, because it is one of the
-              things you do with a card rather than a footnote to it. Its label is the date it
-              picked, so "later" is never a date you cannot see. */}
+              things you do with a card rather than a footnote to it, and it keeps to the right
+              edge — so the three that ask for a move can sit on the middle of the screen
+              instead of being pushed left to make room for it. The day is three letters
+              because at 390px "till Tuesday" is wide enough to collide with "Ask a Friend";
+              the whole sentence is the button's title. */}
           <button
             type="button"
             onClick={() => void defer(DEFAULT_DEFERRAL)}
-            title="Put it down, and have it come back then"
-            className="flex w-[74px] shrink-0 flex-col items-center gap-1.5"
+            title={`Put it down until ${deferDay} — it comes back then`}
+            className="absolute right-0 bottom-0 flex w-12 flex-col items-center gap-1.5"
           >
             <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">✓</span>
             <span className="text-center text-xs font-medium whitespace-nowrap text-ink">
-              till {deferDay}
+              {deferShort}
             </span>
           </button>
         </div>

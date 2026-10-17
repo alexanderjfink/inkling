@@ -53,6 +53,8 @@ export interface FriendMoveEntry {
   spec: MoveSpec
   note?: string
   at: ISODate
+  /** Somebody pressed "not this move". It stays in the history and stops being shown. */
+  dismissed?: boolean
 }
 
 /** Having asked a friend for help with this Inkling. */
@@ -64,18 +66,40 @@ export interface FriendAskEntry {
 }
 
 /**
- * The newest friend move that nothing has been written against yet.
+ * The moves from friends still waiting, oldest first.
  *
- * What makes it pop: somebody spent a moment on your behalf, and it should be in front of
- * you until you have said something back — then it becomes an ordinary Inkling again
- * rather than pinning itself to the top of the stack forever.
+ * What makes them pop: somebody spent a moment on your behalf, and one should be in front of
+ * you until you have said something back — then it becomes an ordinary Inkling again rather
+ * than pinning itself to the top of the stack forever.
+ *
+ * Sequential rather than piled up: "two people suggested something" is two things to do, and a
+ * card with both of them on it is a card you read instead of one you act on. The one that has
+ * been waiting longest goes first.
+ *
+ * A move is done when an entry names it. Comparing timestamps against the newest entry — what
+ * this did first — cannot work with more than one: a single entry dated after both of them
+ * tidied them both away, and the second move was never seen.
+ */
+export function pendingFriendMoves(blip: Blip): FriendMoveEntry[] {
+  const answered = new Set(
+    blip.entries
+      .map((entry) => entry.fromMessageId)
+      .filter((id): id is string => typeof id === 'string'),
+  )
+  return blip.friendMoves
+    .filter((move) => !move.dismissed && !answered.has(move.messageId))
+    .sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? -1 : 1))
+}
+
+/**
+ * The first move a friend is still waiting on, if any.
+ *
+ * Kept as a question in its own right because the schedule asks it separately: somebody
+ * having thought about your Inkling is a reason for it to come round, whether or not anybody
+ * has done anything about it yet.
  */
 export function unansweredFriendMove(blip: Blip): FriendMoveEntry | undefined {
-  const latest = blip.friendMoves[blip.friendMoves.length - 1]
-  if (!latest) return undefined
-  const lastEntry = blip.entries[blip.entries.length - 1]
-  if (lastEntry && lastEntry.at > latest.at) return undefined
-  return latest
+  return pendingFriendMoves(blip)[0]
 }
 
 /** The folded, read-only projection of a blip. Never written directly. */
@@ -193,7 +217,11 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
     case 'entry':
       // `moveId` lives on the event, so copy it onto the entry: the projection is what
       // everything downstream reads, and the link has to survive the fold.
-      blip.entries.push(event.moveId ? { ...event.entry, moveId: event.moveId } : event.entry)
+      blip.entries.push({
+        ...event.entry,
+        ...(event.moveId ? { moveId: event.moveId } : {}),
+        ...(event.fromMessageId ? { fromMessageId: event.fromMessageId } : {}),
+      })
       blip.schedule.lastTouched = event.at
       blip.schedule.heat = clamp01(blip.schedule.heat + 0.1)
       blip.schedule.timesEngaged += 1
@@ -376,6 +404,20 @@ export function project(events: BlipEvent[]): Blip[] {
   const sorted = [...events].sort(totalOrder)
   const map = new Map<string, Blip>()
   for (const event of sorted) applyEvent(map, event)
+
+  /**
+   * Apply "not this move" after everything else.
+   *
+   * A dismissal can be merged in before the move it refers to — two devices, two orders — and
+   * the fold has to give the same answer either way. Doing it in the pass above made the
+   * answer depend on which arrived first, which is the one thing a fold must never do.
+   */
+  for (const event of sorted) {
+    if (event.t !== 'friendMoveDismissed') continue
+    const blip = map.get(event.id)
+    const move = blip?.friendMoves.find((candidate) => candidate.messageId === event.messageId)
+    if (move) move.dismissed = true
+  }
 
   // Make `linked` symmetric after every blip exists, so forward references work.
   for (const blip of map.values()) {

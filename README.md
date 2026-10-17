@@ -466,12 +466,13 @@ rather than quietly counted as empty.
 
 | | |
 |---|---|
-**Four things in one row, and they are not equals.** *Generate*, *New Move* (write your own)
+**Four things in one row, and the middle three are centred on the screen.** *Generate*, *New Move* (write your own)
 and *Ask a Friend* are centred, because they are the choice; **till Tuesday** — the deferral,
 labelled with the day it picked, so "later" is never a date you cannot see — keeps to the right
-edge of the row. The three centre in what is *left* rather than on the screen: at 390px there
-is room for the three or for the row of four centred on the middle, not both, and centring on
-the middle put "Ask a Friend" against "till Tuesday". **Export** is a quiet link underneath.
+edge of the row, absolutely, so the three can sit on the middle of the screen rather than in
+what is left of it. That only works because the day is abbreviated to three letters — "till
+Tuesday" is wide enough to collide with "Ask a Friend" at 390px, and the whole sentence is the
+button's title instead. **Export** is a quiet link underneath.
 
 The row used to be five things where three were a question and two were an answer, and its
 outer buttons were grey enough to read as disabled next to the one filled one. The three that
@@ -671,6 +672,16 @@ to be shown what they have been noticing. They see the request the next time the
 Inkling, and nothing of yours is visible until they accept. Removing one takes away both
 directions at once.
 
+### Asking, and thanking
+
+**Ask as many as you like.** The panel is a row of chips you toggle, and it sends one message
+each rather than one message to several — an ask is one person's to answer, and a single message
+with two recipients would let the first answer look like it answered for both.
+
+**A thank-you can be an emoji.** 🙏 ❤️ 😄 ✨ send on the tap, and the field underneath is for
+the times it is more than that. Asking somebody to write a sentence in order to say thank you
+is how the sentence does not get written.
+
 ### Suggesting, for somebody else
 
 Suggesting a move is deliberately the same three fields a move has always had — what they
@@ -759,6 +770,31 @@ on the Inkling, the card still says where it came from, and the announcement is 
 is an event in your log like everything else, so clearing it on the phone clears it on the
 laptop, and the count is a count of what you have not dealt with rather than a count of what
 has arrived.
+
+### Two friends, two moves, one at a time
+
+When more than one move comes back they are shown **sequentially** — whoever has been waiting
+longest first — because "two people suggested something" is two things to do, and a card with
+both on it is a card you read instead of one you act on. Answering one brings the next.
+
+**Answering means an entry that names the move.** Not a timestamp comparison, which is what
+this did first and which cannot work with more than one: a single entry dated after both moves
+tidied away both, and the second one was never seen. An entry carries `fromMessageId` — and
+deliberately not `moveId`, because a friend's move takes its id from its own title, so two
+people suggesting "photograph the wall" get one id between them.
+
+**And there are two ways past a move you are not going to do now**, which mean different
+things. *do this later* puts it back in the pile: the card shows whoever is next, or the app's
+own suggestion if nobody else sent one, and it comes round again in a later round — kept in the
+screen rather than in the log, because it is about when, not about what happened. *not this
+move* is about the suggestion itself: off the card for good, and still in the log and in the
+history with them. The fold marks the move, so nothing downstream has to be told twice, and the
+mark is applied after every event so a dismissal merged in before the move it refers to still
+lands — a fold that depends on arrival order is not a fold.
+
+**A move from a friend is not app move history.** `moveShown` and `moveDone` record what the
+*app* suggested and what became of it; a friend's move logged there is how the log filled up
+with "offered" entries for moves nobody was offered.
 
 ### A friend, and what has passed between you
 

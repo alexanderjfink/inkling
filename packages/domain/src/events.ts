@@ -81,6 +81,8 @@ export interface Entry {
    * an entry can never be traced back to what asked for it.
    */
   moveId?: string
+  /** The move from a friend this entry answers, by the message it arrived in. */
+  fromMessageId?: string
   /** Present when a move prompted this entry, and there was something to record. */
   context?: EntryContext
 }
@@ -376,7 +378,15 @@ export type BlipEventBody =
        */
       visibility?: Visibility
     }
-  | { t: 'entry'; id: string; entry: Entry; moveId?: string }
+  /**
+   * Something written against an Inkling.
+   *
+   * `fromMessageId` is set when it answers a move a friend sent, and it is what lets a second
+   * friend's move be shown after the first has been answered. `moveId` will not do: a friend's
+   * move takes its id from its own title, so two people suggesting "photograph the wall" get
+   * one id between them and there is no telling which of them was done.
+   */
+  | { t: 'entry'; id: string; entry: Entry; moveId?: string; fromMessageId?: string }
   | { t: 'blockAdded'; id: string; block: Block }
   | { t: 'blockUpdated'; id: string; blockId: string; patch: Partial<Omit<Block, 'id'>> }
   | { t: 'blockRemoved'; id: string; blockId: string }
@@ -484,6 +494,15 @@ export type BlipEventBody =
    * the telling — not the fact.
    */
   | { t: 'friendMoveSeen'; id: string; messageId: string }
+  /**
+   * "Not this move" — taken off the card for good.
+   *
+   * Distinct from putting it down, which is about when, and from clearing the announcement,
+   * which is about whether you have been told. This is about the suggestion itself: it stays
+   * in the log, it stays in the history with the friend, and it stops being put in front of
+   * you.
+   */
+  | { t: 'friendMoveDismissed'; id: string; messageId: string }
   /** A record of having suggested a move for somebody else's Inkling. */
   | {
       t: 'friendMoveSent'

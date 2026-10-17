@@ -138,7 +138,7 @@ export type {
   MoveRejection,
   ScheduleState,
 } from './project'
-export { liveBlips, project, unansweredFriendMove } from './project'
+export { liveBlips, pendingFriendMoves, project, unansweredFriendMove } from './project'
 export type { FeedContext } from './schedule'
 export type { DeferralChoice, SnoozeReason } from './schedule'
 export {

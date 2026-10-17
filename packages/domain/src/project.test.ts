@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'bun:test'
 import type { BlipEvent, BlipEventBody, BlipType } from '../src/index'
-import { DEMO_MOVE, liveBlips, newId, project, unansweredFriendMove } from '../src/index'
+import {
+  DEMO_MOVE,
+  liveBlips,
+  newId,
+  pendingFriendMoves,
+  project,
+  unansweredFriendMove,
+} from '../src/index'
 
 const DEVICE = 'deviceA'
 
@@ -239,13 +246,30 @@ describe('help from a friend', () => {
     expect(blip?.friendMoves).toHaveLength(1)
   })
 
-  test('it is unanswered until something is written against it', () => {
+  test('it is unanswered until an entry says it answers it', () => {
     const id = newId()
     const [blip] = project([
       captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
       received(id, 'm1', '2026-01-02T00:00:00Z'),
     ])
     expect(unansweredFriendMove(blip!)).toBeDefined()
+
+    // An entry that does not say which move it answers leaves the move waiting: you wrote
+    // something, and the thing they suggested is still something you have not done.
+    const [unrelated] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      received(id, 'm1', '2026-01-02T00:00:00Z'),
+      ev(
+        {
+          t: 'entry',
+          id,
+          entry: { id: 'e1', kind: 'note', text: 'a thought', at: '2026-01-03T00:00:00Z' },
+        },
+        2,
+        '2026-01-03T00:00:00Z',
+      ),
+    ])
+    expect(pendingFriendMoves(unrelated!)).toHaveLength(1)
 
     const [answered] = project([
       captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
@@ -254,6 +278,7 @@ describe('help from a friend', () => {
         {
           t: 'entry',
           id,
+          fromMessageId: 'm1',
           entry: { id: 'e1', kind: 'note', text: 'tried it', at: '2026-01-03T00:00:00Z' },
         },
         2,
@@ -261,6 +286,55 @@ describe('help from a friend', () => {
       ),
     ])
     expect(unansweredFriendMove(answered!)).toBeUndefined()
+    expect(answered?.entries[0]?.fromMessageId).toBe('m1')
+  })
+
+  test('two moves come one at a time, oldest first, and the second waits its turn', () => {
+    const id = newId()
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      received(id, 'm1', '2026-01-02T00:00:00Z'),
+      received(id, 'm2', '2026-01-04T00:00:00Z', 2),
+    ])
+
+    const queue = pendingFriendMoves(blip!)
+    expect(queue.map((move) => move.messageId)).toEqual(['m1', 'm2'])
+
+    // Answering the first leaves the second — the entry names the one it is about, so one
+    // entry cannot tidy away a move nobody has done.
+    const [after] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      received(id, 'm1', '2026-01-02T00:00:00Z'),
+      received(id, 'm2', '2026-01-04T00:00:00Z', 2),
+      ev(
+        {
+          t: 'entry',
+          id,
+          fromMessageId: 'm1',
+          entry: { id: 'e1', kind: 'note', text: 'did the first one', at: '2026-01-05T00:00:00Z' },
+        },
+        3,
+        '2026-01-05T00:00:00Z',
+      ),
+    ])
+    expect(pendingFriendMoves(after!).map((move) => move.messageId)).toEqual(['m2'])
+  })
+
+  test('"not this move" takes it off the card and leaves it in the history', () => {
+    const id = newId()
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      received(id, 'm1', '2026-01-02T00:00:00Z'),
+      received(id, 'm2', '2026-01-04T00:00:00Z', 2),
+      // The dismissal arrives before the move it refers to, which is what a two-device merge
+      // can produce — and the fold is only ever a fold, so the order must not matter.
+      ev({ t: 'friendMoveDismissed', id, messageId: 'm2' }, 3, '2026-01-03T00:00:00Z'),
+    ])
+
+    expect(pendingFriendMoves(blip!).map((move) => move.messageId)).toEqual(['m1'])
+    // Still here, still theirs, still in the history.
+    expect(blip?.friendMoves).toHaveLength(2)
+    expect(blip?.friendMoves.find((move) => move.messageId === 'm2')?.dismissed).toBe(true)
   })
 
   test('an Inkling is private unless it was written shared', () => {

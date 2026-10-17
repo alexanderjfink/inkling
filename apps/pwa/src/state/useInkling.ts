@@ -112,6 +112,13 @@ export interface InklingActions {
    */
   markMoveSeen(id: string, messageId: string): Promise<BlipEvent>
   /**
+   * "Not this move", for a move a friend sent.
+   *
+   * Off the card for good, and still in the log and in the history with them. The fold marks
+   * the move itself, so nothing downstream has to be told about it twice.
+   */
+  dismissFriendMove(id: string, messageId: string): Promise<BlipEvent>
+  /**
    * Something written down.
    *
    * Takes whatever came with it as well as the words: a link, a picture, or both. An entry
@@ -312,6 +319,9 @@ export function useInkling(accountId: string | null = null) {
       markMoveSeen(id, messageId) {
         return storage().append({ t: 'friendMoveSeen', id, messageId })
       },
+      dismissFriendMove(id, messageId) {
+        return storage().append({ t: 'friendMoveDismissed', id, messageId })
+      },
       giveFeedback(text, context) {
         // A fresh id rather than a blip's: the fold ignores events for ids it has not
         // seen, which is exactly right for something that is not about an Inkling.
@@ -321,6 +331,7 @@ export function useInkling(accountId: string | null = null) {
         const event = await storage().append({
           t: 'entry',
           id,
+          fromMessageId: draft.fromMessageId,
           entry: {
             id: newId(),
             kind: entryKind(draft),
@@ -408,11 +419,23 @@ export function useInkling(accountId: string | null = null) {
         const before = project(await store.allEvents()).find((blip) => blip.id === id)
         const streak = before?.schedule.timesEngaged ?? 0
 
-        // A move can be completed without having been recorded as shown, so make sure
-        // the history has an entry for it — otherwise the log would miss it.
-        const alreadyShown = before?.moves.some((move) => move.moveId === moveSpec.id) ?? false
-        if (!alreadyShown) {
-          await store.append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
+        /**
+         * A move from a friend is not app move history.
+         *
+         * `moveShown` and `moveDone` record what the *app* suggested and what became of it,
+         * and a friend's move logged there is how the log filled up with "offered" entries
+         * for moves nobody was offered. What a friend's move keeps instead is the entry that
+         * names it, which is what the queue reads.
+         */
+        const fromFriend = draft.fromMessageId
+
+        if (!fromFriend) {
+          // A move can be completed without having been recorded as shown, so make sure the
+          // history has an entry for it — otherwise the log would miss it.
+          const alreadyShown = before?.moves.some((move) => move.moveId === moveSpec.id) ?? false
+          if (!alreadyShown) {
+            await store.append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
+          }
         }
 
         const text = draft.text?.trim() ?? ''
@@ -420,7 +443,8 @@ export function useInkling(accountId: string | null = null) {
           await store.append({
             t: 'entry',
             id,
-            moveId: moveSpec.id,
+            moveId: fromFriend ? undefined : moveSpec.id,
+            fromMessageId: fromFriend,
             entry: {
               id: newId(),
               kind: entryKind(draft),
@@ -434,7 +458,7 @@ export function useInkling(accountId: string | null = null) {
             },
           })
         }
-        await store.append({ t: 'moveDone', id, moveId: moveSpec.id })
+        if (!fromFriend) await store.append({ t: 'moveDone', id, moveId: moveSpec.id })
         return store.append({
           t: 'snoozed',
           id,

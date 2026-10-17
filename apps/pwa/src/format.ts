@@ -37,3 +37,8 @@ export function formatAgo(value: string, now: Date = new Date()): string {
   if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
   return then.toLocaleDateString()
 }
+
+/** "Tue" — a weekday in three letters, for a label with no room for the whole name. */
+export function formatShortWeekday(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { weekday: 'short' }).replace('.', '')
+}

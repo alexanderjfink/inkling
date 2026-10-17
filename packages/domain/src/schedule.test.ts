@@ -340,6 +340,9 @@ describe('a move from a friend', () => {
         {
           t: 'entry',
           id: plain.id,
+          // Answering *that* move: an entry that does not name one leaves it waiting, which
+          // is the distinction the card's queue is built on.
+          fromMessageId: 'm1',
           entry: { id: 'e1', kind: 'note', text: 'tried it', at: '2026-02-03T12:00:00Z' },
         },
         2,

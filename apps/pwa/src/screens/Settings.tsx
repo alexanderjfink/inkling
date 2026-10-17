@@ -734,7 +734,7 @@ export function Settings({
                 onClick={onOpenFriends}
                 className="self-start rounded-full border border-line px-4 py-2 text-xs text-ink-soft"
               >
-                Friends — add one, or see who asked
+                Notifications and friends — what has happened, and who you can ask
               </button>
               {social.asks.length > 0 ? (
                 <p className="text-xs text-accent">

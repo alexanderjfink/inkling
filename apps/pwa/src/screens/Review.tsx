@@ -207,19 +207,6 @@ const SWIPE_TRAVEL = 460
 
 type SwipeDirection = 'left' | 'right'
 
-/**
- * Moves waved past on this device, for as long as the app is open.
- *
- * Module state, not component state, because the Review screen unmounts when you go to the
- * list and back — so a swipe past a move, or a "do this later", came back the moment you
- * returned to the card. A move that has been acted on is done with, and swiping should not
- * walk back over it.
- *
- * Nothing is written down: this is about this sitting, not about the move. What somebody
- * suggested is never lost — it is in the log and in the history with them either way.
- */
-const passedThisSession = new Set<string>()
-
 function useMoveSwipe(onSwipe: (direction: SwipeDirection) => void) {
   const [dx, setDx] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -630,14 +617,15 @@ export function Review({
   const [links, setLinks] = useState<MoveLink[]>([])
   const [noting, setNoting] = useState<'kudos' | 'thanks' | null>(null)
   /**
-   * Moves from friends waved past, seeded from what was waved past earlier in the sitting:
-   * "do this later" and a swipe both mean "not this one, not now".
+   * Which of the moves from friends is on the card.
+   *
+   * A ring, not a queue: swiping past one — and "do this later" — means "not now", not "never".
+   * Who suggested something is the most interesting thing on the card, and the two things that
+   * are actually final are doing it and "not this move", both of which are written down and
+   * both of which take a move out of the ring for good.
    */
-  const [setAside, setSetAside] = useState<string[]>(() => [...passedThisSession])
-  const wavePast = (messageId: string) => {
-    passedThisSession.add(messageId)
-    setSetAside([...passedThisSession])
-  }
+  const [ringIndex, setRingIndex] = useState(0)
+  const nextFriendMove = () => setRingIndex((index) => index + 1)
   const [noteProblem, setNoteProblem] = useState<string | null>(null)
   /** Open while the note is being rendered and handed over. */
   const [exporting, setExporting] = useState(false)
@@ -789,7 +777,8 @@ export function Review({
    * because it is about when, not about what happened: it comes back next time.
    */
   const pendingMoves = current ? pendingFriendMoves(current) : []
-  const friendMove = pendingMoves.find((candidate) => !setAside.includes(candidate.messageId))
+  const friendMove =
+    pendingMoves.length > 0 ? pendingMoves[ringIndex % pendingMoves.length] : undefined
 
   /**
    * Which of the two the card is showing.
@@ -803,13 +792,17 @@ export function Review({
 
   const swipe = (direction: SwipeDirection) => {
     if (direction === 'right') {
-      // Back to what people suggested. Already there? Then the next one along, which is what
-      // "sequentially show all the moves suggested by friends" means from the inside.
+      // Back to what people suggested. Already there? Then the next one round the ring — and
+      // if nobody has suggested anything, the swipe is the way to ask.
       if (slotNow !== 'friend' && friendMove) {
         setSlot('friend')
         return
       }
-      if (friendMove) wavePast(friendMove.messageId)
+      if (friendMove) {
+        nextFriendMove()
+        return
+      }
+      setAskOpen(true)
       return
     }
     setSlot('ai')
@@ -1060,9 +1053,8 @@ export function Review({
             onClick={() => {
               setDecisions({})
               setSession(null)
-              // A new round is a fresh look at everything.
-              passedThisSession.clear()
-              setSetAside([])
+              // A new round starts at the first move again.
+              setRingIndex(0)
             }}
             className="rounded-full border border-line bg-surface px-5 py-3 text-sm font-medium"
           >
@@ -1137,7 +1129,7 @@ export function Review({
             } ${swipeState.armed ? 'scale-110' : 'opacity-70'}`}
           >
             {swipeState.direction === 'right'
-              ? `☺ ${friendMove ? friendMove.fromUsername : 'friends'}`
+              ? `☺ ${friendMove ? friendMove.fromUsername : 'ask a friend'}`
               : '✦ the app'}
           </span>
         ) : null}
@@ -1380,11 +1372,7 @@ export function Review({
                 later round. "Not this move" is about the suggestion itself — it leaves the
                 card for good and stays in the log and in the history with them. */}
             <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
-              <button
-                type="button"
-                onClick={() => wavePast(friendMove.messageId)}
-                className="quiet underline"
-              >
+              <button type="button" onClick={nextFriendMove} className="quiet underline">
                 do this later
               </button>
               <button

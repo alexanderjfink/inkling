@@ -114,6 +114,7 @@ export type {
 } from './social'
 export {
   ASK_ENTRIES_MAX,
+  ASK_MEDIA_MAX,
   FRIEND_MOVE_MAX_SEC,
   NOTE_MAX,
   askContextFor,

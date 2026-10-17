@@ -1,5 +1,16 @@
 import { describe, expect, test } from 'bun:test'
-import { type FriendEvent, areFriends, friendsOf, pairKey, sanitizeFriendMove } from './social'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import {
+  type FriendEvent,
+  areFriends,
+  friendsOf,
+  pairKey,
+  sanitizeFriendMove,
+  sharedMediaIds,
+} from './social'
+import { FileStore } from './store'
 
 const NAMES = new Map([
   ['u-priya', 'priya'],
@@ -130,5 +141,63 @@ describe('a move from a friend, as it arrives', () => {
       lookUp: ['one', 'two', 'three', 'four', 'x'.repeat(400), '  '],
     })
     expect(move?.lookUp).toEqual(['one', 'two', 'three'])
+  })
+})
+
+describe('the pictures a friend is allowed to see', () => {
+  test('only the ones on an Inkling they chose to share', async () => {
+    // The blob store is content-addressed and knows nothing about who is asking, so this is
+    // the only thing between a photograph somebody kept private and a friend's request for
+    // it. It is checked at the boundary rather than in the app, for the same reason as the
+    // words: "private means private" has to be true of what the server will serve.
+    const dir = await mkdtemp(join(tmpdir(), 'inkling-media-'))
+    try {
+      const store = new FileStore(dir)
+      const events = [
+        {
+          t: 'captured',
+          id: 'shared-one',
+          input: { kind: 'text', text: 'shared' },
+          type: 'idea',
+          visibility: 'friends',
+          mediaIds: ['hash-shared'],
+        },
+        {
+          t: 'captured',
+          id: 'private-one',
+          input: { kind: 'text', text: 'private' },
+          type: 'idea',
+          visibility: 'private',
+          mediaIds: ['hash-private'],
+        },
+        {
+          t: 'captured',
+          id: 'retired-one',
+          input: { kind: 'text', text: 'in the attic' },
+          type: 'idea',
+          visibility: 'friends',
+          mediaIds: ['hash-retired'],
+        },
+        { t: 'retired', id: 'retired-one' },
+      ].map((body, index) => ({
+        ...body,
+        deviceId: 'dev1',
+        seq: index,
+        at: '2026-01-01T00:00:00Z',
+      }))
+
+      await store.appendLog(
+        'dev1',
+        new TextEncoder().encode(events.map((event) => JSON.stringify(event)).join('\n') + '\n'),
+      )
+
+      const allowed = await sharedMediaIds(store)
+      expect(allowed.has('hash-shared')).toBe(true)
+      expect(allowed.has('hash-private')).toBe(false)
+      // In the attic is not shared either: it stopped being in play.
+      expect(allowed.has('hash-retired')).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
   })
 })

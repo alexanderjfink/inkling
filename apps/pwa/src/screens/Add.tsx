@@ -47,7 +47,6 @@ export function Add({
   socialOn,
   shareDefault,
   asking,
-  onFriends,
   onNotifications,
   friendsWaiting,
   transcribeUrl,
@@ -81,7 +80,6 @@ export function Add({
   shareDefault: ShareDefault
   /** Asks from friends, so the entry screen can say somebody is waiting. */
   asking: ReceivedAsk[]
-  onFriends: () => void
   onNotifications: () => void
   /** Friends waiting on something from you, shown on the button. */
   friendsWaiting: number
@@ -131,7 +129,8 @@ export function Add({
     (spoken) => setText((current) => (current.trim() ? `${current.trim()} ${spoken}` : spoken)),
     // The server's transcriber, when it has one: a recording goes up and words come back.
     // Null means the browser's own, if it has one.
-    { transcribeUrl: transcribeUrl ? `${transcribeUrl}/api/transcribe` : null },
+    // Same prefix rule: `transcribeUrl` is already `/api`.
+    { transcribeUrl: transcribeUrl ? `${transcribeUrl}/transcribe` : null },
   )
 
   useEffect(() => {
@@ -200,7 +199,10 @@ export function Add({
           <p className="truncate text-base leading-tight font-semibold">Inkling</p>
         </div>
         <span data-tour="friends">
-          <FriendsButton count={friendsWaiting} onClick={onFriends} />
+          {/* Notifications, not the list of names: it is the area's default view, and the two
+              are tabs of one screen anyway. Being sent to the list of friends is what this
+              button used to do, which nobody ever wanted. */}
+          <FriendsButton count={friendsWaiting} onClick={onNotifications} />
         </span>
         <button
           type="button"

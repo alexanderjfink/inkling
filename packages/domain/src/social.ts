@@ -102,6 +102,8 @@ export const NOTE_MAX = 280
 
 /** How much of an Inkling's written history a friend is shown. */
 export const ASK_ENTRIES_MAX = 6
+/** How many pictures of theirs a friend is shown. Enough to see, not a gallery. */
+export const ASK_MEDIA_MAX = 4
 
 /** The longest a friend's suggested move may be, matching the playbook's own ceiling. */
 export const FRIEND_MOVE_MAX_SEC = 900
@@ -133,5 +135,11 @@ export function askContextFor(blip: Blip): AskContext {
       .filter((text) => text.trim().length > 0)
       .slice(-ASK_ENTRIES_MAX),
     offered: blip.moves.map((move) => move.spec.title).slice(-ASK_ENTRIES_MAX),
+    // A few, in the order they were added: enough to show what they are looking at without
+    // turning a message into a gallery.
+    mediaIds: blip.entries
+      .map((entry) => entry.mediaId)
+      .filter((id): id is string => typeof id === 'string')
+      .slice(0, ASK_MEDIA_MAX),
   }
 }

@@ -24,6 +24,8 @@ import {
   type SocialStore,
   areFriends,
   friendsOf,
+  sharedMediaForBlip,
+  sharedMediaIds,
   ownsSharedBlip,
   readSharedInklings,
   sanitizeFriendMove,
@@ -1074,6 +1076,29 @@ async function handleSocial(
     })
   }
 
+  // --- a picture on something they have shared -------------------------------------------
+  if (rest.length === 4 && rest[0] === 'friends' && rest[2] === 'blobs') {
+    const other = rest[1] ?? ''
+    const hash = rest[3] ?? ''
+    if (!areFriends(user.id, other, friendships)) {
+      return json({ error: 'you are not friends' }, 403)
+    }
+    if (!isSafeHash(hash)) return json({ error: 'invalid hash' }, 400)
+
+    const allowed = await sharedMediaIds(resolveStore(storeSource, other))
+    if (!allowed.has(hash)) {
+      // Either it is private, or it was never theirs. Both answers are "no".
+      return json({ error: 'that picture is not on an Inkling they have shared' }, 403)
+    }
+
+    const bytes = await resolveStore(storeSource, other).getBlob(hash)
+    if (!bytes) return json({ error: 'not found' }, 404)
+    return new Response(toBody(bytes), {
+      status: 200,
+      headers: withCors(new Headers({ 'content-type': 'application/octet-stream' })),
+    })
+  }
+
   // --- accepting, declining, removing --------------------------------------------------
   if (rest.length === 3 && rest[0] === 'friends') {
     const other = rest[1] ?? ''
@@ -1156,6 +1181,10 @@ async function handleSocial(
         offered: Array.isArray(context.offered)
           ? context.offered.slice(0, ASK_ENTRIES_MAX).map((title) => String(title).slice(0, 200))
           : [],
+        // Their own list is ignored: the ids come from the server's fold of the Inkling it has
+        // just checked is shared. A sender that named a hash of its choosing would otherwise be
+        // asking the recipient's app to fetch whatever it liked.
+        mediaIds: await sharedMediaForBlip(resolveStore(storeSource, user.id), context.blipId),
       },
       note: str(body, 'note').trim().slice(0, NOTE_MAX) || undefined,
     }

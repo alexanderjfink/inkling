@@ -302,6 +302,14 @@ export interface AskContext {
   entries: string[]
   /** Moves already put in front of them, so a friend does not offer the same one. */
   offered: string[]
+  /**
+   * The pictures on it, by content hash.
+   *
+   * Hashes rather than the pictures: a message is a line of JSON in a file, and a photograph
+   * is not. The ids are what the friend's app fetches through the route that serves the
+   * blobs of somebody you are actually friends with — and only the ones on a shared Inkling.
+   */
+  mediaIds?: string[]
 }
 
 /** Carried by every event, and what makes the total order deterministic. */

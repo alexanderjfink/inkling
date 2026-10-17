@@ -8,6 +8,7 @@ import {
   type ISODate,
   type MoveSpec,
   type SocialMessage,
+  ASK_MEDIA_MAX,
   askContextFor,
   FRIEND_MOVE_MAX_SEC,
   defaultColor,
@@ -292,6 +293,49 @@ export async function readSharedInklings(store: Store): Promise<AskContext[]> {
     .filter((blip) => blip.status === 'active' || blip.status === 'snoozed')
     .map(askContextFor)
     .sort((a, b) => a.title.localeCompare(b.title))
+}
+
+/**
+ * The pictures on an Inkling somebody has shared, and nothing else.
+ *
+ * A friend who has been asked about an Inkling needs to see it — a photograph of the thing is
+ * most of what there is to say about it — and a content-addressed blob store has no idea who
+ * is asking. So the check is here, at the boundary: the hash has to be on one of *their*
+ * Inklings, and that Inkling has to be one they chose to share. Private means private, for the
+ * picture as much as for the words.
+ */
+export async function sharedMediaForBlip(store: Store, blipId: string): Promise<string[]> {
+  const events: BlipEvent[] = []
+  for (const device of await store.devices()) {
+    const bytes = await store.readLog(device.deviceId, 0)
+    if (bytes.byteLength === 0) continue
+    events.push(...parseLog(new TextDecoder().decode(bytes)))
+  }
+
+  const blip = project(events).find((candidate) => candidate.id === blipId)
+  if (!blip || blip.deleted || blip.visibility !== 'friends') return []
+  return blip.entries
+    .map((entry) => entry.mediaId)
+    .filter((id): id is string => typeof id === 'string')
+    .slice(0, ASK_MEDIA_MAX)
+}
+
+export async function sharedMediaIds(store: Store): Promise<Set<string>> {
+  const events: BlipEvent[] = []
+  for (const device of await store.devices()) {
+    const bytes = await store.readLog(device.deviceId, 0)
+    if (bytes.byteLength === 0) continue
+    events.push(...parseLog(new TextDecoder().decode(bytes)))
+  }
+
+  const ids = new Set<string>()
+  for (const blip of project(events)) {
+    if (blip.deleted || blip.demo) continue
+    if (blip.visibility !== 'friends') continue
+    if (blip.status !== 'active' && blip.status !== 'snoozed') continue
+    for (const entry of blip.entries) if (entry.mediaId) ids.add(entry.mediaId)
+  }
+  return ids
 }
 
 /**

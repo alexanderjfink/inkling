@@ -368,7 +368,6 @@ export default function App() {
           socialOn={socialOn}
           shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
           asking={social.asks}
-          onFriends={() => go('friends')}
           onNotifications={() => go('notifications')}
           friendsWaiting={friendsWaiting}
           transcribeUrl={
@@ -453,6 +452,7 @@ export default function App() {
           picked={picked}
           blips={blips}
           events={events}
+          serverUrl={server.serverUrl}
           onClearPicked={() => setPicked(null)}
           onOpenFriends={() => go('friends')}
           onOpenBlip={(id) => {
@@ -476,7 +476,7 @@ export default function App() {
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
           social={social}
-          onOpenFriends={() => go('friends')}
+          onOpenFriends={() => go('notifications')}
           adminServerConfig={serverConfig}
           adminModelStatus={syncState.model}
           onRefreshAdminModel={syncState.refreshModel}
@@ -509,7 +509,7 @@ export default function App() {
           feedbackEnv={feedbackEnv}
           onFeedback={actions.giveFeedback}
           social={social}
-          onOpenFriends={() => go('friends')}
+          onOpenFriends={() => go('notifications')}
           only={['friends', 'about', 'admin']}
         />
       ) : null}

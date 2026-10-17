@@ -9,6 +9,7 @@ import type {
 import { buildSocialTimeline } from '@inkling/domain'
 import { useMemo, useState } from 'react'
 import { Avatar } from '../components/Avatar'
+import { FriendImage } from '../components/FriendImage'
 import { SocialTabs } from '../components/SocialTabs'
 import { Suggest } from '../components/Suggest'
 import { formatAgo } from '../format'
@@ -24,15 +25,17 @@ type Direction = 'all' | 'out' | 'in'
  * somebody arrives with is "what has been happening", not "who are my friends": a menu of
  * names answers a question nobody asked and hides the interactions, which are the point.
  *
- * The waiting things — a move somebody sent, an ask nobody has answered — are in the timeline
- * where they happened, with their actions on them, rather than lifted into a list of their own
- * that would then have to be read alongside it.
+ * Split in two, though: what is waiting on you, and everything else. Being told about
+ * something and having it dealt with look identical in a single list, so answering a question
+ * did nothing visible at all — it stayed exactly where it was. Answered things go to an
+ * archive underneath, which is worth keeping and worth not being in the way.
  */
 export function Notifications({
   social,
   picked,
   blips,
   events,
+  serverUrl,
   onClearPicked,
   onOpenFriends,
   onOpenBlip,
@@ -42,21 +45,22 @@ export function Notifications({
   picked: { friend: Friend; context: AskContext } | null
   blips: Blip[]
   events: BlipEvent[]
+  /** For the pictures on an Inkling somebody has shared: they are theirs, not ours. */
+  serverUrl: string
   onClearPicked: () => void
   onOpenFriends: () => void
   /** Open the Inkling a move landed on, which is where doing it happens. */
   onOpenBlip: (id: string) => void
 }) {
-  const [clearing, setClearing] = useState<string | null>(null)
-  /** Which ask on the timeline is being answered, by its key. One form open at a time. */
   const [openAsk, setOpenAsk] = useState<string | null>(null)
+  const [clearing, setClearing] = useState<string | null>(null)
   const [who, setWho] = useState('everyone')
   const [direction, setDirection] = useState<Direction>('all')
+  const [archive, setArchive] = useState<boolean | null>(null)
 
   const accepted = social.friends.filter((friend) => friend.status === 'accepted')
   const friendFor = (userId: string | undefined): Friend | undefined =>
     accepted.find((friend) => friend.userId === userId)
-  const nameFor = (userId: string | undefined): string => friendFor(userId)?.username ?? 'a friend'
 
   /** What an Inkling id was called, from both sides: mine folded, theirs from the ask. */
   const titles = useMemo(() => {
@@ -75,37 +79,72 @@ export function Notifications({
     .filter((entry) => who === 'everyone' || entry.userId === who)
     .filter((entry) => direction === 'all' || entry.direction === direction)
 
-  /** An incoming ask, with everything a friend needs to suggest something specific. */
+  /**
+   * A move that arrived and has not been cleared, and a question of theirs nobody has
+   * answered. Those are the two things actually waiting on you; the rest is the record.
+   */
+  const uncleared = new Set(social.moves.map((notice) => notice.messageId))
+  const wantsAnswer = (entry: FriendTimelineEntry) =>
+    (entry.kind === 'they-asked' && Boolean(entry.open)) ||
+    (entry.kind === 'they-sent-move' && uncleared.has(entry.messageId ?? ''))
+  const waitingOn = shown.filter(wantsAnswer)
+  const archived = shown.filter((entry) => !wantsAnswer(entry))
+  const archiveOpen = archive ?? waitingOn.length === 0
+
   const askFor = (entry: FriendTimelineEntry): ReceivedAsk | undefined =>
     entry.messageId ? social.asks.find((ask) => ask.messageId === entry.messageId) : undefined
 
-  async function thank(entry: FriendTimelineEntry) {
+  const row = (entry: FriendTimelineEntry) => {
     const friend = friendFor(entry.userId)
-    if (!friend || !entry.blipId) return
-    await social.note({
-      to: friend,
-      blipId: entry.blipId,
-      kind: 'thanks',
-      moveTitle: entry.moveTitle,
-      text: '🙏',
-    })
-  }
+    const name = friend?.username ?? entry.username ?? 'a friend'
+    const ask = askFor(entry)
 
-  async function suggestWith(
-    entry: FriendTimelineEntry,
-    context: AskContext,
-    move: MoveSpec,
-    note: string,
-  ): Promise<string | null> {
-    const friend = friendFor(entry.userId)
-    if (!friend) return 'that is no longer a friendship'
-    return social.suggest({
-      to: friend,
-      askId: entry.messageId ?? '',
-      blipId: context.blipId,
-      move,
-      note: note || undefined,
-    })
+    return (
+      <Row
+        key={entry.key}
+        entry={entry}
+        friend={friend}
+        name={name}
+        serverUrl={serverUrl}
+        ask={ask}
+        open={openAsk === entry.key}
+        clearing={clearing === entry.key}
+        onOpenAsk={() => setOpenAsk(entry.key)}
+        onCloseAsk={() => setOpenAsk(null)}
+        onClear={() =>
+          void (async () => {
+            setClearing(entry.key)
+            await social.clearMove({
+              messageId: entry.messageId ?? entry.key,
+              blipId: entry.blipId ?? '',
+            })
+            setClearing(null)
+          })()
+        }
+        onOpenBlip={onOpenBlip}
+        onThank={() => {
+          if (!friend || !entry.blipId) return
+          void social.note({
+            to: friend,
+            blipId: entry.blipId,
+            kind: 'thanks',
+            moveTitle: entry.moveTitle,
+            text: '🙏',
+          })
+        }}
+        onSuggest={(context, move, note) =>
+          friend
+            ? social.suggest({
+                to: friend,
+                askId: entry.messageId ?? '',
+                blipId: context.blipId,
+                move,
+                note: note || undefined,
+              })
+            : Promise.resolve('that is no longer a friendship')
+        }
+      />
+    )
   }
 
   return (
@@ -145,7 +184,6 @@ export function Notifications({
         </section>
       ) : null}
 
-      {/* Who, then what kind of thing. Both are filters on one timeline. */}
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -200,143 +238,214 @@ export function Notifications({
         ))}
       </div>
 
-      {shown.length === 0 ? (
+      {waitingOn.length === 0 ? (
         <p className="text-xs text-ink-faint">
           {timeline.length === 0
             ? 'Nothing yet. Ask a friend for a move on one of your Inklings, or look at what they have been noticing and suggest one — it all turns up here.'
-            : 'Nothing between those two yet.'}
+            : 'Nothing is waiting on you.'}
         </p>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {shown.map((entry) => {
-            const friend = friendFor(entry.userId)
-            const name = friend?.username ?? nameFor(entry.userId)
-            const waiting = Boolean(entry.open)
-            const ask = askFor(entry)
-            const theirs = entry.kind === 'they-asked' || entry.kind === 'you-sent-move'
-            const aboutAnInkling =
-              entry.kind === 'you-asked' ||
-              entry.kind === 'they-asked' ||
-              entry.kind === 'you-sent-move' ||
-              entry.kind === 'they-sent-move'
-
-            return (
-              <li
-                key={entry.key}
-                className={`rounded-2xl border p-3 ${
-                  waiting ? 'border-accent/40 bg-surface/60' : 'border-line bg-surface/50'
-                }`}
-              >
-                <div className="flex items-start gap-2.5">
-                  <Avatar
-                    username={name}
-                    userId={entry.userId ?? ''}
-                    color={friend?.color}
-                    hash={friend?.avatar}
-                    size={28}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm">
-                      <span className="text-ink-soft">{say(entry, name)} </span>
-                      {aboutAnInkling ? (
-                        theirs || !entry.blipId ? (
-                          <span className="font-medium">{entry.title}</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => entry.blipId && onOpenBlip(entry.blipId)}
-                            className="text-left font-medium underline decoration-dotted"
-                          >
-                            {entry.title}
-                          </button>
-                        )
-                      ) : null}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-ink-faint">
-                      {formatAgo(entry.at)}
-                      {waiting ? ' · waiting' : ''}
-                    </span>
-                  </span>
-                </div>
-
-                {entry.kind === 'they-asked' ? (
-                  ask && openAsk === entry.key ? (
-                    <Suggest
-                      context={ask.context}
-                      onCancel={() => setOpenAsk(null)}
-                      onSend={(move, note) => suggestWith(entry, ask.context, move, note)}
-                    />
-                  ) : (
-                    <div className="mt-2">
-                      <button
-                        type="button"
-                        onClick={() => setOpenAsk(entry.key)}
-                        className="rounded-full px-4 py-2.5 text-xs font-semibold text-white"
-                        style={{ background: friend?.color ?? 'var(--color-ink)' }}
-                      >
-                        {ask ? `Suggest a move for ${name}` : 'open it on their card'}
-                      </button>
-                      {ask ? null : (
-                        <p className="mt-1 text-xs text-ink-faint">
-                          the question is answered — the Inkling is still theirs
-                        </p>
-                      )}
-                    </div>
-                  )
-                ) : null}
-
-                {entry.kind === 'they-sent-move' && entry.blipId ? (
-                  <div className="mt-2 flex flex-wrap items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => entry.blipId && onOpenBlip(entry.blipId)}
-                      className="rounded-full px-4 py-2.5 text-xs font-semibold text-white"
-                      style={{ background: friend?.color ?? 'var(--color-ink)' }}
-                    >
-                      Open it
-                    </button>
-                    {entry.thanked ? (
-                      <span className="text-xs text-good">thanked 🙏</span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => void thank(entry)}
-                        className="quiet text-xs underline"
-                      >
-                        thank them 🙏
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      disabled={clearing !== null}
-                      onClick={() =>
-                        void (async () => {
-                          setClearing(entry.key)
-                          await social.clearMove({
-                            messageId: entry.messageId ?? entry.key,
-                            blipId: entry.blipId ?? '',
-                          })
-                          setClearing(null)
-                        })()
-                      }
-                      className="quiet text-xs underline disabled:opacity-40"
-                    >
-                      clear — not now
-                    </button>
-                  </div>
-                ) : null}
-              </li>
-            )
-          })}
-        </ul>
+        <ul className="flex flex-col gap-2">{waitingOn.map(row)}</ul>
       )}
+
+      {archived.length > 0 ? (
+        <details
+          open={archiveOpen}
+          onToggle={(event) => setArchive((event.target as HTMLDetailsElement).open)}
+          className="border-t border-line pt-3"
+        >
+          <summary className="cursor-pointer text-xs tracking-wide text-ink-faint uppercase">
+            archive · {archived.length}
+          </summary>
+          <ul className="mt-2 flex flex-col gap-2">{archived.map(row)}</ul>
+        </details>
+      ) : null}
     </div>
+  )
+}
+
+/** One thing that happened, and whatever it still asks of you. */
+function Row({
+  entry,
+  friend,
+  name,
+  serverUrl,
+  ask,
+  open,
+  clearing,
+  onOpenAsk,
+  onCloseAsk,
+  onClear,
+  onOpenBlip,
+  onThank,
+  onSuggest,
+}: {
+  entry: FriendTimelineEntry
+  friend?: Friend
+  name: string
+  serverUrl: string
+  ask?: ReceivedAsk
+  open: boolean
+  clearing: boolean
+  onOpenAsk: () => void
+  onCloseAsk: () => void
+  onClear: () => void
+  onOpenBlip: (id: string) => void
+  onThank: () => void
+  onSuggest: (context: AskContext, move: MoveSpec, note: string) => Promise<string | null>
+}) {
+  const mine = entry.direction === 'out'
+  const waiting = Boolean(entry.open)
+  /** Their Inkling, which is not in this log — so no link, just the name. */
+  const theirs = entry.kind === 'they-asked' || entry.kind === 'you-sent-move'
+  const aboutAnInkling =
+    entry.kind === 'you-asked' ||
+    entry.kind === 'they-asked' ||
+    entry.kind === 'you-sent-move' ||
+    entry.kind === 'they-sent-move'
+
+  return (
+    <li
+      className={`rounded-2xl border p-3 ${
+        waiting ? 'border-accent/40 bg-surface/60' : 'border-line bg-surface/50'
+      }`}
+    >
+      <div className="flex items-start gap-2.5">
+        <Avatar
+          username={name}
+          userId={entry.userId ?? ''}
+          color={friend?.color}
+          hash={friend?.avatar}
+          size={28}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm">
+            <span className="text-ink-soft">{say(entry, name)} </span>
+            {aboutAnInkling ? (
+              theirs || !entry.blipId ? (
+                <span className="font-medium">{entry.title}</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => entry.blipId && onOpenBlip(entry.blipId)}
+                  className="text-left font-medium underline decoration-dotted"
+                >
+                  {entry.title}
+                </button>
+              )
+            ) : null}
+          </span>
+          <span className="mt-0.5 block text-xs text-ink-faint">
+            {formatAgo(entry.at)}
+            {waiting ? ' · waiting' : ''}
+            {mine && entry.kind === 'you-asked' && waiting ? ' · nothing back yet' : ''}
+          </span>
+        </span>
+      </div>
+
+      {/* What they are looking at, in full: the words they wrote, what they have already
+          tried, and the pictures. Saying "they want help with a sourdough starter" and showing
+          nothing else is a request to guess — and a photograph of the thing is most of what
+          there is to say about it. */}
+      {entry.kind === 'they-asked' && ask ? (
+        <div className="mt-2 rounded-xl border border-line bg-canvas/60 p-3">
+          {ask.context.body ? (
+            <p className="text-xs whitespace-pre-wrap text-ink-soft">{ask.context.body}</p>
+          ) : null}
+          {ask.context.topics.length > 0 ? (
+            <p className="mt-1.5 text-xs text-ink-faint">{ask.context.topics.join(' · ')}</p>
+          ) : null}
+          {ask.context.entries.length > 0 ? (
+            <div className="mt-1.5">
+              <p className="text-xs text-ink-faint">they have written</p>
+              <ul className="mt-0.5 flex flex-col gap-0.5">
+                {ask.context.entries.map((written) => (
+                  <li key={written} className="text-xs text-ink-soft">
+                    {written}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {ask.context.offered.length > 0 ? (
+            <p className="mt-1.5 text-xs text-ink-faint">
+              already suggested: {ask.context.offered.join(' · ')}
+            </p>
+          ) : null}
+          {(ask.context.mediaIds ?? []).length > 0 && entry.userId ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {(ask.context.mediaIds ?? []).map((hash) => (
+                <FriendImage
+                  key={hash}
+                  serverUrl={serverUrl}
+                  userId={entry.userId as string}
+                  hash={hash}
+                  className="max-h-40 rounded-xl border border-line object-cover"
+                />
+              ))}
+            </div>
+          ) : null}
+          {ask.note ? <p className="mt-2 text-xs text-accent italic">“{ask.note}”</p> : null}
+        </div>
+      ) : null}
+
+      {entry.kind === 'they-asked' ? (
+        ask && open ? (
+          <Suggest
+            context={ask.context}
+            onCancel={onCloseAsk}
+            onSend={(move, note) => onSuggest(ask.context, move, note)}
+          />
+        ) : (
+          /* No button when there is nothing to do. It used to offer "open it on their card",
+             which opened nothing and could not: the question is answered, and the Inkling is
+             theirs, in their log, on their card. */
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={onOpenAsk}
+              className="rounded-full px-4 py-2.5 text-xs font-semibold text-white"
+              style={{ background: friend?.color ?? 'var(--color-ink)' }}
+            >
+              Suggest a move for {name}
+            </button>
+          </div>
+        )
+      ) : null}
+
+      {entry.kind === 'they-sent-move' && entry.blipId ? (
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => entry.blipId && onOpenBlip(entry.blipId)}
+            className="rounded-full px-4 py-2.5 text-xs font-semibold text-white"
+            style={{ background: friend?.color ?? 'var(--color-ink)' }}
+          >
+            Open it
+          </button>
+          {entry.thanked ? (
+            <span className="text-xs text-good">thanked 🙏</span>
+          ) : (
+            <button type="button" onClick={onThank} className="quiet text-xs underline">
+              thank them 🙏
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={clearing}
+            onClick={onClear}
+            className="quiet text-xs underline disabled:opacity-40"
+          >
+            clear — not now
+          </button>
+        </div>
+      ) : null}
+    </li>
   )
 }
 
 /** The words for one thing that happened, with the person's name where one is needed. */
 function say(entry: FriendTimelineEntry, name: string): string {
-  // Every line names the person, because this list has more than one of them in it.
   switch (entry.kind) {
     case 'you-asked':
       return `you asked ${name} for a move on`

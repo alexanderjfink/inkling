@@ -2,22 +2,17 @@ import type { AskContext, MoveSpec } from '@inkling/domain'
 import { useState } from 'react'
 import { ButtonLabel } from './Spinner'
 
-const field =
-  'w-full rounded-2xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent'
-
 /**
  * Suggesting a move for somebody else's Inkling.
  *
- * Deliberately the same fields a move has always had — a title, a goal, and how long it
- * takes — because a friend is making the same kind of thing a playbook or a model makes, and
- * it should feel like the same kind of thing. Nothing else: "something to look up" was a
- * fourth box that asked a person to do the searching half of the job the app does for a
- * generated move, and nobody filled it in.
+ * The same shape as the box you write a move of your own in: one field to write in, the
+ * awkward bits in a row underneath, and the send on the right. It used to be three small
+ * inputs stacked with placeholders — which is a form, and a form asks you to think about a
+ * move in fields rather than in sentences.
  *
- * It lives here rather than inside the notifications screen because it is now reachable from
- * two places — answering somebody who asked, and suggesting something unprompted after
- * looking at what they have been noticing — and two copies of a form is two places for the
- * same bug.
+ * The first line is the move and the rest is what done looks like, which is the same rule the
+ * app uses for naming an Inkling from what you wrote. A one-line suggestion works too: the
+ * line becomes both.
  */
 export function Suggest({
   context,
@@ -28,14 +23,19 @@ export function Suggest({
   onSend: (move: MoveSpec, note: string) => Promise<string | null>
   onCancel: () => void
 }) {
-  const [title, setTitle] = useState('')
-  const [goal, setGoal] = useState('')
+  const [text, setText] = useState('')
   const [minutes, setMinutes] = useState('5')
   const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
 
-  const ready = title.trim().length > 0 && goal.trim().length > 0
+  const lines = text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+  const title = lines[0] ?? ''
+  const goal = lines.slice(1).join(' ') || title
+  const ready = title.length > 0
 
   async function send() {
     if (!ready || busy) return
@@ -46,10 +46,10 @@ export function Suggest({
       const problemText = await onSend(
         {
           id: 'friend.suggested',
-          title: title.trim(),
+          title: title.slice(0, 120),
           why: 'because a friend thought of it',
           timeLimitSec: seconds,
-          goal: goal.trim(),
+          goal: goal.slice(0, 200),
           playbook: 'friend',
           generatedBy: 'friend',
         },
@@ -63,29 +63,32 @@ export function Suggest({
   }
 
   return (
-    <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-line bg-surface/40 p-3">
-      <p className="text-xs tracking-wide text-ink-faint uppercase">suggest a move</p>
-      <input
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        placeholder="what should they do? e.g. Play one chord badly, twice"
-        className={field}
+    <div className="mt-3 flex flex-col gap-3">
+      <textarea
+        value={text}
+        onChange={(event) => setText(event.target.value)}
+        rows={3}
+        autoFocus
+        placeholder={'what should they do?\nthe rest is what done looks like'}
+        className="w-full resize-none rounded-2xl border border-line p-4 text-sm outline-none focus:border-accent"
       />
-      <input
-        value={goal}
-        onChange={(event) => setGoal(event.target.value)}
-        placeholder="what does done look like? e.g. one chord, both times"
-        className={field}
-      />
+      <p className="text-xs text-ink-faint">
+        {lines.length > 1
+          ? `“${title}” — done when: ${goal}`
+          : 'first line is the move; a second line says what done looks like'}
+      </p>
       <input
         value={note}
         onChange={(event) => setNote(event.target.value)}
         placeholder="anything you want to say with it (optional)"
-        className={field}
+        className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
       />
       {problem ? <p className="text-xs text-warn">{problem}</p> : null}
       <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-xs text-ink-soft">
+        <button type="button" onClick={onCancel} className="quiet text-xs underline">
+          cancel
+        </button>
+        <label className="ml-auto flex items-center gap-2 text-xs text-ink-soft">
           minutes
           <input
             value={minutes}
@@ -94,16 +97,13 @@ export function Suggest({
             className="w-16 rounded-xl border border-line bg-surface p-2 text-sm outline-none focus:border-accent"
           />
         </label>
-        <button type="button" onClick={onCancel} className="quiet ml-auto text-xs underline">
-          cancel
-        </button>
         <button
           type="button"
           disabled={!ready || busy}
           onClick={() => void send()}
-          className="shrink-0 rounded-full bg-ink px-4 py-2.5 text-xs font-semibold whitespace-nowrap text-surface disabled:opacity-40"
+          className="shrink-0 rounded-full bg-ink px-5 py-2.5 text-xs font-semibold whitespace-nowrap text-surface disabled:opacity-40"
         >
-          <ButtonLabel busy={busy}>{busy ? 'Sending…' : 'Send it'}</ButtonLabel>
+          <ButtonLabel busy={busy}>{busy ? 'Sending…' : 'Send the move'}</ButtonLabel>
         </button>
       </div>
       <p className="text-xs text-ink-faint">

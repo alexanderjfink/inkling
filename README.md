@@ -509,11 +509,13 @@ words, but pressing one raises "Retire?" or "Delete?" with the question large an
 answers — and the one that does the thing is not where your thumb already is. Deleting used to
 be a small word beside a small word, and retiring did not ask at all.
 
-**A move that has been acted on is done with.** Swiping does not walk back over one you have
-already passed, answered or waved away — and the memory of that is module state rather than screen
-state, because the Review screen unmounts when you go to the list and back, so a swipe past a move
-came back the moment you returned. Nothing is written down: it is about this sitting, not about
-the move, which is in the log and in the history with them either way.
+**The moves from friends are a ring, not a queue.** Swiping past one — and *do this later* —
+means "not now", not "never": it comes round again after the others, because who suggested
+something is the most interesting thing on the card and a person may well want it later. Only two
+things take a move out for good, and both are written down: doing it, and *not this move*.
+
+**And swiping right with nothing there is how you ask.** Nobody has suggested anything, so the
+gesture opens the ask panel rather than doing nothing at all.
 
 **And while a new suggestion is being found, that is what you see** — not the one you just swiped
 away sitting there unchanged, which is indistinguishable from a swipe that did not register.
@@ -707,16 +709,30 @@ directions at once.
 each rather than one message to several — an ask is one person's to answer, and a single message
 with two recipients would let the first answer look like it answered for both.
 
+**A friend sees the whole of what they are being asked about** — the words, what has already been
+tried, what has already been suggested, and the pictures. Saying "they want help with a sourdough
+starter" and showing nothing else is a request to guess, and a photograph of the thing is most of
+what there is to say about it.
+
+The pictures travel as content hashes in the ask, and are fetched from
+`/api/social/friends/<id>/blobs/<hash>` — which serves one only if it is on an Inkling that person
+has actually shared, whatever the sender claimed. Private means private for the picture as much as
+for the words, and the check is at the boundary for the same reason as everything else: the blob
+store is content-addressed and has no idea who is asking.
+
 **A thank-you can be an emoji.** 🙏 ❤️ 😄 ✨ send on the tap, and the field underneath is for
 the times it is more than that. Asking somebody to write a sentence in order to say thank you
 is how the sentence does not get written.
 
 ### Suggesting, for somebody else
 
-Suggesting a move is deliberately the same three fields a move has always had — what they
-should do, what done looks like, and how long it takes — plus somewhere to say why. Nothing
-else: *"something to look up"* was a fourth box that asked a person to do the searching half of
-the job the app does for a generated move, and nobody filled it in.
+Suggesting a move is **one box to write in**, the same shape as writing a move of your own: the
+first line is the move, the rest is what done looks like — the same rule the app uses to name an
+Inkling from what you wrote — and a one-line suggestion works too, the line becoming both. The
+minutes are underneath, because a friend knows how long it takes as well as what it is.
+
+It used to be three small inputs stacked with placeholders, which is a form, and a form asks you
+to think about a move in fields rather than in sentences.
 
 It is one component (`Suggest.tsx`) rather than two, because it is reachable from two places
 now: answering somebody who asked, and suggesting something unprompted after looking at what a
@@ -851,7 +867,14 @@ with "offered" entries for moves nobody was offered.
 ### Interactions first, friends second
 
 Both halves are one area with **two tabs** — notifications and friends — and notifications is the
-one you land on. Landing on the list of names made the second half look like the whole of it.
+one you land on, from the header button, from Settings, and from the entry screen. Landing on the
+list of names made the second half look like the whole of it, and every way in went there.
+
+**What is waiting on you, then the archive.** A move that arrived and has not been cleared, and a
+question of theirs nobody has answered, are the two things actually waiting; everything else —
+asks you sent, moves you suggested, thank-yous, and everything already dealt with — goes to an
+archive underneath. In a single list, being told about something and having dealt with it looked
+identical, so answering a question did nothing visible at all.
 
 The smiling face opens a **timeline of everything that has passed with anyone** — newest first,
 with the person on each line, filtered by person and by direction (*help you gave* / *help you

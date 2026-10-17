@@ -503,6 +503,14 @@ export type BlipEventBody =
    */
   | { t: 'friendMoveSeen'; id: string; messageId: string }
   /**
+   * The same, for a question somebody asked.
+   *
+   * Being told about something and having looked at it are different from having dealt with it,
+   * and the list has to show which is which: an answer is not owed the moment a question
+   * arrives. Marking it seen says "I have read this", and nothing else.
+   */
+  | { t: 'friendAskSeen'; id: string; messageId: string }
+  /**
    * "Not this move" — taken off the card for good.
    *
    * Distinct from putting it down, which is about when, and from clearing the announcement,

@@ -111,6 +111,8 @@ export interface InklingActions {
    * clear it on the laptop as well.
    */
   markMoveSeen(id: string, messageId: string): Promise<BlipEvent>
+  /** The same for a question: read, not answered. */
+  markAskSeen(id: string, messageId: string): Promise<BlipEvent>
   /**
    * "Not this move", for a move a friend sent.
    *
@@ -318,6 +320,9 @@ export function useInkling(accountId: string | null = null) {
       },
       markMoveSeen(id, messageId) {
         return storage().append({ t: 'friendMoveSeen', id, messageId })
+      },
+      markAskSeen(id, messageId) {
+        return storage().append({ t: 'friendAskSeen', id, messageId })
       },
       dismissFriendMove(id, messageId) {
         return storage().append({ t: 'friendMoveDismissed', id, messageId })

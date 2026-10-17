@@ -6,11 +6,13 @@ import type {
   FriendTimelineEntry,
   MoveSpec,
 } from '@inkling/domain'
-import { buildSocialTimeline } from '@inkling/domain'
+import { buildSocialTimeline, seenNoticeIds } from '@inkling/domain'
 import { useMemo, useState } from 'react'
 import { Avatar } from '../components/Avatar'
+import { Linkified } from '../components/Linkified'
 import { FriendImage } from '../components/FriendImage'
 import { SocialTabs } from '../components/SocialTabs'
+import { ButtonLabel } from '../components/Spinner'
 import { Suggest } from '../components/Suggest'
 import { formatAgo } from '../format'
 import type { ReceivedAsk, SocialState } from '../state/useSocial'
@@ -57,6 +59,7 @@ export function Notifications({
   const [who, setWho] = useState('everyone')
   const [direction, setDirection] = useState<Direction>('all')
   const [archive, setArchive] = useState<boolean | null>(null)
+  const [marking, setMarking] = useState(false)
 
   const accepted = social.friends.filter((friend) => friend.status === 'accepted')
   const friendFor = (userId: string | undefined): Friend | undefined =>
@@ -89,6 +92,18 @@ export function Notifications({
     (entry.kind === 'they-sent-move' && uncleared.has(entry.messageId ?? ''))
   const waitingOn = shown.filter(wantsAnswer)
   const archived = shown.filter((entry) => !wantsAnswer(entry))
+
+  /**
+   * What has been read, and what has not.
+   *
+   * "Seen" and "dealt with" are different things and the list has to say so: a question can be
+   * read without being answered, and something that was looked at an hour ago is not new. The
+   * unseen ones carry a dot and the accent border; everything else is quiet.
+   */
+  const seen = useMemo(() => seenNoticeIds(events), [events])
+  const isNew = (entry: FriendTimelineEntry) =>
+    Boolean(entry.messageId) && !seen.has(entry.messageId as string)
+  const unseen = waitingOn.filter(isNew)
   const archiveOpen = archive ?? waitingOn.length === 0
 
   const askFor = (entry: FriendTimelineEntry): ReceivedAsk | undefined =>
@@ -107,6 +122,7 @@ export function Notifications({
         name={name}
         serverUrl={serverUrl}
         ask={ask}
+        isNew={isNew(entry)}
         open={openAsk === entry.key}
         clearing={clearing === entry.key}
         onOpenAsk={() => setOpenAsk(entry.key)}
@@ -121,9 +137,19 @@ export function Notifications({
             setClearing(null)
           })()
         }
-        onOpenBlip={onOpenBlip}
+        /* Looking at it, or saying thank you, is "interacted with": the notice stops being new
+           even though the move is still on the Inkling, because nothing has been lost either way. */
+        onOpenBlip={(id) => {
+          if (entry.messageId && entry.blipId) {
+            void social.clearMove({ messageId: entry.messageId, blipId: entry.blipId })
+          }
+          onOpenBlip(id)
+        }}
         onThank={() => {
           if (!friend || !entry.blipId) return
+          if (entry.messageId) {
+            void social.clearMove({ messageId: entry.messageId, blipId: entry.blipId })
+          }
           void social.note({
             to: friend,
             blipId: entry.blipId,
@@ -238,6 +264,35 @@ export function Notifications({
         ))}
       </div>
 
+      {unseen.length > 0 ? (
+        <div className="flex items-center gap-3">
+          <p className="text-xs text-ink-faint">{unseen.length} new since you last looked</p>
+          <button
+            type="button"
+            disabled={marking}
+            onClick={() =>
+              void (async () => {
+                setMarking(true)
+                await social.markAllSeen({
+                  moves: social.moves.map((notice) => ({
+                    messageId: notice.messageId,
+                    blipId: notice.blipId,
+                  })),
+                  asks: social.asks.map((ask) => ({
+                    messageId: ask.messageId,
+                    blipId: ask.context.blipId,
+                  })),
+                })
+                setMarking(false)
+              })()
+            }
+            className="quiet ml-auto text-xs underline disabled:opacity-40"
+          >
+            <ButtonLabel busy={marking}>mark all seen</ButtonLabel>
+          </button>
+        </div>
+      ) : null}
+
       {waitingOn.length === 0 ? (
         <p className="text-xs text-ink-faint">
           {timeline.length === 0
@@ -271,6 +326,7 @@ function Row({
   name,
   serverUrl,
   ask,
+  isNew,
   open,
   clearing,
   onOpenAsk,
@@ -285,6 +341,8 @@ function Row({
   name: string
   serverUrl: string
   ask?: ReceivedAsk
+  /** Not looked at yet: the only thing in this list that gets to shout. */
+  isNew: boolean
   open: boolean
   clearing: boolean
   onOpenAsk: () => void
@@ -307,7 +365,7 @@ function Row({
   return (
     <li
       className={`rounded-2xl border p-3 ${
-        waiting ? 'border-accent/40 bg-surface/60' : 'border-line bg-surface/50'
+        isNew ? 'border-accent bg-surface/70' : 'border-line bg-surface/50'
       }`}
     >
       <div className="flex items-start gap-2.5">
@@ -318,6 +376,7 @@ function Row({
           hash={friend?.avatar}
           size={28}
         />
+        {isNew ? <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-accent" /> : null}
         <span className="min-w-0 flex-1">
           <span className="block text-sm">
             <span className="text-ink-soft">{say(entry, name)} </span>
@@ -350,7 +409,9 @@ function Row({
       {entry.kind === 'they-asked' && ask ? (
         <div className="mt-2 rounded-xl border border-line bg-canvas/60 p-3">
           {ask.context.body ? (
-            <p className="text-xs whitespace-pre-wrap text-ink-soft">{ask.context.body}</p>
+            <p className="text-xs whitespace-pre-wrap text-ink-soft">
+              <Linkified text={ask.context.body} />
+            </p>
           ) : null}
           {ask.context.topics.length > 0 ? (
             <p className="mt-1.5 text-xs text-ink-faint">{ask.context.topics.join(' · ')}</p>
@@ -361,7 +422,7 @@ function Row({
               <ul className="mt-0.5 flex flex-col gap-0.5">
                 {ask.context.entries.map((written) => (
                   <li key={written} className="text-xs text-ink-soft">
-                    {written}
+                    <Linkified text={written} />
                   </li>
                 ))}
               </ul>

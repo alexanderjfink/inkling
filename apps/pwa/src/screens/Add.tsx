@@ -31,11 +31,8 @@ export function Add({
   onConsumed,
   waiting,
   next,
-  total,
-  attic,
   serverWarning,
   onReview,
-  onAttic,
   onSettings,
   onYou,
   userId,
@@ -62,11 +59,8 @@ export function Add({
   waiting: number
   /** The first Inkling up for review, shown as the preview. */
   next?: Blip | null
-  total: number
-  attic: number
   serverWarning: string | null
   onReview: () => void
-  onAttic: () => void
   onSettings: () => void
   /** Who you are: your picture, your colour, your password. */
   onYou: () => void
@@ -244,7 +238,8 @@ export function Add({
             onClick={onNotifications}
             className="card flex items-center gap-3 border border-accent/40 p-4 text-left transition active:scale-[0.99]"
           >
-            <span className="circle h-10 w-10 shrink-0 text-lg leading-none">✎</span>
+            {/* A face, because it is a person asking; the ✎ is what the card below it is for. */}
+            <span className="circle h-10 w-10 shrink-0 text-base leading-none">☺</span>
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">
                 {asking.length === 1
@@ -367,7 +362,14 @@ export function Add({
                 data-tour="field"
                 className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
               >
-                <span className="circle h-10 w-10 shrink-0 text-base leading-none">✎</span>
+                {/* A different colour from the Review card above it: they are the two things you
+                    came to do, and they were two grey circles with grey words under them. */}
+                <span
+                  className="circle h-10 w-10 shrink-0 text-base leading-none text-surface"
+                  style={{ background: 'var(--color-good)' }}
+                >
+                  ✎
+                </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold">What did you notice?</span>
                   <span className="block text-xs text-ink-soft">
@@ -494,17 +496,6 @@ export function Add({
           onSend={onFeedback}
           className="text-xs text-ink-faint"
         />
-
-        <button
-          type="button"
-          onClick={onAttic}
-          disabled={total === 0}
-          className="quiet underline disabled:no-underline disabled:opacity-50"
-        >
-          {total === 0
-            ? 'no Inklings yet'
-            : `all ${total} Inkling${total === 1 ? '' : 's'}${attic > 0 ? ` · ${attic} in the attic` : ''}`}
-        </button>
       </div>
     </div>
   )

@@ -316,6 +316,12 @@ The card for somebody waiting on you says **"priya wants your help"** — one pe
 *Friends want your help!* for more than one. It used to say "2 friends asked for a move", which
 describes a queue rather than a person who is stuck.
 
+**The two cards you land on are told apart**: the notification card wears a face on a dark
+circle, Review wears the clock on the accent, and *What did you notice?* wears a pen on green.
+They were two grey circles with grey words under them. And the tally at the bottom —
+"all 4 Inklings · 2 in the attic" — is gone: the Review screen has *browse*, which is where
+looking through everything belongs.
+
 **The closed box is the same card as the Review one above it**: an icon, what it is for, and a
 line under that. It used to be a large empty box with a question in it, which read as a different
 kind of thing from the card beside it — two boxes, one to understand and one to use. Everything
@@ -331,6 +337,11 @@ anything — leaves it as it was, asking what you noticed, rather than a large e
 did not start filling in. It waits a moment before deciding, because a tap on the paperclip or
 the type or the microphone is also a blur, and clearing the field out from under a tap that
 belongs to it would be worse than the form.
+
+**And there is a + wherever you are.** A tray comes up from the bottom over whatever you were
+reading, with the same field doing the same things — words, a link, or a picture pasted in. The
+alternative was the rhythm most people keep: leave what you were doing, go home, capture, come
+back. Not on the entry screen, where capture already is.
 
 **Entry opens as a button.** "What did you notice?" is a button, not a placeholder — it is an
 invitation rather than a form, and tapping it opens the field with the cursor in it. That is
@@ -709,6 +720,10 @@ directions at once.
 each rather than one message to several — an ask is one person's to answer, and a single message
 with two recipients would let the first answer look like it answered for both.
 
+**What a friend has shared is shown properly too**: their words, with any links tappable, what
+they have written against it, and their pictures — the same route, and the same permission check,
+as the pictures in a request for help.
+
 **A friend sees the whole of what they are being asked about** — the words, what has already been
 tried, what has already been suggested, and the pictures. Saying "they want help with a sourdough
 starter" and showing nothing else is a request to guess, and a photograph of the thing is most of
@@ -816,6 +831,21 @@ is an event in your log like everything else, so clearing it on the phone clears
 laptop, and the count is a count of what you have not dealt with rather than a count of what
 has arrived.
 
+**On a phone the three buttons step aside while a move is on screen** — the swipes are the way
+to the other sources, and three buttons under a suggestion are three buttons in the way of the
+thing they produce. With nothing on screen they are the only way in, so they stay. Writing your
+own move is a link on the card instead, because it is a verb rather than a source to browse.
+
+**And the card tells you the swipes exist**: the face of whoever suggested something on the left,
+a spark on the right.
+
+**Putting it down marks the whole card.** It was a button in the row, which said it applied to
+the row; it is now a small clock on the bottom right corner of the frame, overlapping the border.
+
+**Up and down moves between the Inklings of a round**, with a hint at the top and the bottom that
+brightens as the pull gets far enough to do it — and only at the ends of the card, because the
+card scrolls and taking over every vertical drag would make a long Inkling unreadable.
+
 ### One move at a time, and the two sides of it
 
 The card shows **one move**, never two. A friend who has suggested something is the more
@@ -869,6 +899,12 @@ with "offered" entries for moves nobody was offered.
 Both halves are one area with **two tabs** — notifications and friends — and notifications is the
 one you land on, from the header button, from Settings, and from the entry screen. Landing on the
 list of names made the second half look like the whole of it, and every way in went there.
+
+**New, seen, and dealt with are three different things**, and the list says so. An unseen
+notification carries a dot and the accent border; looking at one, or thanking somebody for it,
+marks it seen — the move stays on the Inkling, because "I have read this" is not "I have done
+this". Questions can be seen without being answered. And *mark all seen* is there for the morning
+you have been away: it is a log entry like everything else, so it holds across your devices.
 
 **What is waiting on you, then the archive.** A move that arrived and has not been cleared, and a
 question of theirs nobody has answered, are the two things actually waiting; everything else —
@@ -1538,6 +1574,21 @@ notes**. Those already are typed Markdown records in a folder, with frontmatter.
 the vault an mdbase collection with a `blip` type — so the mdbase editor or TaskNotes
 could read what Inkling promoted — costs nothing and touches no sync code. Worth doing;
 just not as the backbone.
+
+## Notifications on the phone
+
+**Yes, while the app is open.** The Notification API and the service worker can put something in
+the phone's notification shade, and the browser can show it. That part is a small amount of work.
+
+**Not while the app is closed** — not without Web Push. The web cannot wake itself: a notification
+that arrives when nothing is running has to come from the server, through a push service, to a
+subscription the browser made. That is a real feature rather than a flag: VAPID keys, a
+subscription stored per device, a service worker that handles the push, and something on the
+server that decides when to send. It is entirely doable — Bun can talk to a push service with a
+fetch — and it needs HTTPS, which the server already has. On iOS it also only works when Inkling
+is installed to the home screen, which is a limitation of Safari rather than of this.
+
+Worth doing. Not done.
 
 ## Not yet
 

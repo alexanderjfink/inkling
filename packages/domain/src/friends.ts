@@ -241,6 +241,20 @@ export function buildSocialTimeline(
   return entries.sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? 1 : -1))
 }
 
+/**
+ * The messages that have been looked at, whichever kind they were.
+ *
+ * Read from the log like everything else. "Seen" and "dealt with" are kept apart on purpose:
+ * a question can be read without being answered, and the list needs to be able to say so.
+ */
+export function seenNoticeIds(events: BlipEvent[]): Set<string> {
+  const seen = new Set<string>()
+  for (const event of events) {
+    if (event.t === 'friendMoveSeen' || event.t === 'friendAskSeen') seen.add(event.messageId)
+  }
+  return seen
+}
+
 /** How many thank-yous this account has been sent. The reward for helping people. */
 export function thanksReceivedNote(events: BlipEvent[]): number {
   return events.filter(

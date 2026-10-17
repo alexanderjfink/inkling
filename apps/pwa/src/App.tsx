@@ -8,6 +8,7 @@ import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
 import { Add } from './screens/Add'
 import { AllBlips } from './screens/AllBlips'
+import { CaptureTray } from './components/CaptureTray'
 import { SavedTick } from './components/SavedTick'
 import { FriendScreen } from './screens/Friend'
 import { Friends } from './screens/Friends'
@@ -162,6 +163,8 @@ export default function App() {
   const [picked, setPicked] = useState<{ friend: Friend; context: AskContext } | null>(null)
   /** Which friend's history is open, by id: a name is not an identity. */
   const [friendId, setFriendId] = useState<string | null>(null)
+  /** The tray you catch something in, from anywhere but the entry screen. */
+  const [trayOpen, setTrayOpen] = useState(false)
 
   const active = blips.filter((blip) => !blip.deleted).length
   const { open: tourOpen, setOpen: setTourOpen } = useTour({
@@ -243,9 +246,6 @@ export default function App() {
   const waiting = feed.length
   /** What the Review card previews: the one you would actually be shown first. */
   const upNext = feed[0] ?? null
-  const attic = blips.filter(
-    (blip) => !blip.deleted && (blip.status === 'retired' || blip.status === 'promoted'),
-  ).length
 
   // "Every capture is acknowledged and counted." A capture that vanished silently is
   // the failure this app exists to avoid, so the count is visible rather than assumed.
@@ -346,8 +346,6 @@ export default function App() {
           onConsumed={() => setShared(null)}
           waiting={waiting}
           next={upNext}
-          total={active}
-          attic={attic}
           serverWarning={
             serverConfig.status === 'ok' ||
             serverConfig.status === 'loading' ||
@@ -356,7 +354,6 @@ export default function App() {
               : 'the server is not reachable, so sync and the model are off'
           }
           onReview={() => go('review')}
-          onAttic={() => go('all')}
           onSettings={() => go('settings')}
           onYou={() => go('you')}
           userId={auth.user?.id}
@@ -433,6 +430,7 @@ export default function App() {
               <FriendScreen
                 friend={friend}
                 social={social}
+                serverUrl={server.serverUrl}
                 events={events}
                 blips={blips}
                 onOpenBlip={(id) => {
@@ -511,6 +509,28 @@ export default function App() {
           social={social}
           onOpenFriends={() => go('notifications')}
           only={['friends', 'about', 'admin']}
+        />
+      ) : null}
+
+      {/* Not on the entry screen: capture is what that screen is. Everywhere else this is the
+          way to notice something without leaving what you were reading. */}
+      {screen !== 'add' && !tourOpen ? (
+        <button
+          type="button"
+          onClick={() => setTrayOpen(true)}
+          aria-label="Capture a new Inkling"
+          className="fixed right-5 bottom-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle"
+        >
+          +
+        </button>
+      ) : null}
+
+      {trayOpen ? (
+        <CaptureTray
+          onCapture={actions.capture}
+          onClose={() => setTrayOpen(false)}
+          shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
+          socialOn={socialOn}
         />
       ) : null}
 

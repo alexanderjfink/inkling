@@ -246,3 +246,22 @@ body {
 .move-in {
   animation: move-in 180ms ease-out;
 }
+
+/*
+ * The capture tray arriving from the bottom.
+ *
+ * Only the offset animates, never the opacity — the rule this file keeps relearning. The panel
+ * is visible wherever it ends up, whether or not the animation runs at all.
+ */
+@keyframes tray-in {
+  from {
+    transform: translateY(24px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.tray-in {
+  animation: tray-in 180ms ease-out;
+}

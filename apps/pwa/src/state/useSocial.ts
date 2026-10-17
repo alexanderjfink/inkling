@@ -52,6 +52,13 @@ export interface SocialState {
   moves: FriendMoveNotice[]
   /** Wave one away. The move stays on the Inkling. */
   clearMove: (input: { messageId: string; blipId: string }) => Promise<string | null>
+  /** Read a question, without answering it. */
+  markAskSeen: (input: { messageId: string; blipId: string }) => Promise<string | null>
+  /** Everything currently new, seen. */
+  markAllSeen: (input: {
+    moves: Array<{ messageId: string; blipId: string }>
+    asks: Array<{ messageId: string; blipId: string }>
+  }) => Promise<string | null>
   loading: boolean
   error: string | null
   refresh: () => void
@@ -321,6 +328,25 @@ export function useSocial({
         return null
       } catch {
         return 'could not clear that'
+      }
+    },
+
+    markAskSeen: async ({ messageId, blipId }) => {
+      try {
+        await actions.markAskSeen(blipId, messageId)
+        return null
+      } catch {
+        return 'could not mark that seen'
+      }
+    },
+
+    markAllSeen: async ({ moves, asks }) => {
+      try {
+        for (const move of moves) await actions.markMoveSeen(move.blipId, move.messageId)
+        for (const ask of asks) await actions.markAskSeen(ask.blipId, ask.messageId)
+        return null
+      } catch {
+        return 'could not mark them all seen'
       }
     },
 

@@ -161,3 +161,8 @@ export interface EntryDraft {
    */
   fromMessageId?: string
 }
+
+/** The image in a paste or a drop, when there is one. The one rule both capture places share. */
+export function takeImageFrom(data: DataTransfer | null): File | undefined {
+  return [...(data?.files ?? [])].find((candidate) => candidate.type.startsWith('image/'))
+}

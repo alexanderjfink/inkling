@@ -220,6 +220,10 @@ export function useSuggestedMove(
     if (lookingAtSaved && target.savedMove) {
       savedSeen.add(target.id)
       setAvoid({ blipId: target.id, ids: [...avoidIds, target.savedMove.id] })
+      // And ask for one. Marking it seen without generating left the card empty for ever, which
+      // is what "swiping to generate new suggestions seems to not load sometimes" turned out to be.
+      askedFor.add(target.id)
+      setAsked(target.id)
       return
     }
     if (!move) generate()

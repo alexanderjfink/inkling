@@ -33,6 +33,7 @@ export {
   buildFriendTimeline,
   buildSocialTimeline,
   hasThanked,
+  seenNoticeIds,
   thanksReceivedNote,
   unseenFriendMoves,
 } from './friends'

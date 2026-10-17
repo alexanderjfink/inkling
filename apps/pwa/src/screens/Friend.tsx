@@ -2,6 +2,8 @@ import type { AskContext, Blip, BlipEvent, Friend, FriendTimelineEntry } from '@
 import { buildFriendTimeline } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { Avatar } from '../components/Avatar'
+import { FriendImage } from '../components/FriendImage'
+import { Linkified } from '../components/Linkified'
 import { ButtonLabel, Spinner } from '../components/Spinner'
 import { Suggest } from '../components/Suggest'
 import { formatAgo, formatShortDate } from '../format'
@@ -23,6 +25,7 @@ type Filter = 'all' | 'out' | 'in'
 export function FriendScreen({
   friend,
   social,
+  serverUrl,
   events,
   blips,
   onOpenBlip,
@@ -31,6 +34,8 @@ export function FriendScreen({
 }: {
   friend: Friend
   social: SocialState
+  /** For their pictures: they are theirs, and served only where they chose to share. */
+  serverUrl: string
   events: BlipEvent[]
   blips: Blip[]
   /** Open one of your own Inklings, from an entry that is about it. */
@@ -209,10 +214,39 @@ export function FriendScreen({
               className="rounded-2xl border border-line bg-surface/60 p-3 text-left"
             >
               <p className="text-sm font-medium">{context.title}</p>
+              {context.body ? (
+                <p className="mt-1 text-xs whitespace-pre-wrap text-ink-soft">
+                  <Linkified text={context.body} />
+                </p>
+              ) : null}
               <p className="mt-0.5 text-xs text-ink-faint">
                 {context.type}
                 {context.topics.length > 0 ? ` · ${context.topics.join(' · ')}` : ''}
               </p>
+              {context.entries.length > 0 ? (
+                <ul className="mt-1 flex flex-col gap-0.5">
+                  {context.entries.map((written) => (
+                    <li key={written} className="text-xs text-ink-soft">
+                      <Linkified text={written} />
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+              {/* Their pictures. Served only because the Inkling they are on was shared —
+                  the same route, and the same check, as the ones in a request for help. */}
+              {(context.mediaIds ?? []).length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {(context.mediaIds ?? []).map((hash) => (
+                    <FriendImage
+                      key={hash}
+                      serverUrl={serverUrl}
+                      userId={friend.userId}
+                      hash={hash}
+                      className="max-h-40 rounded-xl border border-line object-cover"
+                    />
+                  ))}
+                </div>
+              ) : null}
               <button
                 type="button"
                 onClick={() =>

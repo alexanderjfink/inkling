@@ -31,6 +31,7 @@ export type {
 } from './friends'
 export {
   buildFriendTimeline,
+  buildSocialTimeline,
   hasThanked,
   thanksReceivedNote,
   unseenFriendMoves,

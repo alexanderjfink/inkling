@@ -195,6 +195,86 @@ function Note({
 }
 
 /**
+ * Dragging the move sideways, and what the two sides mean.
+ *
+ * On a phone the whole move is the control: tap it to do it, pull it right for what friends
+ * suggested, left for what the app has. The indicator appears as soon as the drag starts — so
+ * a hold in the middle shows what letting go would do, which is the whole of discoverability
+ * here. Nothing happens for a drag shorter than the threshold; it springs back.
+ */
+const SWIPE_AT = 72
+const SWIPE_TRAVEL = 460
+
+type SwipeDirection = 'left' | 'right'
+
+function useMoveSwipe(onSwipe: (direction: SwipeDirection) => void) {
+  const [dx, setDx] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const [leaving, setLeaving] = useState<SwipeDirection | null>(null)
+  const from = useRef<number | null>(null)
+  /** Whether this gesture turned into a drag, so the tap underneath does not also fire. */
+  const dragged = useRef(false)
+
+  const handlers = {
+    onPointerDown: (event: React.PointerEvent) => {
+      if (event.pointerType === 'mouse' && event.button !== 0) return
+      from.current = event.clientX
+      dragged.current = false
+      setLeaving(null)
+      setDragging(true)
+    },
+    onPointerMove: (event: React.PointerEvent) => {
+      if (from.current === null) return
+      const delta = event.clientX - from.current
+      if (Math.abs(delta) > 6) dragged.current = true
+      // A little rubber beyond the threshold, so the pull has weight.
+      setDx(Math.max(-140, Math.min(140, delta)))
+    },
+    onPointerUp: () => {
+      if (from.current === null) return
+      from.current = null
+      setDragging(false)
+      const delta = dx
+      if (Math.abs(delta) < SWIPE_AT) {
+        setDx(0)
+        return
+      }
+      const direction: SwipeDirection = delta > 0 ? 'right' : 'left'
+      setLeaving(direction)
+      setDx(direction === 'right' ? SWIPE_TRAVEL : -SWIPE_TRAVEL)
+      window.setTimeout(() => {
+        onSwipe(direction)
+        setLeaving(null)
+        setDx(0)
+      }, 190)
+    },
+    onPointerCancel: () => {
+      from.current = null
+      setDragging(false)
+      setDx(0)
+    },
+  }
+
+  /** Swallowed when the gesture was a drag: a swipe is not also a tap. */
+  const wasDragged = () => dragged.current
+
+  const progress = Math.min(1, Math.abs(dx) / SWIPE_AT)
+  return {
+    handlers,
+    wasDragged,
+    progress,
+    direction: dx === 0 ? null : dx > 0 ? ('right' as const) : ('left' as const),
+    armed: progress >= 1,
+    style: {
+      transform: `translateX(${dx}px)`,
+      transition: dragging ? 'none' : 'transform 190ms ease, opacity 190ms ease',
+      opacity: leaving ? Math.max(0, 1 - progress) : 1,
+      touchAction: 'pan-y' as const,
+    },
+  }
+}
+
+/**
  * Asking a friend for a move.
  *
  * A component of its own so it can be rendered wherever it was opened from: inside the move
@@ -635,6 +715,7 @@ export function Review({
     reroll,
     generate: generateMove,
     discard: discardMove,
+    nextAiMove,
   } = useSuggestedMove(
     current,
     currentRelated.map((entry_) => entry_.blip),
@@ -689,6 +770,33 @@ export function Review({
    */
   const pendingMoves = current ? pendingFriendMoves(current) : []
   const friendMove = pendingMoves.find((candidate) => !setAside.includes(candidate.messageId))
+
+  /**
+   * Which of the two the card is showing.
+   *
+   * One move at a time, because two on a card is a card you read rather than act on. A friend
+   * who has suggested something is the more interesting of the two, so that is what a card
+   * opens on; swiping left moves to the app's own, and swiping right moves back.
+   */
+  const [slot, setSlot] = useState<'friend' | 'ai'>('friend')
+  const slotNow: 'friend' | 'ai' = slot === 'friend' && friendMove ? 'friend' : 'ai'
+
+  const swipe = (direction: SwipeDirection) => {
+    if (direction === 'right') {
+      // Back to what people suggested. Already there? Then the next one along, which is what
+      // "sequentially show all the moves suggested by friends" means from the inside.
+      if (slotNow !== 'friend' && friendMove) {
+        setSlot('friend')
+        return
+      }
+      if (friendMove) setSetAside((list) => [...list, friendMove.messageId])
+      return
+    }
+    setSlot('ai')
+    nextAiMove()
+  }
+
+  const swipeState = useMoveSwipe(swipe)
   const shownMove = composer?.move ?? friendMove?.spec ?? move
 
   // Where this move sends you. Resolved together, because they are independent and a
@@ -992,12 +1100,26 @@ export function Review({
         <button type="button" onClick={onBrowse} className="quiet text-xs underline">
           browse
         </button>
-        <span className="ml-auto text-xs text-ink-faint">
+        <span className="ml-auto text-xs whitespace-nowrap text-ink-faint">
           {done + 1} of {total}
         </span>
       </div>
 
-      <div className="card flex flex-1 flex-col overflow-y-auto p-6">
+      <div className="card relative flex flex-1 flex-col overflow-y-auto p-6">
+        {/* What a drag in each direction would do, shown while you are pulling and highlighted
+            once it would happen. On the card rather than on the move, so it stays put while
+            the move slides away underneath it. */}
+        {swipeState.direction ? (
+          <span
+            className={`pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 rounded-full bg-accent px-3 py-2 text-xs font-semibold text-surface transition-transform ${
+              swipeState.direction === 'right' ? 'left-3' : 'right-3'
+            } ${swipeState.armed ? 'scale-110' : 'opacity-70'}`}
+          >
+            {swipeState.direction === 'right'
+              ? `☺ ${friendMove ? friendMove.fromUsername : 'friends'}`
+              : '✦ the app'}
+          </span>
+        ) : null}
         <div className="flex items-center gap-2 text-xs tracking-wide uppercase">
           <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">
             {current.type}
@@ -1167,8 +1289,13 @@ export function Review({
 
         <Blocks blip={current} actions={actions} />
 
-        {friendMove && !askOpen ? (
-          <div className="mt-5 rounded-2xl border border-line bg-surface/60 p-4">
+        {slotNow === 'friend' && friendMove && !askOpen ? (
+          <div
+            key={friendMove.messageId}
+            {...swipeState.handlers}
+            style={swipeState.style}
+            className="move-in mt-5 rounded-2xl border border-line bg-surface/60 p-4"
+          >
             <div className="flex items-center gap-2.5">
               <Avatar
                 username={friendMove.fromUsername}
@@ -1181,8 +1308,18 @@ export function Review({
                 a move from {friendMove.fromUsername}
               </p>
             </div>
-            <p className="mt-1 text-sm font-medium">{friendMove.spec.title}</p>
-            <p className="mt-1 text-xs text-ink-soft">goal: {friendMove.spec.goal}</p>
+            {/* The whole title is the button: on a phone, tapping the move is how you do it. */}
+            <button
+              type="button"
+              onClick={() => {
+                if (swipeState.wasDragged()) return
+                setComposer({ move: friendMove.spec, fromMessageId: friendMove.messageId })
+              }}
+              className="mt-1 block text-left"
+            >
+              <span className="block text-sm font-medium">{friendMove.spec.title}</span>
+              <span className="mt-1 block text-xs text-ink-soft">goal: {friendMove.spec.goal}</span>
+            </button>
             {friendMove.note ? (
               <p className="mt-2 text-xs text-accent italic">“{friendMove.note}”</p>
             ) : null}
@@ -1443,15 +1580,27 @@ export function Review({
               </button>
             </div>
           </div>
-        ) : move && !askOpen ? (
+        ) : slotNow === 'ai' && move && !askOpen ? (
           <div
-            className={`mt-5 rounded-2xl bg-accent-soft/70 p-4 transition-opacity ${
+            key={move.id}
+            {...swipeState.handlers}
+            style={swipeState.style}
+            className={`move-in mt-5 rounded-2xl bg-accent-soft/70 p-4 ${
               moveLoading ? 'opacity-60' : ''
             }`}
           >
             <p className="text-xs tracking-wide text-accent uppercase">a move, if you want one</p>
-            <p className="mt-1 text-sm font-medium">{move.title}</p>
-            <p className="mt-1 text-xs text-ink-soft">goal: {move.goal}</p>
+            <button
+              type="button"
+              onClick={() => {
+                if (swipeState.wasDragged()) return
+                setComposer({ move })
+              }}
+              className="mt-1 block text-left"
+            >
+              <span className="block text-sm font-medium">{move.title}</span>
+              <span className="mt-1 block text-xs text-ink-soft">goal: {move.goal}</span>
+            </button>
             {current.savedMove ? (
               <p className="mt-1 text-xs text-good">
                 {current.demo

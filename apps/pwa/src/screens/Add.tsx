@@ -33,7 +33,6 @@ export function Add({
   next,
   total,
   attic,
-  capturedToday,
   serverWarning,
   onReview,
   onAttic,
@@ -66,7 +65,6 @@ export function Add({
   next?: Blip | null
   total: number
   attic: number
-  capturedToday: number
   serverWarning: string | null
   onReview: () => void
   onAttic: () => void
@@ -128,7 +126,6 @@ export function Add({
   /** The box and everything that belongs to it: the field, the paperclip, the type, the mic. */
   const boxRef = useRef<HTMLDivElement | null>(null)
   const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState(0)
 
   const speech = useSpeech(
     (spoken) => setText((current) => (current.trim() ? `${current.trim()} ${spoken}` : spoken)),
@@ -183,7 +180,7 @@ export function Add({
       setType('auto')
       setBlocks([])
       setStarted(false)
-      setSaved((count) => count + 1)
+      // The green tick is the confirmation now; a count that never goes down said less.
     } finally {
       setBusy(false)
     }
@@ -481,12 +478,7 @@ export function Add({
         {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
       </div>
 
-      {saved > 0 ? <p className="text-center text-xs text-ink-faint">{saved} captured.</p> : null}
-
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
-        {capturedToday > 0 ? (
-          <span className="text-ink-faint">{capturedToday} captured today — all saved</span>
-        ) : null}
         <Feedback
           env={feedbackEnv}
           screen="entry"

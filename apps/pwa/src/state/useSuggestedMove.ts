@@ -33,6 +33,14 @@ const chosen = new Map<string, MoveSpec>()
  */
 const askedFor = new Set<string>()
 
+/**
+ * Inklings whose saved move has already been shown this session.
+ *
+ * "Show what was saved first, then generate" needs a memory of having shown it, or swiping
+ * past a move you kept brings it straight back for ever.
+ */
+const savedSeen = new Set<string>()
+
 function requestMove(
   key: string,
   context: Parameters<typeof selectMove>[0],
@@ -81,6 +89,8 @@ export function useSuggestedMove(
   /** Forget the suggestion: somebody is asking a person instead. */
   discard: () => void
   reroll: () => void
+  /** The next thing to look at: one you saved first, then something new. */
+  nextAiMove: () => void
 } {
   const [move, setMove] = useState<MoveSpec | null>(null)
   const [loading, setLoading] = useState(false)
@@ -138,9 +148,9 @@ export function useSuggestedMove(
       return
     }
 
-    // A move you saved deliberately is the one to show — no need to ask again, and no
-    // need to have been asked either.
-    if (target.savedMove) {
+    // A move you saved deliberately is the one to show — no need to ask again, and no need
+    // to have been asked either. Once, though: after that it is a move you have seen.
+    if (target.savedMove && !savedSeen.has(target.id)) {
       setMove(target.savedMove)
       setLoading(false)
       return
@@ -197,5 +207,25 @@ export function useSuggestedMove(
     setAvoid({ blipId, ids: [...avoidIds, move.id] })
   }
 
-  return { move, loading, generate, discard, reroll }
+  /**
+   * The next move from the app.
+   *
+   * Nothing on screen yet? Show it — which is the saved one, if there is one. Already looking
+   * at the saved one? It has been seen, so a new one is asked for. Otherwise: another.
+   */
+  const nextAiMove = useCallback(() => {
+    const target = latest.current
+    if (!target) return
+    const lookingAtSaved = Boolean(target.savedMove && move && target.savedMove.id === move.id)
+    if (lookingAtSaved && target.savedMove) {
+      savedSeen.add(target.id)
+      setAvoid({ blipId: target.id, ids: [...avoidIds, target.savedMove.id] })
+      return
+    }
+    if (!move) generate()
+    else reroll()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the same refs the effect reads
+  }, [move, blipId, avoidIds, generate])
+
+  return { move, loading, generate, discard, reroll, nextAiMove }
 }

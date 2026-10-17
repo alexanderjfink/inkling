@@ -348,7 +348,6 @@ export default function App() {
           next={upNext}
           total={active}
           attic={attic}
-          capturedToday={capturedToday}
           serverWarning={
             serverConfig.status === 'ok' ||
             serverConfig.status === 'loading' ||
@@ -452,6 +451,7 @@ export default function App() {
           social={social}
           picked={picked}
           blips={blips}
+          events={events}
           onClearPicked={() => setPicked(null)}
           onOpenFriends={() => go('friends')}
           onOpenBlip={(id) => {

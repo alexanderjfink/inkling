@@ -76,6 +76,10 @@ same app and skips a step.
 - **When something is meant to last a second and a half, look at it with a longer hold first.**
   A model round trip is longer than the animation. Pin it open or raise the constant, look,
   then put it back — and say in the commit that you did.
+- **A touch drag cannot be driven from here.** The browser panel clicks, types and scrolls; it
+  does not drag. A gesture can be looked at by pinning its state open (as with the saved tick)
+  and its decisions can be tested, but "the swipe works" is not something this loop can show —
+  say so rather than implying otherwise.
 - **Tests carry the logic; the browser carries the truth about the browser.** Anything in
   `packages/domain` — folds, schedules, parsing, timelines — belongs in a test, where it runs in
   milliseconds and cannot be misread. Layout, focus, gestures and the service worker belong in

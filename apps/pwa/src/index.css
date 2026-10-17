@@ -225,3 +225,24 @@ body {
 .saved-tick__mark {
   animation: tick-pop 220ms cubic-bezier(0.2, 1.6, 0.4, 1);
 }
+
+/*
+ * A move arriving from the side after a swipe.
+ *
+ * Only the offset animates — never the opacity. An element whose keyframe starts at
+ * `opacity: 0` is invisible wherever the animation does not run, which is how the saved tick
+ * spent an hour as a green disc with nothing on it. Moving in from the side is visible even
+ * when it is not animated.
+ */
+@keyframes move-in {
+  from {
+    transform: translateX(24px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.move-in {
+  animation: move-in 180ms ease-out;
+}

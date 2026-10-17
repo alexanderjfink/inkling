@@ -316,6 +316,10 @@ The card for somebody waiting on you says **"priya wants your help"** — one pe
 *Friends want your help!* for more than one. It used to say "2 friends asked for a move", which
 describes a queue rather than a person who is stuck.
 
+**And the running total is gone.** "4 captured today — all saved" sat at the bottom of the entry
+screen saying something that was never in doubt, counting up and never down. The green tick says
+a thing was saved at the moment it is worth saying; a tally of them says nothing at all.
+
 **The box goes back to its question.** Tapping in and then tapping away — without writing
 anything — leaves it as it was, asking what you noticed, rather than a large empty form you
 did not start filling in. It waits a moment before deciding, because a tap on the paperclip or
@@ -771,6 +775,29 @@ is an event in your log like everything else, so clearing it on the phone clears
 laptop, and the count is a count of what you have not dealt with rather than a count of what
 has arrived.
 
+### One move at a time, and the two sides of it
+
+The card shows **one move**, never two. A friend who has suggested something is the more
+interesting of the two, so that is what a card opens on; the app's own suggestion is behind a
+gesture rather than beside it.
+
+On a phone the move *is* the control:
+
+| | |
+|---|---|
+| **tap it** | do it — the whole title is the button |
+| **swipe right** | what friends suggested, one after another |
+| **swipe left** | what the app has: the move you saved first, then new ones |
+
+The indicator for a drag appears the moment it starts and highlights once letting go would
+actually do something, so a hold in the middle shows what the swipe means — which is the whole
+of discoverability here. A drag shorter than the threshold springs back, and a gesture that
+turned into a drag does not also fire the tap underneath it.
+
+There is a subtlety in "then new ones": a move you saved is shown first, and *once*. Without
+remembering that it has been seen, swiping past the move you kept brought it straight back for
+ever.
+
 ### Two friends, two moves, one at a time
 
 When more than one move comes back they are shown **sequentially** — whoever has been waiting
@@ -795,6 +822,18 @@ lands — a fold that depends on arrival order is not a fold.
 **A move from a friend is not app move history.** `moveShown` and `moveDone` record what the
 *app* suggested and what became of it; a friend's move logged there is how the log filled up
 with "offered" entries for moves nobody was offered.
+
+### Interactions first, friends second
+
+The smiling face opens a **timeline of everything that has passed with anyone** — newest first,
+with the person on each line, filtered by person and by direction (*help you gave* / *help you
+got*). The waiting things are in it where they happened, with their actions on them.
+
+It used to be a list of names with a timeline behind each one, which answers "who are my
+friends" — a question nobody arrives with. The question is "what has been going on", and a menu
+of names hides the interactions, which are the point.
+
+The friends list, and adding one, is one press further on.
 
 ### A friend, and what has passed between you
 

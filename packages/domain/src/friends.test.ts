@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { BlipEvent, BlipEventBody, MoveSpec } from '../src/index'
 import {
   buildFriendTimeline,
+  buildSocialTimeline,
   hasThanked,
   thanksReceivedNote,
   unseenFriendMoves,
@@ -214,6 +215,153 @@ describe('the history between two people', () => {
     )
 
     expect(entries.map((entry) => entry.kind)).toEqual(['they-sent-move', 'you-asked'])
+  })
+
+  test('every kind of interaction is classified by who helped whom', () => {
+    // The direction filter is the only thing standing between "what I have done for people"
+    // and "what people have done for me", so each kind is pinned down here.
+    const events: BlipEvent[] = [
+      ev(
+        {
+          t: 'friendAsk',
+          id: 'blip-mine',
+          messageId: 'ask-out',
+          direction: 'out',
+          userId: SAM.userId,
+          username: SAM.username,
+        },
+        0,
+        '2026-01-01T00:00:00Z',
+      ),
+      ev(
+        {
+          t: 'friendAsk',
+          id: 'foreign',
+          messageId: 'ask-in',
+          direction: 'in',
+          userId: SAM.userId,
+          username: SAM.username,
+          context: {
+            blipId: 'blip-theirs',
+            type: 'idea',
+            title: 'the sourdough starter',
+            topics: [],
+            entries: [],
+            offered: [],
+          },
+        },
+        1,
+        '2026-01-02T00:00:00Z',
+      ),
+      ev(
+        {
+          t: 'friendMove',
+          id: 'blip-mine',
+          messageId: 'move-in',
+          from: SAM.userId,
+          fromUsername: SAM.username,
+          moveSpec: MOVE,
+        },
+        2,
+        '2026-01-03T00:00:00Z',
+      ),
+      ev(
+        {
+          t: 'friendMoveSent',
+          id: 'sent',
+          messageId: 'move-out',
+          to: SAM.userId,
+          toUsername: SAM.username,
+          moveSpec: MOVE,
+          blipId: 'blip-theirs',
+        },
+        3,
+        '2026-01-04T00:00:00Z',
+      ),
+      ev(
+        {
+          t: 'friendNote',
+          id: 'blip-mine',
+          note: {
+            id: 'n1',
+            direction: 'out',
+            kind: 'thanks',
+            username: SAM.username,
+            userId: SAM.userId,
+            text: '🙏',
+            at: '2026-01-05T00:00:00Z',
+          },
+        },
+        4,
+        '2026-01-05T00:00:00Z',
+      ),
+      ev(
+        {
+          t: 'friendNote',
+          id: 'blip-mine',
+          note: {
+            id: 'n2',
+            direction: 'in',
+            kind: 'thanks',
+            username: SAM.username,
+            userId: SAM.userId,
+            text: '🙏',
+            at: '2026-01-06T00:00:00Z',
+          },
+        },
+        5,
+        '2026-01-06T00:00:00Z',
+      ),
+    ]
+
+    const byKind = new Map(
+      buildFriendTimeline(events, SAM, titles).map((entry) => [entry.kind, entry.direction]),
+    )
+
+    // Out: help I gave. In: help I was given.
+    expect(byKind.get('you-asked')).toBe('out')
+    expect(byKind.get('they-asked')).toBe('in')
+    expect(byKind.get('you-sent-move')).toBe('out')
+    expect(byKind.get('they-sent-move')).toBe('in')
+    expect(byKind.get('you-thanked')).toBe('out')
+    expect(byKind.get('they-thanked')).toBe('in')
+  })
+
+  test('the whole timeline knows who each thing was with', () => {
+    const entries = buildSocialTimeline(
+      [
+        ev(
+          {
+            t: 'friendMove',
+            id: 'blip-mine',
+            messageId: 'm1',
+            from: SAM.userId,
+            fromUsername: SAM.username,
+            moveSpec: MOVE,
+          },
+          0,
+          '2026-01-02T00:00:00Z',
+        ),
+        ev(
+          {
+            t: 'friendAsk',
+            id: 'blip-mine',
+            messageId: 'm2',
+            direction: 'out',
+            userId: 'user-alex-0002',
+            username: 'alex',
+          },
+          1,
+          '2026-01-05T00:00:00Z',
+        ),
+      ],
+      titles,
+    )
+
+    expect(entries.map((entry) => entry.username)).toEqual(['alex', 'sam'])
+    // And one person's view is a filter on it, not a second implementation.
+    expect(buildFriendTimeline(entries.length ? [] : [], SAM, titles)).toEqual([])
+    expect(buildSocialTimeline(entries.length ? [] : [], titles)).toEqual([])
   })
 
   test('a move from a friend is announced until somebody waves it away', () => {

@@ -1,5 +1,12 @@
-import type { AskContext, BlipEvent, Friend, MoveSpec, SocialMessage } from '@inkling/domain'
-import { newId } from '@inkling/domain'
+import type {
+  AskContext,
+  BlipEvent,
+  Friend,
+  FriendMoveNotice,
+  MoveSpec,
+  SocialMessage,
+} from '@inkling/domain'
+import { newId, unseenFriendMoves } from '@inkling/domain'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   acceptFriend,
@@ -12,6 +19,7 @@ import {
   sendMove,
   sendNote,
 } from '../social'
+import { flashSaved } from './useSavedTick'
 import { storage, type InklingActions } from './useInkling'
 
 /** Where the postbox got to. A byte offset into this account's own inbox file. */
@@ -34,6 +42,16 @@ export interface SocialState {
   friends: Friend[]
   /** Asks from friends that have not been answered yet, newest first. */
   asks: ReceivedAsk[]
+  /**
+   * Moves from friends that have not been cleared yet, newest first.
+   *
+   * Announced rather than discovered: a person having thought about your Inkling is the whole
+   * point of the social half, and a move that only turns up when you happen to open the right
+   * card is a favour nobody notices. Clearing one ends the telling and nothing else.
+   */
+  moves: FriendMoveNotice[]
+  /** Wave one away. The move stays on the Inkling. */
+  clearMove: (input: { messageId: string; blipId: string }) => Promise<string | null>
   loading: boolean
   error: string | null
   refresh: () => void
@@ -177,6 +195,7 @@ export function useSocial({
    * reload — which is the whole reason a received ask is written down at all.
    */
   const asks = useMemo(() => openAsks(events), [events])
+  const moves = useMemo(() => unseenFriendMoves(events), [events])
 
   /** Run an action and turn a refusal into words rather than a thrown error. */
   const attempt = useCallback(
@@ -203,6 +222,7 @@ export function useSocial({
     off,
     friends,
     asks,
+    moves,
     loading,
     error,
     refresh,
@@ -211,12 +231,14 @@ export function useSocial({
       attempt(async () => {
         const result = await addFriend(serverUrl, username)
         if (result.ok) setFriends(result.value)
+        if (result.ok) flashSaved()
         return result
       }),
     accept: (userId) =>
       attempt(async () => {
         const result = await acceptFriend(serverUrl, userId)
         if (result.ok) setFriends(result.value)
+        if (result.ok) flashSaved()
         return result
       }),
     decline: (userId) =>
@@ -245,6 +267,7 @@ export function useSocial({
           userId: to.userId,
           username: to.username,
         })
+        flashSaved()
         return { ok: true }
       }),
 
@@ -263,6 +286,7 @@ export function useSocial({
           blipId,
           askId: askId || undefined,
         })
+        flashSaved()
         return { ok: true }
       }),
 
@@ -287,8 +311,18 @@ export function useSocial({
           text,
           at: result.value.message.at,
         })
+        flashSaved()
         return { ok: true }
       }),
+
+    clearMove: async ({ messageId, blipId }) => {
+      try {
+        await actions.markMoveSeen(blipId, messageId)
+        return null
+      } catch {
+        return 'could not clear that'
+      }
+    },
 
     theirInklings: async (userId) => {
       const result = await friendInklings(serverUrl, userId)

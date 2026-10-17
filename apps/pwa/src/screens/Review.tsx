@@ -28,6 +28,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Avatar } from '../components/Avatar'
 import { FriendFaces } from '../components/FriendFaces'
 import { BlockPicker, Blocks } from '../components/Blocks'
+import { Confirm } from '../components/Confirm'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
 import { EntryContextPanel } from '../components/EntryContext'
 import { ExportNote } from '../components/ExportNote'
@@ -495,7 +496,9 @@ export function Review({
   const [draftTitle, setDraftTitle] = useState('')
   const [draftBody, setDraftBody] = useState('')
   const [draftType, setDraftType] = useState<BlipType>('idea')
-  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  /** Which question is in the middle of the screen, if any. */
+  const [confirming, setConfirming] = useState<'retire' | 'delete' | null>(null)
+  const [confirmingBusy, setConfirmingBusy] = useState(false)
   /** Open when the person is saying a suggestion was bad, rather than just unwanted. */
   const [rejecting, setRejecting] = useState(false)
   const [rejectionReason, setRejectionReason] = useState<string | null>(null)
@@ -651,7 +654,6 @@ export function Review({
     setEntry('')
     setGuidance(null)
     setEditing(false)
-    setConfirmingDelete(false)
     setRejecting(false)
     setRejectionReason(null)
     setRejectionNote('')
@@ -823,22 +825,29 @@ export function Review({
   if (!current) {
     const counts = Object.values(decisions)
     const advanced = counts.filter((value) => value === 'advanced').length
-    const deferred = counts.filter((value) => value === 'deferred').length
-    const retired = counts.filter((value) => value === 'retired').length
-    const deleted = counts.filter((value) => value === 'deleted').length
-    const rejected = counts.filter((value) => value === 'rejected').length
-    const promoted = counts.filter((value) => value === 'promoted').length
-    const revived = counts.filter((value) => value === 'revived').length
+    /**
+     * Everything still in play, including what this round deferred.
+     *
+     * The first version counted only what rankBlips returns, which is the Inklings that are
+     * due now — so a round spent putting all four down, deliberately leaving them for the
+     * future, cheerfully reported "0 left for the future". A deferral is the one case where
+     * this number has to include what you just did, because leaving it for later is exactly
+     * what you did.
+     */
+    const stillToCome = blips.filter(
+      (blip) => !blip.deleted && (blip.status === 'active' || blip.status === 'snoozed'),
+    ).length
 
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
         <p className="text-2xl font-semibold">{done === 0 ? 'Nothing waiting' : 'Done for now'}</p>
         {done > 0 ? (
-          <p className="text-sm text-ink-soft">
-            {advanced} advanced · {deferred} put down · {promoted} to notes · {retired} retired
-            {deleted > 0 ? ` · ${deleted} deleted` : ''}
-            {rejected > 0 ? ` · ${rejected} marked bad` : ''}
-            {revived > 0 ? ` · ${revived} revived` : ''} · nothing lost.
+          /* Two numbers and no accounting. A row of six counters, most of them nought, reads
+             as a receipt for a transaction you did not know you were making — and "nothing
+             lost" is reassurance for a worry nobody had. What matters is what you did and how
+             much is still waiting. */
+          <p className="text-lg font-medium text-ink">
+            {advanced} move{advanced === 1 ? '' : 's'} made · {stillToCome} left for the future
           </p>
         ) : (
           <p className="text-sm text-ink-soft">Capture something, or look in the attic.</p>
@@ -1686,44 +1695,52 @@ export function Review({
             revive — put it back in play
           </button>
         ) : (
-          <button type="button" onClick={() => void retire()} className="quiet underline">
+          <button type="button" onClick={() => setConfirming('retire')} className="quiet underline">
             retire
           </button>
         )}
-        {confirmingDelete ? (
-          <>
-            <span className="text-ink-faint">delete for good?</span>
-            <button
-              type="button"
-              onClick={() => void remove()}
-              className="font-medium text-warn underline"
-            >
-              yes, delete
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmingDelete(false)}
-              className="quiet underline"
-            >
-              keep it
-            </button>
-          </>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setConfirmingDelete(true)}
-            className="quiet underline"
-          >
-            delete
-          </button>
-        )}
+        {/* Both of these ask, in the middle of the screen. Deleting used to be a small word
+            beside a small word, and retiring did not ask at all. */}
+        <button type="button" onClick={() => setConfirming('delete')} className="quiet underline">
+          delete
+        </button>
       </div>
 
-      {confirmingDelete ? (
-        <p className="mt-2 text-center text-xs text-ink-faint">
-          retire means “not now” — it goes to the attic and can come back. delete means “not this”:
-          it leaves the app. Neither is a hard erase from the log.
-        </p>
+      {confirming === 'retire' ? (
+        <Confirm
+          question="Retire?"
+          detail="It goes to the attic and stops coming up. You can revive it whenever you want — this is “not now”, not “not this”."
+          confirmLabel="Yes, retire it"
+          busy={confirmingBusy}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() =>
+            void (async () => {
+              setConfirmingBusy(true)
+              await retire()
+              setConfirmingBusy(false)
+              setConfirming(null)
+            })()
+          }
+        />
+      ) : null}
+
+      {confirming === 'delete' ? (
+        <Confirm
+          question="Delete?"
+          detail="It leaves the app and stops appearing anywhere. The log still holds it, but nothing will show it again."
+          confirmLabel="Yes, delete it"
+          tone="danger"
+          busy={confirmingBusy}
+          onCancel={() => setConfirming(null)}
+          onConfirm={() =>
+            void (async () => {
+              setConfirmingBusy(true)
+              await remove()
+              setConfirmingBusy(false)
+              setConfirming(null)
+            })()
+          }
+        />
       ) : null}
 
       {lastNote ? (

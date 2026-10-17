@@ -1,4 +1,4 @@
-import type { AskContext, Friend } from '@inkling/domain'
+import type { AskContext, Blip, Friend } from '@inkling/domain'
 import { useState } from 'react'
 import { Avatar } from '../components/Avatar'
 import { Suggest } from '../components/Suggest'
@@ -71,16 +71,24 @@ function Ask({
 export function Notifications({
   social,
   picked,
+  blips,
   onClearPicked,
   onOpenFriends,
+  onOpenBlip,
 }: {
   social: SocialState
   /** A friend's shared Inkling chosen from the friends screen, to suggest on unprompted. */
   picked: { friend: Friend; context: AskContext } | null
+  blips: Blip[]
   onClearPicked: () => void
   onOpenFriends: () => void
+  /** Open the Inkling a move landed on, which is where doing it happens. */
+  onOpenBlip: (id: string) => void
 }) {
   const [openFor, setOpenFor] = useState<string | null>(null)
+  const [clearing, setClearing] = useState<string | null>(null)
+  const titleFor = (id: string): string =>
+    blips.find((blip) => blip.id === id)?.title ?? 'an Inkling'
 
   const friendFor = (userId: string): Friend =>
     social.friends.find((friend) => friend.userId === userId) ?? {
@@ -151,6 +159,74 @@ export function Notifications({
         <span className="text-ink-faint">›</span>
       </button>
 
+      {/* A move somebody thought of, said out loud. It is the one thing here that is not a
+          request: a person spent a minute on your Inkling, and finding that out only by
+          opening the right card is how a favour goes unnoticed. Clearing it ends the telling
+          and nothing else — the move stays exactly where it is. */}
+      {social.moves.length > 0 ? (
+        <section className="flex flex-col gap-2">
+          <p className="text-xs tracking-wide text-ink-faint uppercase">
+            a move from a friend · {social.moves.length}
+          </p>
+          {social.moves.map((notice) => {
+            const friend = friendFor(notice.from)
+            return (
+              <div
+                key={notice.messageId}
+                className="rounded-2xl border border-accent/40 bg-surface/60 p-3"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Avatar
+                    username={notice.fromUsername}
+                    userId={notice.from}
+                    color={friend.color}
+                    hash={friend.avatar}
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold">
+                      {notice.fromUsername} sent you a move
+                    </span>
+                    <span className="block text-xs text-ink-faint">{formatAgo(notice.at)}</span>
+                  </span>
+                </div>
+                <p className="mt-2 text-sm font-medium">{notice.moveTitle}</p>
+                {notice.note ? (
+                  <p className="mt-1 text-sm text-accent italic">“{notice.note}”</p>
+                ) : null}
+                <p className="mt-1 text-xs text-ink-faint">on “{titleFor(notice.blipId)}”</p>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => onOpenBlip(notice.blipId)}
+                    className="rounded-full px-4 py-2.5 text-xs font-semibold text-white"
+                    style={{ background: friend.color ?? 'var(--color-ink)' }}
+                  >
+                    Open it
+                  </button>
+                  <button
+                    type="button"
+                    disabled={clearing !== null}
+                    onClick={() =>
+                      void (async () => {
+                        setClearing(notice.messageId)
+                        await social.clearMove({
+                          messageId: notice.messageId,
+                          blipId: notice.blipId,
+                        })
+                        setClearing(null)
+                      })()
+                    }
+                    className="quiet text-xs underline disabled:opacity-40"
+                  >
+                    clear — not now
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      ) : null}
+
       <section className="flex flex-col gap-2">
         <p className="text-xs tracking-wide text-ink-faint uppercase">
           asked for a move · {social.asks.length}
@@ -160,7 +236,7 @@ export function Notifications({
           <p className="text-xs text-ink-faint">
             Nobody is waiting on you. When somebody asks, their Inkling turns up here — with what
             they have written about it and what has already been suggested — and you can send them
-            something to do.
+            something to do. Moves they think of for you arrive here too.
           </p>
         ) : (
           social.asks.map((ask) => {

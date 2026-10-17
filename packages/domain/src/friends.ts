@@ -43,6 +43,55 @@ export interface FriendTimelineEntry {
   thanked?: boolean
 }
 
+/**
+ * A move a friend sent that has not been cleared yet.
+ *
+ * Enough to say who, what, and about which Inkling — which is all a notification needs, and
+ * all it should carry: the move itself lives on the Inkling where it happened.
+ */
+export interface FriendMoveNotice {
+  messageId: string
+  from: string
+  fromUsername: string
+  /** The Inkling it landed on, which is yours. */
+  blipId: string
+  moveTitle: string
+  note?: string
+  at: ISODate
+}
+
+/**
+ * Moves from friends that nobody has waved away, newest first.
+ *
+ * Read from the log like everything else social: the announcement is a thing that happened,
+ * and clearing it is another. Nothing is deleted and nothing is rewritten, so a notification
+ * cleared on the phone is cleared on the laptop the moment they sync.
+ */
+export function unseenFriendMoves(events: BlipEvent[]): FriendMoveNotice[] {
+  const cleared = new Set(
+    events
+      .filter(
+        (event): event is Extract<BlipEvent, { t: 'friendMoveSeen' }> =>
+          event.t === 'friendMoveSeen',
+      )
+      .map((event) => event.messageId),
+  )
+
+  return events
+    .filter((event): event is Extract<BlipEvent, { t: 'friendMove' }> => event.t === 'friendMove')
+    .filter((event) => !cleared.has(event.messageId))
+    .map((event) => ({
+      messageId: event.messageId,
+      from: event.from,
+      fromUsername: event.fromUsername,
+      blipId: event.id,
+      moveTitle: event.moveSpec.title,
+      note: event.note,
+      at: event.at,
+    }))
+    .sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? 1 : -1))
+}
+
 export interface FriendIdentity {
   userId: string
   username: string

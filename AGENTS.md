@@ -63,6 +63,19 @@ same app and skips a step.
 - **Screenshots are expensive and usually unnecessary.** A snapshot scoped to one `selector`
   answers "is it there, and what shape is it" for a fraction of the context. Capture an image
   when the question is genuinely visual.
+- **Never let a keyframe hold the only visible state.** `animation-fill-mode: both` with
+  `opacity: 0` in the first keyframe means a browser that decides not to run the animation —
+  a background tab, a headless viewer, a reduced-motion setting — leaves the element at
+  "invisible". A green disc with nothing on it, three times in one session, while the DOM
+  happily reported a white check in the middle of it. Make the element's own state the
+  finished state and let the animation only decorate.
+- **A screenshot can be older than the DOM.** `browser.inspect` said the glyph was white, 72px,
+  visible, in the right place; the capture showed an empty disc. When an image and an inspect
+  disagree, believe the inspect and change what you are checking, rather than re-running the
+  image.
+- **When something is meant to last a second and a half, look at it with a longer hold first.**
+  A model round trip is longer than the animation. Pin it open or raise the constant, look,
+  then put it back — and say in the commit that you did.
 - **Tests carry the logic; the browser carries the truth about the browser.** Anything in
   `packages/domain` — folds, schedules, parsing, timelines — belongs in a test, where it runs in
   milliseconds and cannot be misread. Layout, focus, gestures and the service worker belong in

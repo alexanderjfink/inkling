@@ -125,6 +125,8 @@ export function Add({
   const [started, setStarted] = useState(Boolean(initial?.text || initial?.url))
   /** Whether that first focus has happened, so later renders leave the cursor alone. */
   const focusedOnce = useRef(false)
+  /** The box and everything that belongs to it: the field, the paperclip, the type, the mic. */
+  const boxRef = useRef<HTMLDivElement | null>(null)
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(0)
 
@@ -303,7 +305,10 @@ export function Add({
           {/* One box, holding the words and the structure chosen for them. A chip under the
             field is attached to nothing in particular; a chip inside the box is part of what
             you are writing, which is what it is. */}
-          <div className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent">
+          <div
+            ref={boxRef}
+            className="flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent"
+          >
             {!started ? (
               <span className="text-xs text-ink-faint">
                 a photo, a link, an idea, a question, or a quest — paste one in, or just write
@@ -328,6 +333,19 @@ export function Add({
                   // A copied image attaches; copied words paste as words, which may include a
                   // link — that is found when it is kept.
                   takeImage(event.clipboardData)
+                }}
+                onBlur={() => {
+                  // Tapping in and then tapping away leaves the box as it was: back to the
+                  // question it asks, rather than a large empty form you did not start
+                  // filling in. Deferred by a moment because a blur also happens when the
+                  // tap went to something that belongs to the box — the paperclip, the type,
+                  // the microphone — and clearing the field then would take it away from
+                  // under the tap.
+                  window.setTimeout(() => {
+                    if (boxRef.current?.contains(document.activeElement)) return
+                    if (text.trim() || file || blocks.length > 0) return
+                    setStarted(false)
+                  }, 150)
                 }}
                 onKeyDown={(event) => {
                   // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
@@ -409,7 +427,11 @@ export function Add({
               type="file"
               accept="image/*"
               className="hidden"
-              onChange={(event) => setFile(event.target.files?.[0] ?? undefined)}
+              onChange={(event) => {
+                const chosen = event.target.files?.[0]
+                setFile(chosen)
+                if (chosen) setStarted(true)
+              }}
             />
           </label>
           <select

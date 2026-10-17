@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test'
 import type { BlipEvent, BlipEventBody, MoveSpec } from '../src/index'
-import { buildFriendTimeline, hasThanked, thanksReceivedNote } from '../src/index'
+import {
+  buildFriendTimeline,
+  hasThanked,
+  thanksReceivedNote,
+  unseenFriendMoves,
+} from '../src/index'
 
 const DEVICE = 'deviceA'
 const SAM = { userId: 'user-sam-0001', username: 'sam' }
@@ -209,6 +214,54 @@ describe('the history between two people', () => {
     )
 
     expect(entries.map((entry) => entry.kind)).toEqual(['they-sent-move', 'you-asked'])
+  })
+
+  test('a move from a friend is announced until somebody waves it away', () => {
+    const arrived = ev(
+      {
+        t: 'friendMove',
+        id: 'blip-mine',
+        messageId: 'm1',
+        from: SAM.userId,
+        fromUsername: SAM.username,
+        moveSpec: MOVE,
+        note: 'this might be the one',
+      },
+      0,
+      '2026-01-02T00:00:00Z',
+    )
+
+    const announced = unseenFriendMoves([arrived])
+    expect(announced).toHaveLength(1)
+    expect(announced[0]?.moveTitle).toBe('Play one chord badly, twice')
+    expect(announced[0]?.blipId).toBe('blip-mine')
+    expect(announced[0]?.fromUsername).toBe('sam')
+    expect(announced[0]?.note).toBe('this might be the one')
+
+    // Cleared: the telling ends, and the move does not.
+    const cleared = unseenFriendMoves([
+      arrived,
+      ev({ t: 'friendMoveSeen', id: 'blip-mine', messageId: 'm1' }, 1, '2026-01-03T00:00:00Z'),
+    ])
+    expect(cleared).toHaveLength(0)
+
+    // A move that never arrived is not cleared by clearing something else.
+    const other = ev(
+      {
+        t: 'friendMove',
+        id: 'blip-mine',
+        messageId: 'm2',
+        from: SAM.userId,
+        fromUsername: SAM.username,
+        moveSpec: MOVE,
+      },
+      2,
+      '2026-01-04T00:00:00Z',
+    )
+    expect(unseenFriendMoves([arrived, other]).map((notice) => notice.messageId)).toEqual([
+      'm2',
+      'm1',
+    ])
   })
 
   test('thank-yous are counted, and an old one with no id still lands on the right person', () => {

@@ -475,6 +475,15 @@ export type BlipEventBody =
       context?: AskContext
       note?: string
     }
+  /**
+   * Clearing the announcement for a move a friend sent.
+   *
+   * A received move is announced, because a person having thought about your Inkling is the
+   * point of the social half. Then it can be waved away without touching the move: the Inkling
+   * stays, the move stays on it, and the card goes on saying where it came from. What ends is
+   * the telling — not the fact.
+   */
+  | { t: 'friendMoveSeen'; id: string; messageId: string }
   /** A record of having suggested a move for somebody else's Inkling. */
   | {
       t: 'friendMoveSent'

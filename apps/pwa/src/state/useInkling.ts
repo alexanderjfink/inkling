@@ -17,6 +17,7 @@ import { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE, newId, project, snoozeUntil } from '@
 import { useEffect, useMemo, useState } from 'react'
 import { type CaptureDraft, type EntryDraft, extractTopics, guessType, inferBody } from '../capture'
 import { AppendOnlyLog } from '../storage/appendOnlyLog'
+import { flashSaved } from './useSavedTick'
 
 let singleton: AppendOnlyLog | null = null
 let singletonKey: string | null = null
@@ -102,6 +103,14 @@ export interface InklingActions {
   }): Promise<BlipEvent>
   /** A note from a friend, or one sent to one. */
   addFriendNote(id: string, note: FriendNote): Promise<BlipEvent>
+  /**
+   * Wave away the announcement for a move a friend sent.
+   *
+   * The Inkling and the move are untouched: this ends the telling, not the fact. Writing it
+   * down rather than holding it in memory is what makes clearing a notification on the phone
+   * clear it on the laptop as well.
+   */
+  markMoveSeen(id: string, messageId: string): Promise<BlipEvent>
   /**
    * Something written down.
    *
@@ -248,7 +257,12 @@ export function useInkling(accountId: string | null = null) {
           mediaIds: mediaId ? [mediaId] : undefined,
           visibility: draft.visibility,
         }
-        return store.append(emitted)
+        const event = await store.append(emitted)
+        // The two writes that *keep* something get the tick — a capture and an entry. Editing
+        // a title or putting something down is not a moment, and a green check for it would
+        // make the check mean nothing.
+        flashSaved()
+        return event
       },
       async seedDemo() {
         const store = storage()
@@ -295,13 +309,16 @@ export function useInkling(accountId: string | null = null) {
       addFriendNote(id, note) {
         return storage().append({ t: 'friendNote', id, note })
       },
+      markMoveSeen(id, messageId) {
+        return storage().append({ t: 'friendMoveSeen', id, messageId })
+      },
       giveFeedback(text, context) {
         // A fresh id rather than a blip's: the fold ignores events for ids it has not
         // seen, which is exactly right for something that is not about an Inkling.
         return storage().append({ t: 'feedback', id: newId(), text, context })
       },
       async addEntry(id, draft) {
-        return storage().append({
+        const event = await storage().append({
           t: 'entry',
           id,
           entry: {
@@ -313,6 +330,8 @@ export function useInkling(accountId: string | null = null) {
             at: new Date().toISOString(),
           },
         })
+        flashSaved()
+        return event
       },
       snooze(id, until, triggers) {
         return storage().append({ t: 'snoozed', id, until, triggers })

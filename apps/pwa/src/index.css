@@ -195,3 +195,33 @@ body {
   background: none;
   padding: 0;
 }
+
+/*
+ * The saved tick.
+ *
+ * Every state these two elements can be in is *visible*, and the animation only decorates:
+ * the keyframes move a scale, and nothing anywhere sets opacity to zero. The first version
+ * did the opposite — `animation-fill-mode: both` with `opacity: 0` in the first keyframe —
+ * and a browser that decides not to run the animation leaves the element sitting at that
+ * first keyframe. Which is what happened: a green disc with nothing on it, three times, while
+ * the DOM said there was a white check in the middle of it.
+ */
+@keyframes tick-pop {
+  from {
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+.saved-tick {
+  animation: tick-pop 260ms cubic-bezier(0.2, 1.5, 0.4, 1);
+}
+
+.saved-tick__mark {
+  animation: tick-pop 220ms cubic-bezier(0.2, 1.6, 0.4, 1);
+}

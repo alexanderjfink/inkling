@@ -316,6 +316,12 @@ The card for somebody waiting on you says **"priya wants your help"** — one pe
 *Friends want your help!* for more than one. It used to say "2 friends asked for a move", which
 describes a queue rather than a person who is stuck.
 
+**The box goes back to its question.** Tapping in and then tapping away — without writing
+anything — leaves it as it was, asking what you noticed, rather than a large empty form you
+did not start filling in. It waits a moment before deciding, because a tap on the paperclip or
+the type or the microphone is also a blur, and clearing the field out from under a tap that
+belongs to it would be worse than the form.
+
 **Entry opens as a button.** "What did you notice?" is a button, not a placeholder — it is an
 invitation rather than a form, and tapping it opens the field with the cursor in it. That is
 also the only way a phone will raise the keyboard, since it will not do it for a focus nobody
@@ -471,9 +477,27 @@ The row used to be five things where three were a question and two were an answe
 outer buttons were grey enough to read as disabled next to the one filled one. The three that
 ask for something carry the accent now; only the one you press most is filled.
 
+**Saving gets a tick.** A big green check, for a second and a half, on the two things that
+*keep* something — an Inkling, and an entry — and on handing something to somebody: a move you
+thought of, an answer, a thank-you. Editing a title is not a moment, and a green check for it
+would make the check mean nothing. It takes no touches, so it cannot trap anybody already
+typing the next thing.
+
+**Retiring and deleting ask in the middle of the screen.** The footer still holds the two
+words, but pressing one raises "Retire?" or "Delete?" with the question large and two large
+answers — and the one that does the thing is not where your thumb already is. Deleting used to
+be a small word beside a small word, and retiring did not ask at all.
+
 **The Wikipedia extract is behind a "read it."** It is four or five lines of somebody else's
 prose — the most text on the card by a distance — and the title and description are enough to
 decide whether to read it.
+
+**A finished round is two numbers.** "3 moves made · 12 left for the future", and nothing
+else. Six counters, most of them nought, read as a receipt for a transaction you did not know
+you were making, and "nothing lost" is reassurance for a worry nobody had. The second number
+counts what is still in play, *including what you just put down* — the first version counted
+only what was due now, so a round spent deferring four Inklings reported "0 left for the
+future", which is the opposite of what had just happened.
 
 **Nothing is generated until you ask.** An Inkling opens with the row of ways to get a move
 and no spinner — and while it is thinking, *nothing appears on the card at all*. There used to
@@ -722,6 +746,19 @@ becomes an ordinary Inkling again.
 
 *Say thank you* on a friend's move, and *kudos* once it has worked. One line each, because
 a note that takes as long to write as the move did is a note nobody sends.
+
+### A move from a friend is announced
+
+When somebody sends you a move it arrives as a notification — their face, the move, and the
+Inkling it is for — and it counts on the header button, because a person having spent a minute
+on your Inkling is the whole point of the social half. Finding out only by opening the right
+card is how a favour goes unnoticed.
+
+**And it can be cleared.** "clear — not now" ends the telling and nothing else: the move stays
+on the Inkling, the card still says where it came from, and the announcement is gone. Clearing
+is an event in your log like everything else, so clearing it on the phone clears it on the
+laptop, and the count is a count of what you have not dealt with rather than a count of what
+has arrived.
 
 ### A friend, and what has passed between you
 

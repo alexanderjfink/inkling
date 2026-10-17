@@ -23,8 +23,18 @@ export {
   totalOrder,
 } from './events'
 export type { AskContext, EntryContext, FeedbackContext, FriendNote, Visibility } from './events'
-export type { FriendIdentity, FriendTimelineEntry, FriendTimelineKind } from './friends'
-export { buildFriendTimeline, hasThanked, thanksReceivedNote } from './friends'
+export type {
+  FriendIdentity,
+  FriendMoveNotice,
+  FriendTimelineEntry,
+  FriendTimelineKind,
+} from './friends'
+export {
+  buildFriendTimeline,
+  hasThanked,
+  thanksReceivedNote,
+  unseenFriendMoves,
+} from './friends'
 export { REJECTION_REASONS } from './events'
 export type { RejectionContext, RejectionReason } from './events'
 export { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE } from './demo'

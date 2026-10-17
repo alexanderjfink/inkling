@@ -8,6 +8,7 @@ import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
 import { Add } from './screens/Add'
 import { AllBlips } from './screens/AllBlips'
+import { SavedTick } from './components/SavedTick'
 import { FriendScreen } from './screens/Friend'
 import { Friends } from './screens/Friends'
 import { Help } from './screens/Help'
@@ -261,7 +262,9 @@ export default function App() {
    * needs a person, which is the only kind of number worth putting on a button.
    */
   const friendsWaiting =
-    social.asks.length + social.friends.filter((friend) => friend.status === 'asked-of-you').length
+    social.asks.length +
+    social.moves.length +
+    social.friends.filter((friend) => friend.status === 'asked-of-you').length
 
   /**
    * What a feedback report needs about the app itself.
@@ -448,8 +451,13 @@ export default function App() {
         <Notifications
           social={social}
           picked={picked}
+          blips={blips}
           onClearPicked={() => setPicked(null)}
           onOpenFriends={() => go('friends')}
+          onOpenBlip={(id) => {
+            setFocusId(id)
+            go('review')
+          }}
         />
       ) : null}
 
@@ -507,6 +515,8 @@ export default function App() {
 
       {/* Last, so it sits over whatever screen it is explaining. */}
       {tourOpen ? <Tour steps={TOUR_STEPS} onDone={dismissTour} /> : null}
+      {/* And last of all, because it is about what you just did. */}
+      <SavedTick />
     </div>
   )
 }

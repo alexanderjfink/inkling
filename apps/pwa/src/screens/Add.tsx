@@ -247,8 +247,8 @@ export function Add({
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">
                 {asking.length === 1
-                  ? `${asking[0]?.username} asked for a move`
-                  : `${asking.length} friends asked for a move`}
+                  ? `${asking[0]?.username} wants your help`
+                  : 'Friends want your help!'}
               </span>
               <span className="block truncate text-xs text-ink-soft">
                 {asking[0]?.context.title}

@@ -25,3 +25,15 @@ export function formatWhen(iso: string, now: Date = new Date()): string {
   }
   return then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
+
+/** "just now", "20 min ago", "3 hours ago", then a date — for anything recent. */
+export function formatAgo(value: string, now: Date = new Date()): string {
+  const then = new Date(value)
+  if (Number.isNaN(then.getTime())) return ''
+  const minutes = Math.floor((now.getTime() - then.getTime()) / 60_000)
+  if (minutes < 2) return 'just now'
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
+  return then.toLocaleDateString()
+}

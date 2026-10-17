@@ -1,4 +1,4 @@
-import type { AskContext, Friend } from '@inkling/domain'
+import type { Friend } from '@inkling/domain'
 import { useState } from 'react'
 import { Avatar } from '../components/Avatar'
 import { ButtonLabel, Spinner } from '../components/Spinner'
@@ -22,15 +22,15 @@ function when(value: string): string {
  */
 export function Friends({
   social,
-  onSeeInklings,
+  onOpen,
 }: {
   social: SocialState
-  onSeeInklings: (friend: Friend, inklings: AskContext[]) => void
+  /** Open one friend's history: what you have asked them, and what they have asked you. */
+  onOpen: (friend: Friend) => void
 }) {
   const [username, setUsername] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
-  const [looking, setLooking] = useState<string | null>(null)
 
   const accepted = social.friends.filter((friend) => friend.status === 'accepted')
   const incoming = social.friends.filter((friend) => friend.status === 'asked-of-you')
@@ -43,15 +43,6 @@ export function Friends({
       setProblem(await work())
     } finally {
       setBusy(null)
-    }
-  }
-
-  async function look(friend: Friend) {
-    setLooking(friend.userId)
-    try {
-      onSeeInklings(friend, await social.theirInklings(friend.userId))
-    } finally {
-      setLooking(null)
     }
   }
 
@@ -126,9 +117,15 @@ export function Friends({
           </p>
         ) : (
           accepted.map((friend) => (
-            <div
+            /* The whole row opens their history: what you have asked them, what they have
+               asked you, and what has passed between you. It used to be two quiet links —
+               "their Inklings" and "unfriend" — which made ending a friendship a thing you
+               could do by a mis-tap, and buried the interesting half. */
+            <button
               key={friend.userId}
-              className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-3"
+              type="button"
+              onClick={() => onOpen(friend)}
+              className="card flex items-center gap-3 p-3 text-left transition active:scale-[0.99]"
             >
               <Avatar
                 username={friend.username}
@@ -138,27 +135,12 @@ export function Friends({
               />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">{friend.username}</span>
-                <span className="block text-xs text-ink-faint">since {when(friend.at)}</span>
+                <span className="block text-xs text-ink-faint">
+                  since {when(friend.at)} · tap for what has passed between you
+                </span>
               </span>
-              <button
-                type="button"
-                disabled={looking !== null}
-                onClick={() => void look(friend)}
-                className="quiet text-xs underline disabled:opacity-40"
-              >
-                <ButtonLabel busy={looking === friend.userId}>
-                  {looking === friend.userId ? 'looking…' : 'their Inklings'}
-                </ButtonLabel>
-              </button>
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void run(`r:${friend.userId}`, () => social.remove(friend.userId))}
-                className="quiet text-xs underline disabled:opacity-40"
-              >
-                unfriend
-              </button>
-            </div>
+              <span className="text-ink-faint">›</span>
+            </button>
           ))
         )}
       </section>

@@ -1555,48 +1555,56 @@ export function Review({
           the middle one is filled, so the one you press most is also the one you see first.
           They were all grey once, which read as three disabled buttons and one live one. */}
       {!composer ? (
-        <div className="mt-6 flex flex-wrap items-end justify-center gap-4">
-          {move && !friendMove ? null : (
-            <button
-              type="button"
-              onClick={generateMove}
-              disabled={moveLoading}
-              className="flex flex-col items-center gap-1.5 disabled:opacity-40"
-            >
-              <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
-                ✦
-              </span>
-              <span className="text-xs font-medium text-ink">
-                <ButtonLabel busy={moveLoading}>
-                  {moveLoading ? 'thinking…' : 'Generate'}
-                </ButtonLabel>
-              </span>
-            </button>
-          )}
+        /* The four are not one row of equals. Three of them ask for a move — from the app,
+           from yourself, from a person — and they are centred, because they are the choice.
+           Putting it down is the other thing you can do with a card, and it keeps to the right
+           edge of the row rather than sitting in the middle of the choice. Centring the three
+           in what is left, rather than on the screen, is what keeps "Ask a Friend" and "till
+           Tuesday" from touching at 390px: there is room for one or the other. */
+        <div className="mt-6 flex items-end gap-3">
+          <div className="flex flex-1 flex-wrap items-end justify-center gap-3">
+            {move && !friendMove ? null : (
+              <button
+                type="button"
+                onClick={generateMove}
+                disabled={moveLoading}
+                className="flex flex-col items-center gap-1.5 disabled:opacity-40"
+              >
+                <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
+                  ✦
+                </span>
+                <span className="text-xs font-medium text-ink">
+                  <ButtonLabel busy={moveLoading}>
+                    {moveLoading ? 'thinking…' : 'Generate'}
+                  </ButtonLabel>
+                </span>
+              </button>
+            )}
 
-          {/* The one you press most, and it looks like it: the only filled, round thing in
+            {/* The one you press most, and it looks like it: the only filled, round thing in
               the row, and bigger than the others, so the thumb finds it without looking. */}
-          <button
-            type="button"
-            onClick={() => setComposer({ move: null })}
-            className="flex flex-col items-center gap-1.5"
-          >
-            <span className="circle circle--accent h-16 w-16 text-2xl">+</span>
-            <span className="text-xs font-medium text-ink">New Move</span>
-          </button>
-
-          {socialOn && !current.demo ? (
             <button
               type="button"
-              onClick={() => setAskOpen((open) => !open)}
+              onClick={() => setComposer({ move: null })}
               className="flex flex-col items-center gap-1.5"
             >
-              <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
-                ☺
-              </span>
-              <span className="text-xs font-medium text-accent">Ask a Friend</span>
+              <span className="circle circle--accent h-16 w-16 text-2xl">+</span>
+              <span className="text-xs font-medium text-ink">New Move</span>
             </button>
-          ) : null}
+
+            {socialOn && !current.demo ? (
+              <button
+                type="button"
+                onClick={() => setAskOpen((open) => !open)}
+                className="flex flex-col items-center gap-1.5"
+              >
+                <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
+                  ☺
+                </span>
+                <span className="text-xs font-medium text-accent">Ask a Friend</span>
+              </button>
+            ) : null}
+          </div>
 
           {/* Putting it down belongs with the ways to get a move, because it is one of the
               things you do with a card rather than a footnote to it. Its label is the date it
@@ -1605,10 +1613,12 @@ export function Review({
             type="button"
             onClick={() => void defer(DEFAULT_DEFERRAL)}
             title="Put it down, and have it come back then"
-            className="flex flex-col items-center gap-1.5"
+            className="flex w-[74px] shrink-0 flex-col items-center gap-1.5"
           >
             <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">✓</span>
-            <span className="text-xs font-medium text-ink">till {deferDay}</span>
+            <span className="text-center text-xs font-medium whitespace-nowrap text-ink">
+              till {deferDay}
+            </span>
           </button>
         </div>
       ) : null}

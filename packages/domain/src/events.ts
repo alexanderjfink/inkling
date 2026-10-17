@@ -260,8 +260,24 @@ export interface FriendNote {
   kind: 'kudos' | 'thanks'
   /** The other person's username, as it was when the note was written. */
   username: string
+  /**
+   * Who it was with, once that was known.
+   *
+   * Usernames are unique, so a name was enough until a screen had to group notes *by*
+   * person — and a name is what somebody chose, not what identifies them.
+   */
+  userId?: string
   /** What the note was about, when it was about a move. */
   moveTitle?: string
+  /**
+   * The Inkling it was about, by the id of whoever is holding it.
+   *
+   * A note *event* carries the blip as its own id only when the blip is yours — a thank-you
+   * you send about your own Inkling has a fresh event id, because the note is a thing that
+   * happened to somebody else as well. Without this, "have I thanked them for this one?" had
+   * nothing to match on, and the button kept asking.
+   */
+  blipId?: string
   text: string
   at: ISODate
 }

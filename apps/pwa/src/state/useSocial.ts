@@ -281,7 +281,9 @@ export function useSocial({
           direction: 'out',
           kind,
           username: to.username,
+          userId: to.userId,
           moveTitle,
+          blipId: blipId || undefined,
           text,
           at: result.value.message.at,
         })
@@ -339,7 +341,9 @@ async function ingest(message: SocialMessage, actions: InklingActions): Promise<
         direction: 'in',
         kind: message.kind,
         username: message.fromUsername,
+        userId: message.from,
         moveTitle: message.kind === 'kudos' ? message.moveTitle : undefined,
+        blipId: message.blipId || undefined,
         text: message.text,
         at: message.at,
       })

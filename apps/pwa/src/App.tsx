@@ -8,6 +8,7 @@ import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
 import { Add } from './screens/Add'
 import { AllBlips } from './screens/AllBlips'
+import { FriendScreen } from './screens/Friend'
 import { Friends } from './screens/Friends'
 import { Help } from './screens/Help'
 import { Notifications } from './screens/Notifications'
@@ -27,7 +28,16 @@ import { useTheme } from './state/useTheme'
 import { TOUR_KEY, TOUR_STEPS } from './tour'
 
 /** No home screen: the app opens on entry, which is what you came to do. */
-type Screen = 'add' | 'review' | 'all' | 'settings' | 'you' | 'help' | 'friends' | 'notifications'
+type Screen =
+  | 'add'
+  | 'review'
+  | 'all'
+  | 'settings'
+  | 'you'
+  | 'help'
+  | 'friends'
+  | 'friend'
+  | 'notifications'
 
 const TITLES: Record<Screen, string> = {
   add: 'Add an Inkling',
@@ -37,6 +47,7 @@ const TITLES: Record<Screen, string> = {
   you: 'You',
   help: 'Help',
   friends: 'Friends',
+  friend: 'A friend',
   notifications: 'Notifications',
 }
 
@@ -53,10 +64,16 @@ export default function App() {
    * screen it leaves the app entirely — from a card you were reading. The entry screen is the
    * one with nothing behind it, so that is where back leaves.
    */
+  /** Where we are, for the pop handler: it must not read a stale closure. */
+  const screenRef = useRef(screen)
+  screenRef.current = screen
+
   useEffect(() => {
     const onPop = (event: PopStateEvent) => {
       const wanted = (event.state as { screen?: Screen } | null)?.screen
-      if (!wanted) {
+      // The entry screen is the bottom of the app, so back from it stays here — and that
+      // covers a stale entry underneath as well as nothing underneath.
+      if (!wanted || screenRef.current === 'add') {
         /**
          * Nothing of ours behind: back was pressed on the entry screen, which is the bottom
          * of the app. It used to leave — from the screen you land on, so the app closed when
@@ -99,6 +116,18 @@ export default function App() {
    */
   const { ready, events, blips, actions } = useInkling(auth.user?.id ?? null)
 
+  /**
+   * Signing in puts you on the entry screen, whatever you were looking at when you signed
+   * out — and signing out happens *from* the You screen, so that was exactly where you were.
+   * Every account gets the same start.
+   */
+  useEffect(() => {
+    if (!auth.user?.id) return
+    setScreen('add')
+    setFocusId(null)
+    window.history.replaceState({ screen: 'add' }, '')
+  }, [auth.user?.id])
+
   /** Sync waits for a session: before signing in every request would be a 401. */
   const signedIn = auth.ready && (!auth.accounts || !auth.signedOut)
   const syncState = useSync({
@@ -130,6 +159,8 @@ export default function App() {
   })
   /** A friend's shared Inkling chosen from the friends screen, to suggest on unprompted. */
   const [picked, setPicked] = useState<{ friend: Friend; context: AskContext } | null>(null)
+  /** Which friend's history is open, by id: a name is not an identity. */
+  const [friendId, setFriendId] = useState<string | null>(null)
 
   const active = blips.filter((blip) => !blip.deleted).length
   const { open: tourOpen, setOpen: setTourOpen } = useTour({
@@ -284,8 +315,16 @@ export default function App() {
           >
             ‹
           </button>
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">{TITLES[screen]}</h1>
-          {socialOn ? <FriendsButton count={friendsWaiting} onClick={() => go('friends')} /> : null}
+          {/* A friend's screen is about a person, so it says their name. */}
+          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
+            {screen === 'friend'
+              ? (social.friends.find((entry) => entry.userId === friendId)?.username ??
+                TITLES.friend)
+              : TITLES[screen]}
+          </h1>
+          {socialOn ? (
+            <FriendsButton count={friendsWaiting} onClick={() => go('notifications')} />
+          ) : null}
         </header>
       ) : null}
 
@@ -373,18 +412,37 @@ export default function App() {
       {ready && screen === 'friends' ? (
         <Friends
           social={social}
-          onSeeInklings={(friend, inklings) => {
-            const first = inklings[0]
-            if (!first) {
-              setPicked(null)
-              go('notifications')
-              return
-            }
-            setPicked({ friend, context: first })
-            go('notifications')
+          onOpen={(friend) => {
+            setFriendId(friend.userId)
+            go('friend')
           }}
         />
       ) : null}
+
+      {ready && screen === 'friend'
+        ? (() => {
+            const friend = social.friends.find((entry) => entry.userId === friendId)
+            // The friendship can be gone while the screen is open — the other end can end it —
+            // so there is nothing to show rather than a screen about nobody.
+            if (!friend) {
+              return <p className="text-xs text-ink-faint">That is no longer a friendship.</p>
+            }
+            return (
+              <FriendScreen
+                friend={friend}
+                social={social}
+                events={events}
+                blips={blips}
+                onOpenBlip={(id) => {
+                  setFocusId(id)
+                  go('review')
+                }}
+                onAnswer={() => go('notifications')}
+                onUnfriended={() => go('friends')}
+              />
+            )
+          })()
+        : null}
 
       {ready && screen === 'notifications' ? (
         <Notifications

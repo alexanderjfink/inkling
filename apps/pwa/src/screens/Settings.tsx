@@ -5,7 +5,7 @@ import {
   PROFILE_COLORS,
   type ShareDefault,
 } from '@inkling/domain'
-import { validatePassword } from '@inkling/domain'
+import { thanksReceivedNote, validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
 import { changeOwnPassword, clearMyAvatar, setMyAvatar, setMyColor } from '../admin'
 import { Admin } from './Admin'
@@ -172,6 +172,8 @@ export function Settings({
   const [socialEnabled, setSocialEnabled] = useState(true)
   const [shareDefault, setShareDefault] = useState<ShareDefault>('friends')
   const visible = only ? TABS.filter((entry) => only.includes(entry.id)) : TABS
+  /** Thank-yous this account has been sent. Read from the log, like everything else. */
+  const thanksReceived = thanksReceivedNote(events)
   const [tab, setTab] = useState<Tab>(only?.[0] ?? 'you')
   const [color, setColor] = useState<string | undefined>()
   const [savingColor, setSavingColor] = useState(false)
@@ -420,6 +422,32 @@ export function Settings({
               first account created becomes the admin.
             </p>
           )}
+        </Section>
+      ) : null}
+
+      {tab === 'you' ? (
+        <Section title="The help you have given">
+          {/* The one number in the app that is not about you getting through something. A
+              thank-you is somebody saying that what you thought of was worth doing, and a
+              count of them is the only reward here that comes from another person. */}
+          <div className="flex items-center gap-4">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-accent-soft text-2xl">
+              🙏
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-lg font-semibold">
+                {thanksReceived}
+                <span className="ml-1.5 text-sm font-normal text-ink-soft">
+                  {thanksReceived === 1 ? 'thank you' : 'thank yous'}
+                </span>
+              </span>
+              <span className="block text-xs text-ink-faint">
+                {thanksReceived === 0
+                  ? 'Nobody has thanked you yet. Suggest a move for a friend and you might get one.'
+                  : 'from friends, for moves you thought of.'}
+              </span>
+            </span>
+          </div>
         </Section>
       ) : null}
 

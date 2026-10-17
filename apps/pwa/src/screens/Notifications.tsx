@@ -1,22 +1,9 @@
-import type { AskContext, Friend, MoveSpec } from '@inkling/domain'
+import type { AskContext, Friend } from '@inkling/domain'
 import { useState } from 'react'
 import { Avatar } from '../components/Avatar'
-import { ButtonLabel } from '../components/Spinner'
+import { Suggest } from '../components/Suggest'
+import { formatAgo } from '../format'
 import type { SocialState } from '../state/useSocial'
-
-const field =
-  'w-full rounded-2xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent'
-
-function when(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  const minutes = Math.floor((Date.now() - date.getTime()) / 60_000)
-  if (minutes < 2) return 'just now'
-  if (minutes < 60) return `${minutes} min ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours} hour${hours === 1 ? '' : 's'} ago`
-  return date.toLocaleDateString()
-}
 
 /** What a friend is looking at when they decide what to suggest. */
 function Ask({
@@ -71,119 +58,6 @@ function Ask({
       ) : null}
       {note ? <p className="mt-2 text-xs text-accent italic">“{note}”</p> : null}
       {children}
-    </div>
-  )
-}
-
-/**
- * Suggesting a move for somebody else's Inkling.
- *
- * Deliberately the same three fields a move has always had — a title, a goal, and how long
- * it takes — because a friend is making the same kind of thing a playbook or a model makes,
- * and it should feel like the same kind of thing. Where to look is optional here, since a
- * person can name a page or a phrase they already know about.
- */
-function Suggest({
-  context,
-  onSend,
-  onCancel,
-}: {
-  context: AskContext
-  onSend: (move: MoveSpec, note: string) => Promise<string | null>
-  onCancel: () => void
-}) {
-  const [title, setTitle] = useState('')
-  const [goal, setGoal] = useState('')
-  const [minutes, setMinutes] = useState('5')
-  const [lookUp, setLookUp] = useState('')
-  const [note, setNote] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [problem, setProblem] = useState<string | null>(null)
-
-  const ready = title.trim().length > 0 && goal.trim().length > 0
-
-  async function send() {
-    if (!ready || busy) return
-    setBusy(true)
-    setProblem(null)
-    try {
-      const seconds = Math.max(1, Math.min(15, Number(minutes) || 5)) * 60
-      const problemText = await onSend(
-        {
-          id: 'friend.suggested',
-          title: title.trim(),
-          why: 'because a friend thought of it',
-          timeLimitSec: seconds,
-          goal: goal.trim(),
-          playbook: 'friend',
-          generatedBy: 'friend',
-          ...(lookUp.trim() ? { lookUp: [lookUp.trim()] } : {}),
-        },
-        note.trim(),
-      )
-      if (problemText) setProblem(problemText)
-      else onCancel()
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="mt-3 flex flex-col gap-2 rounded-2xl border border-line bg-surface/40 p-3">
-      <p className="text-xs tracking-wide text-ink-faint uppercase">suggest a move</p>
-      <input
-        value={title}
-        onChange={(event) => setTitle(event.target.value)}
-        placeholder="what should they do? e.g. Play one chord badly, twice"
-        className={field}
-      />
-      <input
-        value={goal}
-        onChange={(event) => setGoal(event.target.value)}
-        placeholder="what does done look like? e.g. one chord, both times"
-        className={field}
-      />
-      <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-xs text-ink-soft">
-          minutes
-          <input
-            value={minutes}
-            onChange={(event) => setMinutes(event.target.value)}
-            inputMode="numeric"
-            className="w-16 rounded-xl border border-line bg-surface p-2 text-sm outline-none focus:border-accent"
-          />
-        </label>
-        <input
-          value={lookUp}
-          onChange={(event) => setLookUp(event.target.value)}
-          placeholder="something to look up (optional)"
-          className={`${field} flex-1`}
-        />
-      </div>
-      <input
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        placeholder="anything you want to say with it (optional)"
-        className={field}
-      />
-      {problem ? <p className="text-xs text-warn">{problem}</p> : null}
-      <div className="flex items-center gap-3">
-        <button type="button" onClick={onCancel} className="quiet text-xs underline">
-          cancel
-        </button>
-        <button
-          type="button"
-          disabled={!ready || busy}
-          onClick={() => void send()}
-          className="ml-auto rounded-full bg-ink px-5 py-2.5 text-xs font-semibold text-surface disabled:opacity-40"
-        >
-          <ButtonLabel busy={busy}>{busy ? 'Sending…' : 'Send the move'}</ButtonLabel>
-        </button>
-      </div>
-      <p className="text-xs text-ink-faint">
-        It arrives on “{context.title}” as coming from you, and pops to the top of their stack until
-        they have done something with it.
-      </p>
     </div>
   )
 }
@@ -258,6 +132,25 @@ export function Notifications({
         </section>
       ) : null}
 
+      {/* Notifications first, and friends one press further on. The two were the same button
+          in the header — it opened whichever had something in it — which meant the way to
+          your friends changed depending on whether anybody had asked you for anything. */}
+      <button
+        type="button"
+        onClick={onOpenFriends}
+        className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
+      >
+        <span className="circle h-10 w-10 shrink-0 text-lg leading-none">☺</span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Friends</span>
+          <span className="block text-xs text-ink-faint">
+            {social.friends.filter((friend) => friend.status === 'accepted').length} of them · who
+            you can ask, and who can ask you
+          </span>
+        </span>
+        <span className="text-ink-faint">›</span>
+      </button>
+
       <section className="flex flex-col gap-2">
         <p className="text-xs tracking-wide text-ink-faint uppercase">
           asked for a move · {social.asks.length}
@@ -265,9 +158,9 @@ export function Notifications({
 
         {social.asks.length === 0 ? (
           <p className="text-xs text-ink-faint">
-            Nobody has asked you for anything yet. When somebody does, their Inkling turns up here —
-            with what they have written about it and what has already been suggested — and you can
-            send them something to do.
+            Nobody is waiting on you. When somebody asks, their Inkling turns up here — with what
+            they have written about it and what has already been suggested — and you can send them
+            something to do.
           </p>
         ) : (
           social.asks.map((ask) => {
@@ -295,7 +188,7 @@ export function Notifications({
                       >
                         Suggest a move for {ask.username}
                       </button>
-                      <span className="text-xs text-ink-faint">asked {when(ask.at)}</span>
+                      <span className="text-xs text-ink-faint">asked {formatAgo(ask.at)}</span>
                     </div>
                   ) : null}
                   {openFor === ask.messageId ? (
@@ -319,10 +212,6 @@ export function Notifications({
           })
         )}
       </section>
-
-      <button type="button" onClick={onOpenFriends} className="quiet self-start text-xs underline">
-        friends — who you can ask, and who can ask you
-      </button>
     </div>
   )
 }

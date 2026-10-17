@@ -306,6 +306,10 @@ header stays at the top, because it is the one thing that should not move — an
 lives with the centred group rather than in the header, where at 390px it truncated to "Make
 Moves on your Inkli…", which is worse than not saying it.
 
+The card for somebody waiting on you says **"priya wants your help"** — one person by name, or
+*Friends want your help!* for more than one. It used to say "2 friends asked for a move", which
+describes a queue rather than a person who is stuck.
+
 **Entry opens as a button.** "What did you notice?" is a button, not a placeholder — it is an
 invitation rather than a form, and tapping it opens the field with the cursor in it. That is
 also the only way a phone will raise the keyboard, since it will not do it for a focus nobody
@@ -450,14 +454,16 @@ rather than quietly counted as empty.
 
 | | |
 |---|---|
-**Four things on one line, and the fourth is putting it down.** *Generate*, *New Move* (write
-your own), *Ask a Friend*, and **till Tuesday** — which is the deferral, labelled with the day
-it picked, so "later" is never a date you cannot see. Putting it down belongs with the ways to
-get a move, because it is one of the things you do with a card rather than a footnote to it.
-**Export** is a quiet link under them. The row used to be five things where three were a
-question and two were an answer, and the outer buttons were grey enough to read as disabled
-next to the one filled one — the three that ask for something now carry the accent, and only
-the one you press most is filled.
+**Four things in one row, and they are not equals.** *Generate*, *New Move* (write your own)
+and *Ask a Friend* are centred, because they are the choice; **till Tuesday** — the deferral,
+labelled with the day it picked, so "later" is never a date you cannot see — keeps to the right
+edge of the row. The three centre in what is *left* rather than on the screen: at 390px there
+is room for the three or for the row of four centred on the middle, not both, and centring on
+the middle put "Ask a Friend" against "till Tuesday". **Export** is a quiet link underneath.
+
+The row used to be five things where three were a question and two were an answer, and its
+outer buttons were grey enough to read as disabled next to the one filled one. The three that
+ask for something carry the accent now; only the one you press most is filled.
 
 **The Wikipedia extract is behind a "read it."** It is four or five lines of somebody else's
 prose — the most text on the card by a distance — and the title and description are enough to
@@ -635,6 +641,17 @@ to be shown what they have been noticing. They see the request the next time the
 Inkling, and nothing of yours is visible until they accept. Removing one takes away both
 directions at once.
 
+### Suggesting, for somebody else
+
+Suggesting a move is deliberately the same three fields a move has always had — what they
+should do, what done looks like, and how long it takes — plus somewhere to say why. Nothing
+else: *"something to look up"* was a fourth box that asked a person to do the searching half of
+the job the app does for a generated move, and nobody filled it in.
+
+It is one component (`Suggest.tsx`) rather than two, because it is reachable from two places
+now: answering somebody who asked, and suggesting something unprompted after looking at what a
+friend has been noticing.
+
 ### Asking
 
 **The way to friends is a button in the header**, on every screen, carrying the number of
@@ -700,6 +717,37 @@ becomes an ordinary Inkling again.
 *Say thank you* on a friend's move, and *kudos* once it has worked. One line each, because
 a note that takes as long to write as the move did is a note nobody sends.
 
+### A friend, and what has passed between you
+
+Tapping a friend opens their history: everything that has gone both ways, newest first, with
+filters for *both ways*, *you → them* and *them → you*. Four kinds of thing are in it — asks in
+either direction, moves suggested in either direction, and notes and thank-yous — and each one
+says which it is and what it was about.
+
+**It is read from this device's own log, not asked of the server.** That is what makes it
+complete: every ask, every suggested move and every thank-you was written down here in both
+directions when it happened, and the server only ever carried the messages. It survives the
+server being unreachable, and it works for the things that never needed a network at all.
+
+**An ask says whether it is still waiting** — one you sent until something comes back, one they
+sent until something goes back. An answer counts whether it came from the ask in the
+notifications list or from browsing their Inklings, because the match is on the Inkling as well
+as on the ask. It has to: only one of those two ways knows which ask it is answering.
+
+**Both directions are on by default.** A list of only what you asked for reads as an invoice;
+the half where you helped them is what makes it a friendship.
+
+**Thanking is one tap**, on anything they did for you — a move they suggested, and no form
+asking what you are grateful for, because that is a form nobody fills in. It sends 🙏 with the
+name of the move, and the entry says "thanked" afterwards rather than asking again.
+
+**And the thank-yous you collect are counted in your own profile**, under *the help you have
+given*. It is the one number in the app that is not about you getting through something: a
+thank-you is another person saying that what you thought of was worth doing, and it is the only
+reward here that comes from somebody else. Each friend's screen has the count both ways as
+well, because a count each way is a record of the two of you and a count of what you are owed
+is a score.
+
 ### Who can see what
 
 Per Inkling, on its card: **private** or **friends**. What you noticed on Tuesday is not the
@@ -764,6 +812,11 @@ hiding Sync is not a dead end.
 
 **Admin is a tab rather than a button**, and only an admin's screen has it at all: a member
 sees no trace of it rather than a tab that refuses to open.
+
+**The smiling face opens notifications**, and friends are one press further on, from the button
+at the top of that screen. The two used to share one header button that opened whichever had
+something in it, which meant the way to your friends moved depending on whether anybody had
+asked you for anything.
 
 **The model is not in there any more.** It moved to the admin screen, and it is now one
 model for the whole server rather than one per account. That is the honest shape: it runs on
@@ -1047,6 +1100,13 @@ context, so everything works without a certificate.
 
 Note: each origin (scheme + host + port) gets its own local datastore, so blips
 captured under `http://localhost:5173` will not appear under `https://<lan-ip>:5173`.
+
+## Signing in
+
+**Signing in lands on the entry screen**, whichever screen you were last on. Signing out happens
+*from* the You screen, so that was exactly where you were — and coming back to a profile page
+you had already read, when you signed in to write something down, is a screen you have to get
+past. Every account gets the same start.
 
 ## Going back
 

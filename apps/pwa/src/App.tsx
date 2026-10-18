@@ -306,7 +306,15 @@ export default function App() {
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-xl flex-col p-4">
+    /* The Review screen is a fixed height, so the card inside it scrolls and not the page. With
+       `min-h-dvh` the column grew to fit its content instead, the page did the scrolling, and the
+       card's own scroll position meant nothing — which is why "at the bottom of the card" was true
+       the whole time, and reading to the end of an Inkling flipped to the next one. */
+    <div
+      className={`mx-auto flex max-w-xl flex-col p-4 ${
+        screen === 'review' ? 'h-dvh overflow-hidden' : 'min-h-dvh'
+      }`}
+    >
       {/* The entry screen carries its own header, because it is where you start. */}
       {screen !== 'add' ? (
         <header className="mb-4 flex items-center gap-3">

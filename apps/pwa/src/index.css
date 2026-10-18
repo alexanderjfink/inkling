@@ -265,3 +265,36 @@ body {
 .tray-in {
   animation: tray-in 180ms ease-out;
 }
+
+/*
+ * The next Inkling arriving.
+ *
+ * Only the offset animates. The old card slides out in the direction of the flick, the round
+ * moves on underneath, and the new one comes in from the far side — because a card that simply
+ * appears is indistinguishable from the app having jumped somewhere on its own.
+ */
+@keyframes card-in-next {
+  from {
+    transform: translateY(28px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-in-prev {
+  from {
+    transform: translateY(-28px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.card-in-next {
+  animation: card-in-next 220ms ease-out;
+}
+
+.card-in-prev {
+  animation: card-in-prev 220ms ease-out;
+}

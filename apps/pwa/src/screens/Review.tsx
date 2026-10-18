@@ -240,17 +240,36 @@ function useRoundSwipe({
    * scroll that brings you there starts in the middle of the card, so it can never qualify; the
    * flick after it starts at the end, and has to travel this far to mean anything.
    */
-  const FLICK_PX = 110
+  const FLICK_PX = 140
   const FLICK_WHEEL = 300
   /** Quiet for this long ends a wheel gesture — a mouse has no touchstart to tell us. */
   const GESTURE_GAP = 240
 
   const jumpedAt = useRef(0)
+  const sliding = useRef<'down' | 'up' | null>(null)
+  const [leaving, setLeaving] = useState<'down' | 'up' | null>(null)
+  /** Which way the last flip went, so the new card can come in from the far side. */
+  const [flip, setFlip] = useState<'down' | 'up'>('down')
   const canJump = () => Date.now() - jumpedAt.current > 650
+  /**
+   * A flip, with the card sliding out of the way first.
+   *
+   * Without it the next Inkling simply appeared, which is indistinguishable from the app having
+   * jumped somewhere on its own. The card leaves in the direction the gesture was going, the
+   * round moves on underneath, and the new one arrives from the other side.
+   */
   const jump = (direction: 'down' | 'up') => {
+    if (sliding.current) return
     jumpedAt.current = Date.now()
-    if (direction === 'down') next()
-    else previous()
+    sliding.current = direction
+    setFlip(direction)
+    setLeaving(direction)
+    window.setTimeout(() => {
+      if (direction === 'down') next()
+      else previous()
+      sliding.current = null
+      setLeaving(null)
+    }, 200)
   }
 
   const wheelAt = useRef(0)
@@ -345,13 +364,23 @@ function useRoundSwipe({
     },
   }
 
+  /** The card's own transform: out of the way when it is leaving, in from the side when it lands. */
+  const slide = {
+    transform: leaving ? `translateY(${leaving === 'down' ? '-14%' : '14%'})` : undefined,
+    opacity: 1,
+    transition: leaving ? 'transform 200ms ease' : 'transform 220ms ease-out',
+  }
+
   return {
     cardRef,
     handlers,
     pull,
     armed,
-    previous,
-    next,
+    previous: () => jump('up'),
+    next: () => jump('down'),
+    slide,
+    /** The class for the card arriving after a flip. */
+    arrival: flip === 'down' ? 'card-in-next' : 'card-in-prev',
     showPrevious: hasPrevious,
     showNext: hasNext,
   }
@@ -1311,7 +1340,7 @@ export function Review({
     moveId ? current.moves.find((entry_) => entry_.moveId === moveId)?.spec : undefined
 
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-3 flex items-center gap-2">
         {/* Three windows on the same list: what is due now, what is coming back inside the
             week, and everything. "All" used to mean "everything active", which is not a
@@ -1341,13 +1370,15 @@ export function Review({
         </span>
       </div>
 
-      <div className="relative flex flex-1 flex-col">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div
           ref={round.cardRef}
           onWheel={round.handlers.onWheel}
           onTouchStart={round.handlers.onTouchStart}
           onTouchMove={round.handlers.onTouchMove}
-          className="card flex flex-1 flex-col overflow-y-auto overscroll-contain p-6"
+          key={current.id}
+          style={round.slide}
+          className={`card ${round.arrival} flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-6`}
         >
           {/* The way to the other Inklings in this round, stuck to the top and the bottom of the
               card so it is always there — and `touch-action: none`, so a swipe on it is a swipe

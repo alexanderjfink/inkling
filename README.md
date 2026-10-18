@@ -871,15 +871,24 @@ right. Nothing of the kind sits below the card any more; three round buttons und
 the page's, not this Inkling's. The three sit on a row of their own because at 390px they do not
 fit beside the two corner buttons, and squeezing them made every label wrap.
 
+**The card scrolls, not the page, and that was the whole of the problem.** The shell of the app
+was `min-h-dvh`, so the column grew to fit its content, the *page* did the scrolling, and the
+card's own scroll position meant nothing: `atBottom()` was true from the moment the screen opened,
+so reading to the end of an Inkling flipped to the next one. The Review screen now has a real
+height (`h-dvh overflow-hidden`) and `min-h-0` down the flex chain, so the card is the scroll
+container and its position means something.
+
 **Scrolling past either end of the card goes to the next or the previous Inkling — on a firmer
 flick than the first attempt.** That version jumped the moment the card was at the end and
 anything tried to scroll further, *including the momentum of the scroll that had just arrived
 there*, so reaching the bottom of an Inkling immediately moved to the next one and the bottom of
 the card could not be read at all.
 
-What it takes now is a **separate gesture that begins with the card already at the end**: a wheel
+What it takes is a **separate gesture that begins with the card already at the end**: a wheel
 gesture started by a pause in the events, or a touch that starts at the bound, and which then has
-to travel 110px (300 of wheel) to mean anything. The scroll that brings you to the end starts in
+to travel 140px (300 of wheel) to mean anything — and the whole card slides out in the direction of
+the flick with the next one arriving from the far side, because a card that simply appears is
+indistinguishable from the app having jumped somewhere on its own. The scroll that brings you to the end starts in
 the middle of the card, so it can never qualify — you see all of it first, and then a flick moves
 on. This needed a different mechanism from the pointer drags in the first place: the card is the
 scroll container, so the browser keeps the vertical gesture and never lets a drag finish. It does

@@ -403,6 +403,7 @@ export default function App() {
           onFeedback={actions.giveFeedback}
           social={social}
           socialOn={socialOn}
+          fabVisible={!readingDown}
         />
       ) : null}
 

@@ -803,6 +803,7 @@ export function Review({
   onFeedback,
   social,
   socialOn,
+  fabVisible,
 }: {
   blips: Blip[]
   actions: InklingActions
@@ -820,6 +821,8 @@ export function Review({
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
   social: SocialState
   socialOn: boolean
+  /** Whether the floating + is on screen: the bottom of the page gives way to it. */
+  fabVisible: boolean
 }) {
   const [session, setSession] = useState<string[] | null>(null)
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
@@ -1739,28 +1742,6 @@ export function Review({
             </div>
           ) : null}
 
-          {/* Asking a friend puts its next step where generating a move puts its result:
-            inside the card, above the actions. It used to open under the two buttons at the
-            bottom of the screen, so the thing you had just started was somewhere other than
-            where the thing you might have started instead would have been. */}
-          {!composer && askOpen ? (
-            <div className="mt-5">
-              <AskPanel
-                blip={current}
-                social={social}
-                onClose={() => setAskOpen(false)}
-                onShare={() => void actions.share(current.id, 'friends')}
-                // Asking a person is the other way of getting a move, so the one the app made
-                // is no longer the thing being answered: it goes, and the two buttons come
-                // back for whenever the answer arrives.
-                onAsked={() => {
-                  setAskOpen(false)
-                  discardMove()
-                }}
-              />
-            </div>
-          ) : null}
-
           {composer ? (
             <div className="mt-5 flex flex-col gap-3">
               {composer.move ? (
@@ -2006,39 +1987,8 @@ export function Review({
                 </button>
               </div>
 
-              {/* Right next to the suggestion, and louder than the rest of this row, because
-                this is the moment the question occurs to somebody: the move is not it, and
-                there is a person who might know better. It used to be a quiet link under the
-                card, which is where things go to be not found. */}
               {/* Only when the friend's move is not the one on screen: there is one ask per
                 card, always in the place you were looking when you wanted it. */}
-              {socialOn && !current.demo && !friendMove ? (
-                <div className="mt-3 flex flex-col gap-2">
-                  {askOpen ? (
-                    <AskPanel
-                      blip={current}
-                      social={social}
-                      onClose={() => setAskOpen(false)}
-                      onShare={() => void actions.share(current.id, 'friends')}
-                    />
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setAskOpen(true)}
-                        className="self-start rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
-                      >
-                        ask a friend for a move
-                      </button>
-                      {social.friends.some((friend) => friend.status === 'accepted') ? null : (
-                        <span className="text-xs text-ink-faint">
-                          add one by username first — they have to say yes
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              ) : null}
 
               {rejecting ? (
                 <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line bg-surface/60 p-3">
@@ -2220,14 +2170,21 @@ export function Review({
             type="button"
             onClick={() => void defer(DEFAULT_DEFERRAL)}
             title={`Put it down until ${deferDay} — it comes back then`}
-            className="sticky bottom-7 z-10 mr-1 self-end rounded-2xl border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-soft shadow-circle"
+            className="sticky bottom-16 z-10 mr-1 flex flex-col items-center gap-1 self-end"
           >
-            <span aria-hidden="true">⏱</span>{' '}
-            <span className="whitespace-nowrap">{deferShort}</span>
+            {/* A circle rather than a pill: it is the one control on the card that is always
+                there, and the round shape says so — the shape the buttons along the bottom used
+                to have. */}
+            <span className="circle flex h-14 w-14 items-center justify-center border border-line text-2xl">
+              ⏱
+            </span>
+            <span className="rounded-full border border-line bg-surface px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-ink-soft">
+              {deferShort}
+            </span>
           </button>
         ) : null}
 
-        {round.showNext ? (
+        {round.showNext && !fabVisible ? (
           <button
             type="button"
             {...round.handlers}
@@ -2247,7 +2204,7 @@ export function Review({
             and that is the choice. Retiring covers "not for a long time". */}
         </div>
 
-        {current.demo ? (
+        {current.demo && !fabVisible ? (
           <div className="mt-4 flex justify-center">
             <button type="button" onClick={() => void remove()} className="quiet text-xs underline">
               that was an example — remove it
@@ -2260,17 +2217,21 @@ export function Review({
           leaving. The button is already saying "thinking", and it is where you pressed. */}
 
         {/* Here as well as on the entry screen, because this is where a suggestion is
-          judged — and "the moves are bad" is worth hearing from the card that showed one. */}
-        <div className="mt-3 flex justify-center">
-          <Feedback
-            env={feedbackEnv}
-            screen="review"
-            blip={current}
-            move={move}
-            onSend={onFeedback}
-            className="text-xs text-ink-faint"
-          />
-        </div>
+          judged — and "the moves are bad" is worth hearing from the card that showed one. Not
+          while the + is up, though: two bits of small text under a floating button is a lot of
+          noise at the moment you are about to act. */}
+        {fabVisible ? null : (
+          <div className="mt-3 flex justify-center">
+            <Feedback
+              env={feedbackEnv}
+              screen="review"
+              blip={current}
+              move={move}
+              onSend={onFeedback}
+              className="text-xs text-ink-faint"
+            />
+          </div>
+        )}
 
         {menuOpen ? (
           <div className="fixed inset-0 z-40 flex flex-col justify-end">

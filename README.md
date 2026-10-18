@@ -727,6 +727,12 @@ directions at once.
 
 ### Asking, and thanking
 
+**One ask form, in one place.** It used to render in three: above the actions, inside the app's
+move card, and as the last slot in the friend ring — so pressing "Ask Friend" opened two of them
+at once, and there was a third waiting behind whichever of the others you were looking at. The
+ring's slot is the one, because it is where a swipe with nothing left to show lands too.
+
+
 **Ask as many as you like.** The panel is a row of chips you toggle, and it sends one message
 each rather than one message to several — an ask is one person's to answer, and a single message
 with two recipients would let the first answer look like it answered for both.
@@ -865,11 +871,19 @@ swipe changes between.
 card's bottom-right corner and it read as the bottom of the page, which is what it was: the card
 fills the screen, so its corner *is* the page's corner.
 
+**And it is a circle, not a pill.** It is the one control on the card that is always there, and
+the round shape says so — the shape the buttons along the bottom used to have — with the day in a
+small label under it.
+
 **Putting it down is stuck to the card's bottom right corner**, so it is there whatever part of the
 Inkling you are reading — `sticky` inside the card's own scroller, above the strip that says where
 the next one is. It sat in the content and scrolled away; it sat on the frame before that and read
 as the page's corner, which it was, because the frame it hangs from also holds the two lines under
 the card.
+
+**While the + is up, the bottom of the page is quiet**: the next-Inkling strip and the feedback
+line give way to it, because two bits of small text under a floating button is a lot of noise at
+the moment you are about to act. They come back as soon as the + steps aside.
 
 **And the + steps aside while you are reading down**, coming back the moment you scroll up at all —
 the usual phone behaviour, and the difference between a button that floats over the text and one

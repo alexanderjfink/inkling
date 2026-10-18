@@ -7,6 +7,7 @@ import {
 } from '@inkling/domain'
 import { useState } from 'react'
 import { ButtonLabel, Spinner } from '../components/Spinner'
+import { needsServerUrl } from '../native'
 import type { Auth } from '../state/useAuth'
 
 /**
@@ -178,7 +179,10 @@ export function SignIn({
               </button>
             </div>
           </div>
-        ) : (
+        ) : /* Only where it is needed. In the browser the app is served by the server it talks
+             to, so its address is not something to put in front of anyone; the Android build is
+             served from the device and cannot work until it is told where to look. */
+        needsServerUrl(serverUrl) ? (
           <button
             type="button"
             onClick={() => setEditingServer(true)}
@@ -186,7 +190,7 @@ export function SignIn({
           >
             server: {serverUrl}
           </button>
-        )}
+        ) : null}
       </div>
 
       {auth.ready ? null : (

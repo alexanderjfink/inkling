@@ -75,7 +75,7 @@ export function CaptureTray({
           >
             ✎
           </span>
-          <span className="text-sm font-semibold">What did you notice?</span>
+          <span className="text-sm font-semibold">What’s your Inkling?</span>
           <button type="button" onClick={onClose} className="quiet ml-auto text-xs underline">
             close
           </button>

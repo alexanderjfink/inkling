@@ -265,7 +265,16 @@ function useRoundSwipe({
     },
   }
 
-  return { cardRef, handlers, pull, armed, showPrevious: hasPrevious, showNext: hasNext }
+  return {
+    cardRef,
+    handlers,
+    pull,
+    armed,
+    previous,
+    next,
+    showPrevious: hasPrevious,
+    showNext: hasNext,
+  }
 }
 
 /**
@@ -283,54 +292,74 @@ type SwipeDirection = 'left' | 'right'
 
 function useMoveSwipe(onSwipe: (direction: SwipeDirection) => void) {
   const [dx, setDx] = useState(0)
+  const [dy, setDy] = useState(0)
   const [dragging, setDragging] = useState(false)
   const [leaving, setLeaving] = useState<SwipeDirection | null>(null)
-  const from = useRef<number | null>(null)
+  const from = useRef<{ x: number; y: number } | null>(null)
   /** Whether this gesture turned into a drag, so the tap underneath does not also fire. */
   const dragged = useRef(false)
 
   const handlers = {
     onPointerDown: (event: React.PointerEvent) => {
       if (event.pointerType === 'mouse' && event.button !== 0) return
-      from.current = event.clientX
+      from.current = { x: event.clientX, y: event.clientY }
       dragged.current = false
       setLeaving(null)
       setDragging(true)
     },
     onPointerMove: (event: React.PointerEvent) => {
       if (from.current === null) return
-      const delta = event.clientX - from.current
-      if (Math.abs(delta) > 6) dragged.current = true
-      // A little rubber beyond the threshold, so the pull has weight.
-      setDx(Math.max(-140, Math.min(140, delta)))
+      const deltaX = event.clientX - from.current.x
+      const deltaY = event.clientY - from.current.y
+      if (Math.abs(deltaX) > 6) dragged.current = true
+      setDx(Math.max(-140, Math.min(140, deltaX)))
+      setDy(deltaY)
     },
     onPointerUp: () => {
       if (from.current === null) return
       from.current = null
       setDragging(false)
-      const delta = dx
-      if (Math.abs(delta) < SWIPE_AT) {
+      commit(dx)
+    },
+    /*
+     * A drag the browser takes away from us, which happens when the finger is travelling
+     * diagonally and the browser reads the vertical part as a scroll. On a phone that is most
+     * swipes: the gesture looks like nothing happened, twice, and the app looks broken. So a
+     * cancel commits the swipe if the drag was mostly sideways — which is what the person was
+     * doing, and the browser guessing otherwise should not overrule that.
+     */
+    onPointerCancel: () => {
+      const mostlySideways = Math.abs(dx) > Math.abs(dy) * 1.5
+      from.current = null
+      setDragging(false)
+      if (!mostlySideways) {
         setDx(0)
         return
       }
-      const direction: SwipeDirection = delta > 0 ? 'right' : 'left'
-      setLeaving(direction)
-      setDx(direction === 'right' ? SWIPE_TRAVEL : -SWIPE_TRAVEL)
-      window.setTimeout(() => {
-        onSwipe(direction)
-        setLeaving(null)
-        setDx(0)
-      }, 190)
-    },
-    onPointerCancel: () => {
-      from.current = null
-      setDragging(false)
-      setDx(0)
+      commit(dx)
     },
   }
 
   /** Swallowed when the gesture was a drag: a swipe is not also a tap. */
   const wasDragged = () => dragged.current
+
+  /** Finish a gesture: past the threshold it goes, otherwise it springs back. */
+  function commit(delta: number) {
+    if (Math.abs(delta) < SWIPE_AT) {
+      setDx(0)
+      setDy(0)
+      return
+    }
+    const direction: SwipeDirection = delta > 0 ? 'right' : 'left'
+    setLeaving(direction)
+    setDx(direction === 'right' ? SWIPE_TRAVEL : -SWIPE_TRAVEL)
+    window.setTimeout(() => {
+      onSwipe(direction)
+      setLeaving(null)
+      setDx(0)
+      setDy(0)
+    }, 190)
+  }
 
   const progress = Math.min(1, Math.abs(dx) / SWIPE_AT)
   return {
@@ -699,7 +728,6 @@ export function Review({
    * both of which take a move out of the ring for good.
    */
   const [ringIndex, setRingIndex] = useState(0)
-  const nextFriendMove = () => setRingIndex((index) => index + 1)
   const [noteProblem, setNoteProblem] = useState<string | null>(null)
   /** Open while the note is being rendered and handed over. */
   const [exporting, setExporting] = useState(false)
@@ -775,11 +803,24 @@ export function Review({
   }, [focusKey])
 
   // Freeze the round when it starts, so acting on an Inkling cannot reshuffle it.
+  /**
+   * What the round pages through: what is due, and then everything else in play.
+   *
+   * The due ones come first and are what the round *is* — "1 of 4" counts those, and the round
+   * ends when they have all been dealt with. The rest are there so that paging up and down has
+   * somewhere to go: an Inkling you are not due to see is still one you might want to look at,
+   * and a card you can only scroll inside of is a card you cannot leave.
+   */
+  const pagingPool = useMemo(() => {
+    const extra = everything.filter((blip) => !candidates.some((entry) => entry.id === blip.id))
+    return [...candidates, ...extra]
+  }, [candidates, everything])
+
   useEffect(() => {
     if (session !== null) return
-    const ordered = buildRound(candidates, byId, focusKey)
+    const ordered = buildRound(pagingPool, byId, focusKey)
     if (ordered.length > 0) setSession(ordered)
-  }, [candidates, session, focusKey, byId])
+  }, [pagingPool, session, focusKey, byId])
 
   /**
    * Inklings waved past this round by swiping up.
@@ -794,8 +835,10 @@ export function Review({
     [session, candidates, byId, decisions, skipped],
   )
   // The round's size is frozen when it starts, not recomputed after a deletion — else
-  // deleting the last Inkling in a round would read as "nothing was waiting".
-  const total = session?.length ?? candidates.length
+  // deleting the last Inkling in a round would read as "nothing was waiting". It counts
+  // everything the round will page through, which is what "2 of 4" has to mean when swiping up
+  // and down moves through four cards.
+  const total = session?.length ?? pagingPool.length
   const done = total - queue.length
   const current = queue[0]
   const currentRelated = current ? (related.get(current.id) ?? []) : []
@@ -859,8 +902,25 @@ export function Review({
    * because it is about when, not about what happened: it comes back next time.
    */
   const pendingMoves = current ? pendingFriendMoves(current) : []
-  const friendMove =
-    pendingMoves.length > 0 ? pendingMoves[ringIndex % pendingMoves.length] : undefined
+  /**
+   * Where the swipe has got to.
+   *
+   * The moves first, then the form for asking somebody yourself — because "nobody has suggested
+   * anything" and "I have seen what they suggested and none of it is it" are the same situation
+   * from here, and both want the same answer. It is the last slot in the ring rather than
+   * something that happens when the ring runs out, so swiping always does something visible.
+   */
+  const friendMove = pendingMoves[ringIndex]
+  /** Whether a swipe has moved the ring on this card: the ask slot is not where a card opens. */
+  const [ringTouched, setRingTouched] = useState(false)
+  /** Their colour, from their own settings. Undefined when they have not chosen one. */
+  const friendColour = social.friends.find((entry) => entry.userId === friendMove?.from)?.color
+  const atAskSlot =
+    ringTouched && (pendingMoves.length > 0 ? ringIndex >= pendingMoves.length : true)
+  const nextFriendMove = () => {
+    setRingTouched(true)
+    setRingIndex((index) => (index + 1) % (pendingMoves.length + 1))
+  }
 
   /**
    * Which of the two the card is showing.
@@ -870,21 +930,14 @@ export function Review({
    * opens on; swiping left moves to the app's own, and swiping right moves back.
    */
   const [slot, setSlot] = useState<'friend' | 'ai'>('friend')
-  const slotNow: 'friend' | 'ai' = slot === 'friend' && friendMove ? 'friend' : 'ai'
+  const slotNow: 'friend' | 'ask' | 'ai' = slot === 'ai' ? 'ai' : atAskSlot ? 'ask' : 'friend'
 
   const swipe = (direction: SwipeDirection) => {
     if (direction === 'right') {
-      // Back to what people suggested. Already there? Then the next one round the ring — and
-      // if nobody has suggested anything, the swipe is the way to ask.
-      if (slotNow !== 'friend' && friendMove) {
-        setSlot('friend')
-        return
-      }
-      if (friendMove) {
-        nextFriendMove()
-        return
-      }
-      setAskOpen(true)
+      // Back to what people suggested, and on round the ring: the next move, or the form for
+      // asking somebody. Never a dead end.
+      setSlot('friend')
+      nextFriendMove()
       return
     }
     setSlot('ai')
@@ -1211,17 +1264,28 @@ export function Review({
         </span>
       </div>
 
-      {/* The frame, with room around it. The corner marks overlap the card's border, and a
-          card that scrolls cannot have children outside its own padding — they get clipped. */}
       <div className="relative flex flex-1 flex-col">
-        <div
-          ref={round.cardRef}
-          onPointerDown={round.handlers.onPointerDown}
-          onPointerMove={round.handlers.onPointerMove}
-          onPointerUp={round.handlers.onPointerUp}
-          onPointerCancel={round.handlers.onPointerCancel}
-          className="card flex flex-1 flex-col overflow-y-auto p-6"
-        >
+        <div ref={round.cardRef} className="card flex flex-1 flex-col overflow-y-auto p-6">
+          {/* The way to the other Inklings in this round, stuck to the top and the bottom of the
+              card so it is always there — and `touch-action: none`, so a swipe on it is a swipe
+              and never a scroll. Taking over the whole card's vertical drags instead was the
+              first two attempts, and both failed for the same reason: the card scrolls, so the
+              browser takes the gesture and cancels the pointer before it can mean anything.
+              Tapping works too, which is what a hint strip should have been all along. */}
+          {round.showPrevious ? (
+            <button
+              type="button"
+              {...round.handlers}
+              onClick={() => round.previous()}
+              className={`sticky top-0 z-10 -mt-2 mb-2 w-full touch-none py-1 text-center text-[11px] ${
+                round.pull === 'down' && round.armed
+                  ? 'font-semibold text-accent'
+                  : 'text-ink-faint'
+              }`}
+            >
+              ▲ the previous Inkling
+            </button>
+          ) : null}
           {/* What a drag in each direction would do, shown while you are pulling and highlighted
             once it would happen. On the card rather than on the move, so it stays put while
             the move slides away underneath it. */}
@@ -1409,9 +1473,29 @@ export function Review({
             <div
               key={friendMove.messageId}
               {...swipeState.handlers}
-              style={swipeState.style}
-              className="move-in mt-5 rounded-2xl border border-line bg-surface/60 p-4"
+              style={{
+                ...swipeState.style,
+                // Their colour, from their settings: the quickest cue that this came from a
+                // person rather than from the app, and the same cue wherever they appear.
+                borderColor: friendColour ?? undefined,
+                background: friendColour ? `${friendColour}14` : undefined,
+              }}
+              className="move-in relative mt-5 rounded-2xl border border-line bg-surface/60 p-4"
             >
+              {/* Left and right of the move, because that is what the swipe moves between: this
+                  suggestion and the other source — not between whole Inklings. */}
+              <span className="pointer-events-none absolute top-1/2 -left-2 flex -translate-y-1/2 items-center rounded-full bg-surface p-0.5 shadow-circle">
+                <Avatar
+                  username={friendMove.fromUsername}
+                  userId={friendMove.from}
+                  color={friendColour}
+                  hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
+                  size={20}
+                />
+              </span>
+              <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
+                ✦
+              </span>
               <div className="flex items-center gap-2.5">
                 <Avatar
                   username={friendMove.fromUsername}
@@ -1498,31 +1582,6 @@ export function Review({
                   not this move
                 </button>
               </div>
-
-              {!composer && socialOn ? (
-                <div className="mt-3 flex flex-col gap-2">
-                  {askOpen ? (
-                    <AskPanel
-                      blip={current}
-                      social={social}
-                      onClose={() => setAskOpen(false)}
-                      onAsked={() => {
-                        setAskOpen(false)
-                        discardMove()
-                      }}
-                      onShare={() => void actions.share(current.id, 'friends')}
-                    />
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setAskOpen(true)}
-                      className="self-start rounded-full border border-accent/50 px-3.5 py-2 text-xs font-medium text-accent"
-                    >
-                      ask someone else
-                    </button>
-                  )}
-                </div>
-              ) : null}
 
               {noting && !composer ? (
                 <Note
@@ -1703,6 +1762,29 @@ export function Review({
                 </button>
               </div>
             </div>
+          ) : slotNow === 'ask' || askOpen ? (
+            /* The end of the ring, and where a swipe with nothing left to show lands. Asking is
+               what you do when nobody has suggested anything, or when what they suggested is not
+               it — the same situation, so the same place. */
+            <div className="mt-5">
+              <AskPanel
+                blip={current}
+                social={social}
+                onClose={() => {
+                  setAskOpen(false)
+                  setRingIndex(0)
+                  setSlot('friend')
+                }}
+                onAsked={() => {
+                  setAskOpen(false)
+                  setRingIndex(0)
+                  setRingTouched(false)
+                  setSlot('friend')
+                  discardMove()
+                }}
+                onShare={() => void actions.share(current.id, 'friends')}
+              />
+            </div>
           ) : slotNow === 'ai' && moveLoading && !askOpen ? (
             /* While a new one is being found, show that rather than the one you just swiped
              away: a suggestion sitting there unchanged is indistinguishable from a swipe that
@@ -1716,10 +1798,22 @@ export function Review({
               key={move.id}
               {...swipeState.handlers}
               style={swipeState.style}
-              className={`move-in mt-5 rounded-2xl bg-accent-soft/70 p-4 ${
+              className={`move-in relative mt-5 rounded-2xl bg-accent-soft/70 p-4 ${
                 moveLoading ? 'opacity-60' : ''
               }`}
             >
+              <span className="pointer-events-none absolute top-1/2 -left-2 flex -translate-y-1/2 items-center rounded-full bg-surface p-0.5 shadow-circle">
+                <Avatar
+                  username={pendingMoves[0]?.fromUsername ?? 'a friend'}
+                  userId={pendingMoves[0]?.from ?? ''}
+                  color={social.friends.find((f) => f.userId === pendingMoves[0]?.from)?.color}
+                  hash={social.friends.find((f) => f.userId === pendingMoves[0]?.from)?.avatar}
+                  size={20}
+                />
+              </span>
+              <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
+                ✦
+              </span>
               <p className="text-xs tracking-wide text-accent uppercase">a move, if you want one</p>
               <button
                 type="button"
@@ -1950,56 +2044,21 @@ export function Review({
           ) : null}
         </div>
 
-        {/* Four things you do to a card, on one line: three ways to get a move, and putting it
-          down till the day named on the button. The outer three are outlined in the accent and
-          the middle one is filled, so the one you press most is also the one you see first.
-          They were all grey once, which read as three disabled buttons and one live one. */}
-        {round.showPrevious ? (
-          <p className="pointer-events-none absolute inset-x-0 top-1 z-10 text-center text-[11px] text-ink-faint">
-            swipe down for the previous Inkling
-          </p>
-        ) : null}
         {round.showNext ? (
-          <p className="pointer-events-none absolute inset-x-0 bottom-1 z-10 text-center text-[11px] text-ink-faint">
-            swipe up for the next Inkling
-          </p>
-        ) : null}
-
-        {/* What the two sides of the card are for. Read at a glance: a face means a person
-          suggested something that way, a spark means the app did. */}
-        {move || friendMove ? (
-          <>
-            <span className="pointer-events-none absolute top-1/3 left-1.5 z-10 flex items-center rounded-full bg-surface/90 p-1 shadow-circle">
-              <Avatar
-                username={friendMove?.fromUsername ?? 'a friend'}
-                userId={friendMove?.from ?? ''}
-                color={social.friends.find((entry) => entry.userId === friendMove?.from)?.color}
-                hash={social.friends.find((entry) => entry.userId === friendMove?.from)?.avatar}
-                size={24}
-              />
-            </span>
-            <span className="pointer-events-none absolute top-1/3 right-1.5 z-10 flex h-8 w-8 items-center justify-center rounded-full bg-surface/90 text-base text-accent shadow-circle">
-              ✦
-            </span>
-          </>
+          <button
+            type="button"
+            {...round.handlers}
+            onClick={() => round.next()}
+            className={`sticky bottom-0 z-10 mt-2 -mb-2 w-full touch-none py-1 text-center text-[11px] ${
+              round.pull === 'up' && round.armed ? 'font-semibold text-accent' : 'text-ink-faint'
+            }`}
+          >
+            ▼ the next Inkling
+          </button>
         ) : null}
 
         {/* Putting it down is about the whole card, so it marks the whole card: overlapping the
           bottom right corner of the frame, out of the way of everything you press. */}
-        {!composer ? (
-          <button
-            type="button"
-            onClick={() => void defer(DEFAULT_DEFERRAL)}
-            title={`Put it down until ${deferDay} — it comes back then`}
-            className="absolute -right-2 -bottom-2 z-10 flex flex-col items-center rounded-2xl border border-line bg-surface px-2.5 py-1.5 shadow-card"
-          >
-            <span className="text-base leading-none" aria-hidden="true">
-              ⏱
-            </span>
-            <span className="text-[10px] font-medium whitespace-nowrap text-ink">{deferShort}</span>
-          </button>
-        ) : null}
-
         {!composer ? (
           /* The four are not one row of equals. Three of them ask for a move — from the app,
            from yourself, from a person — and they are centred, because they are the choice.
@@ -2090,15 +2149,6 @@ export function Review({
           </div>
         ) : null}
 
-        {current.friendAsks.length > 0 ? (
-          <p className="mt-3 text-center text-xs text-ink-faint">
-            asked{' '}
-            {current.friendAsks
-              .map((ask) => `${ask.toUsername} ${formatWhen(ask.at, new Date())}`)
-              .join(', ')}
-          </p>
-        ) : null}
-
         {/* Deliberately nothing here while it thinks. There used to be a line saying so, which
           grew the card by a line and then shrank it again — a blank space appearing and
           leaving. The button is already saying "thinking", and it is where you pressed. */}
@@ -2178,6 +2228,23 @@ export function Review({
           <p className="mt-3 rounded-2xl bg-canvas p-3 text-center text-xs text-good">
             “{lastNote.title}” became a note: {lastNote.path}
           </p>
+        ) : null}
+
+        {/* Putting it down, at the end of this Inkling and to the right — about the Inkling, and
+            nowhere near anything else you press. It was a mark on the frame's corner, and since
+            the card fills the screen, "the card's corner" was the bottom of the page. */}
+        {!composer ? (
+          <div className="mt-4 flex justify-end">
+            <button
+              type="button"
+              onClick={() => void defer(DEFAULT_DEFERRAL)}
+              title={`Put it down until ${deferDay} — it comes back then`}
+              className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-soft"
+            >
+              <span aria-hidden="true">⏱</span>
+              <span className="whitespace-nowrap">{deferShort}</span>
+            </button>
+          </div>
         ) : null}
 
         {promoteResults[current.id]?.ok === false ? (

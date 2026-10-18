@@ -371,7 +371,7 @@ export function Add({
                   ✎
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">What did you notice?</span>
+                  <span className="block text-sm font-semibold">What’s your Inkling?</span>
                   <span className="block text-xs text-ink-soft">
                     a photo, a link, an idea, a question, or a quest — paste one in, or just write
                   </span>

@@ -343,6 +343,11 @@ reading, with the same field doing the same things — words, a link, or a pictu
 alternative was the rhythm most people keep: leave what you were doing, go home, capture, come
 back. Not on the entry screen, where capture already is.
 
+**The question is "What's your Inkling?"**, on the home screen and in the tray, because that is
+what the thing is. And the server address on the sign-in screen is only shown by the build that
+needs it — the Android one, served from the device; in the browser the app is served by the server
+it talks to.
+
 **Entry opens as a button.** "What did you notice?" is a button, not a placeholder — it is an
 invitation rather than a form, and tapping it opens the field with the cursor in it. That is
 also the only way a phone will raise the keyboard, since it will not do it for a focus nobody
@@ -720,6 +725,10 @@ directions at once.
 each rather than one message to several — an ask is one person's to answer, and a single message
 with two recipients would let the first answer look like it answered for both.
 
+**A friend's colour is on the move they sent** — a tint of it on the card and a border in it,
+alongside their face — because their colour is the quickest cue that this came from a person
+rather than from the app, and it is the same cue wherever they appear.
+
 **What a friend has shared is shown properly too**: their words, with any links tappable, what
 they have written against it, and their pictures — the same route, and the same permission check,
 as the pictures in a request for help.
@@ -831,20 +840,35 @@ is an event in your log like everything else, so clearing it on the phone clears
 laptop, and the count is a count of what you have not dealt with rather than a count of what
 has arrived.
 
+**The moves from friends are a ring with the ask form as its last slot**, so swiping right
+always does something: the next suggestion, and after the last of them the form for asking
+somebody yourself. Nobody having suggested anything and everything they suggested being wrong are
+the same situation from here, and they want the same answer. A card still *opens* on the
+suggestion or on nothing — the ask form is where a swipe lands, not where you arrive.
+
 **On a phone the three buttons step aside while a move is on screen** — the swipes are the way
 to the other sources, and three buttons under a suggestion are three buttons in the way of the
 thing they produce. With nothing on screen they are the only way in, so they stay. Writing your
 own move is a link on the card instead, because it is a verb rather than a source to browse.
 
-**And the card tells you the swipes exist**: the face of whoever suggested something on the left,
-a spark on the right.
+**And the move itself tells you the swipes exist**: the face of whoever suggested it on the left
+of the move, a spark on the right — of the move, not of the whole card, because that is what the
+swipe changes between.
+
+**Putting something down sits at the end of the Inkling, to the right.** It was a mark on the
+card's bottom-right corner and it read as the bottom of the page, which is what it was: the card
+fills the screen, so its corner *is* the page's corner.
+
+**Up and down moves between the Inklings of the round** — through everything in play, not only
+what is due, so paging always has somewhere to go — with a strip at the top and another at the
+bottom of the card that says so, brightens as a pull gets far enough, and can simply be tapped.
+The strips are the way it works, after two attempts at taking over the card's own vertical drags:
+the card scrolls, so the browser reads the gesture as a scroll and cancels the pointer before it
+can mean anything. The strips are `touch-action: none`, which is what makes a swipe on them a
+swipe.
 
 **Putting it down marks the whole card.** It was a button in the row, which said it applied to
 the row; it is now a small clock on the bottom right corner of the frame, overlapping the border.
-
-**Up and down moves between the Inklings of a round**, with a hint at the top and the bottom that
-brightens as the pull gets far enough to do it — and only at the ends of the card, because the
-card scrolls and taking over every vertical drag would make a long Inkling unreadable.
 
 ### One move at a time, and the two sides of it
 

@@ -519,7 +519,7 @@ export default function App() {
           type="button"
           onClick={() => setTrayOpen(true)}
           aria-label="Capture a new Inkling"
-          className="fixed right-5 bottom-5 z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle"
+          className="fixed bottom-5 left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle"
         >
           +
         </button>

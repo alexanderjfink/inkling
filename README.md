@@ -871,11 +871,20 @@ right. Nothing of the kind sits below the card any more; three round buttons und
 the page's, not this Inkling's. The three sit on a row of their own because at 390px they do not
 fit beside the two corner buttons, and squeezing them made every label wrap.
 
-**Scrolling past either end of the card goes to the next or the previous Inkling.** That is the
-gesture people actually use, and it needed a different mechanism from the pointer drags: the card
-is the scroll container, so the browser keeps the vertical gesture and never lets a drag finish.
-It does hand over the wheel and the touch moves all the way to the end, and "kept pulling at the
-end" is a perfectly good signal — with `overscroll-contain` so the page does not take the leftover.
+**Scrolling past either end of the card goes to the next or the previous Inkling — on a firmer
+flick than the first attempt.** That version jumped the moment the card was at the end and
+anything tried to scroll further, *including the momentum of the scroll that had just arrived
+there*, so reaching the bottom of an Inkling immediately moved to the next one and the bottom of
+the card could not be read at all.
+
+What it takes now is a **separate gesture that begins with the card already at the end**: a wheel
+gesture started by a pause in the events, or a touch that starts at the bound, and which then has
+to travel 110px (300 of wheel) to mean anything. The scroll that brings you to the end starts in
+the middle of the card, so it can never qualify — you see all of it first, and then a flick moves
+on. This needed a different mechanism from the pointer drags in the first place: the card is the
+scroll container, so the browser keeps the vertical gesture and never lets a drag finish. It does
+hand over the wheel and the touch moves, with `overscroll-contain` so the page does not take the
+leftover.
 
 **Up and down moves between the Inklings of the round** — through everything in play, not only
 what is due, so paging always has somewhere to go — with a strip at the top and another at the

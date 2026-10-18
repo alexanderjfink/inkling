@@ -228,38 +228,86 @@ function useRoundSwipe({
     return element.scrollTop + element.clientHeight >= element.scrollHeight - 1
   }
 
-  /** A jump just happened, so the rest of this gesture does not do it again. */
+  /**
+   * A flick, and nothing less.
+   *
+   * The first version jumped the moment the card was at the end and anything tried to scroll
+   * further — including the momentum of the scroll that had just arrived there. So reaching the
+   * bottom of an Inkling immediately moved to the next one, and the bottom of the card could not
+   * be read at all.
+   *
+   * What it takes now is a *separate* gesture that begins with the card already at the end. The
+   * scroll that brings you there starts in the middle of the card, so it can never qualify; the
+   * flick after it starts at the end, and has to travel this far to mean anything.
+   */
+  const FLICK_PX = 110
+  const FLICK_WHEEL = 300
+  /** Quiet for this long ends a wheel gesture — a mouse has no touchstart to tell us. */
+  const GESTURE_GAP = 240
+
   const jumpedAt = useRef(0)
-  const canJump = () => Date.now() - jumpedAt.current > 600
+  const canJump = () => Date.now() - jumpedAt.current > 650
   const jump = (direction: 'down' | 'up') => {
     jumpedAt.current = Date.now()
     if (direction === 'down') next()
     else previous()
   }
 
+  const wheelAt = useRef(0)
+  const wheelArmed = useRef<'down' | 'up' | null>(null)
+  const wheelTravel = useRef(0)
   const touchFrom = useRef(0)
+  const touchArmed = useRef<'down' | 'up' | null>(null)
+
+  /** Which way a gesture that starts here could go, if it goes anywhere. */
+  const armedNow = (): 'down' | 'up' | null => {
+    if (atBottom() && hasNext) return 'down'
+    if (atTop() && hasPrevious) return 'up'
+    return null
+  }
 
   const handlers = {
     /*
      * Scrolling, which is how somebody will actually try to move between cards. The card is the
      * scroll container, so the browser keeps the vertical gesture and never lets a pointer drag
      * finish — but it does hand us the wheel and the touch moves all the way to the end, and
-     * "kept pulling at the end" is a perfectly good signal. `overscroll-behavior: contain` keeps
-     * the page from taking the leftover.
+     * "pulled hard past the end, having started there" is a good signal. `overscroll-contain`
+     * keeps the page from taking the leftover.
      */
     onWheel: (event: React.WheelEvent) => {
-      if (!canJump()) return
-      if (event.deltaY > 4 && hasNext && atBottom()) jump('down')
-      else if (event.deltaY < -4 && hasPrevious && atTop()) jump('up')
+      const now = Date.now()
+      if (now - wheelAt.current > GESTURE_GAP) {
+        wheelTravel.current = 0
+        // Only a downward gesture can go on, and only an upward one can go back.
+        const at = armedNow()
+        wheelArmed.current =
+          event.deltaY > 0 && at === 'down' ? 'down' : event.deltaY < 0 && at === 'up' ? 'up' : null
+      }
+      wheelAt.current = now
+
+      const armed = wheelArmed.current
+      if (!armed) return
+      wheelTravel.current += Math.abs(event.deltaY)
+      if (wheelTravel.current < FLICK_WHEEL || !canJump()) return
+      wheelTravel.current = 0
+      jump(armed)
     },
     onTouchStart: (event: React.TouchEvent) => {
       touchFrom.current = event.touches[0]?.clientY ?? 0
+      touchArmed.current = armedNow()
     },
     onTouchMove: (event: React.TouchEvent) => {
-      if (!canJump()) return
+      const armed = touchArmed.current
+      if (!armed || !canJump()) return
       const moved = (event.touches[0]?.clientY ?? 0) - touchFrom.current
-      if (moved < -70 && hasNext && atBottom()) jump('down')
-      else if (moved > 70 && hasPrevious && atTop()) jump('up')
+      if (armed === 'down' && moved <= -FLICK_PX) {
+        touchArmed.current = null
+        jump('down')
+      }
+      if (armed === 'up' && moved >= FLICK_PX) {
+        touchArmed.current = null
+        jump('up')
+      }
     },
     onPointerDown: (event: React.PointerEvent) => {
       // A desktop scrolls with a wheel, and a mouse drag is how you select things.

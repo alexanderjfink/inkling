@@ -520,6 +520,12 @@ thought of, an answer, a thank-you. Editing a title is not a moment, and a green
 would make the check mean nothing. It takes no touches, so it cannot trap anybody already
 typing the next thing.
 
+**Retiring and deleting live behind "edit", in a menu that says what they do.** "Edit" had grown
+to mean three different things, and the two that end an Inkling were small words at the bottom of
+the card. The menu has *Edit the words*, *Retire it — not now, it goes to the attic and can come
+back*, and *Delete it — for good, it leaves the app*, each with the sentence under it. Both still
+ask properly before doing anything.
+
 **Retiring and deleting ask in the middle of the screen.** The footer still holds the two
 words, but pressing one raises "Retire?" or "Delete?" with the question large and two large
 answers — and the one that does the thing is not where your thumb already is. Deleting used to
@@ -858,6 +864,18 @@ swipe changes between.
 **Putting something down sits at the end of the Inkling, to the right.** It was a mark on the
 card's bottom-right corner and it read as the bottom of the page, which is what it was: the card
 fills the screen, so its corner *is* the page's corner.
+
+**The card's controls are on the card**: a three-way control in the middle — *Ask Friend* · *Add a
+Move* · *Generate* — with *Export* in the bottom left corner and putting it down in the bottom
+right. Nothing of the kind sits below the card any more; three round buttons under a card read as
+the page's, not this Inkling's. The three sit on a row of their own because at 390px they do not
+fit beside the two corner buttons, and squeezing them made every label wrap.
+
+**Scrolling past either end of the card goes to the next or the previous Inkling.** That is the
+gesture people actually use, and it needed a different mechanism from the pointer drags: the card
+is the scroll container, so the browser keeps the vertical gesture and never lets a drag finish.
+It does hand over the wheel and the touch moves all the way to the end, and "kept pulling at the
+end" is a perfectly good signal — with `overscroll-contain` so the page does not take the leftover.
 
 **Up and down moves between the Inklings of the round** — through everything in play, not only
 what is due, so paging always has somewhere to go — with a strip at the top and another at the

@@ -228,7 +228,39 @@ function useRoundSwipe({
     return element.scrollTop + element.clientHeight >= element.scrollHeight - 1
   }
 
+  /** A jump just happened, so the rest of this gesture does not do it again. */
+  const jumpedAt = useRef(0)
+  const canJump = () => Date.now() - jumpedAt.current > 600
+  const jump = (direction: 'down' | 'up') => {
+    jumpedAt.current = Date.now()
+    if (direction === 'down') next()
+    else previous()
+  }
+
+  const touchFrom = useRef(0)
+
   const handlers = {
+    /*
+     * Scrolling, which is how somebody will actually try to move between cards. The card is the
+     * scroll container, so the browser keeps the vertical gesture and never lets a pointer drag
+     * finish — but it does hand us the wheel and the touch moves all the way to the end, and
+     * "kept pulling at the end" is a perfectly good signal. `overscroll-behavior: contain` keeps
+     * the page from taking the leftover.
+     */
+    onWheel: (event: React.WheelEvent) => {
+      if (!canJump()) return
+      if (event.deltaY > 4 && hasNext && atBottom()) jump('down')
+      else if (event.deltaY < -4 && hasPrevious && atTop()) jump('up')
+    },
+    onTouchStart: (event: React.TouchEvent) => {
+      touchFrom.current = event.touches[0]?.clientY ?? 0
+    },
+    onTouchMove: (event: React.TouchEvent) => {
+      if (!canJump()) return
+      const moved = (event.touches[0]?.clientY ?? 0) - touchFrom.current
+      if (moved < -70 && hasNext && atBottom()) jump('down')
+      else if (moved > 70 && hasPrevious && atTop()) jump('up')
+    },
     onPointerDown: (event: React.PointerEvent) => {
       // A desktop scrolls with a wheel, and a mouse drag is how you select things.
       if (event.pointerType === 'mouse') return
@@ -749,6 +781,8 @@ export function Review({
   const [draftType, setDraftType] = useState<BlipType>('idea')
   /** Which question is in the middle of the screen, if any. */
   const [confirming, setConfirming] = useState<'retire' | 'delete' | null>(null)
+  /** The menu behind "edit": the words, the attic, and the end of it. */
+  const [menuOpen, setMenuOpen] = useState(false)
   const [confirmingBusy, setConfirmingBusy] = useState(false)
   /** Open when the person is saying a suggestion was bad, rather than just unwanted. */
   const [rejecting, setRejecting] = useState(false)
@@ -945,11 +979,6 @@ export function Review({
   }
 
   const swipeState = useMoveSwipe(swipe)
-  /** A phone has the swipes; a mouse does not, so the buttons stay there. */
-  const isTouch = useMemo(
-    () => typeof window !== 'undefined' && window.matchMedia('(hover: none)').matches,
-    [],
-  )
   const round = useRoundSwipe({
     hasNext: queue.length > 1,
     hasPrevious: skipped.length > 0,
@@ -1265,7 +1294,13 @@ export function Review({
       </div>
 
       <div className="relative flex flex-1 flex-col">
-        <div ref={round.cardRef} className="card flex flex-1 flex-col overflow-y-auto p-6">
+        <div
+          ref={round.cardRef}
+          onWheel={round.handlers.onWheel}
+          onTouchStart={round.handlers.onTouchStart}
+          onTouchMove={round.handlers.onTouchMove}
+          className="card flex flex-1 flex-col overflow-y-auto overscroll-contain p-6"
+        >
           {/* The way to the other Inklings in this round, stuck to the top and the bottom of the
               card so it is always there — and `touch-action: none`, so a swipe on it is a swipe
               and never a scroll. Taking over the whole card's vertical drags instead was the
@@ -1347,14 +1382,11 @@ export function Review({
             {current.schedule.timesSkipped > 0 ? (
               <span className="text-ink-faint">put down {current.schedule.timesSkipped}×</span>
             ) : null}
+            {/* One menu, because "edit" had grown to mean three different things and the two
+                that end an Inkling were small words at the bottom of the card. */}
             <button
               type="button"
-              onClick={() => {
-                setDraftTitle(current.title)
-                setDraftBody(current.body)
-                setDraftType(current.type)
-                setEditing(true)
-              }}
+              onClick={() => setMenuOpen(true)}
               className="quiet ml-auto text-xs underline"
             >
               edit
@@ -1995,6 +2027,71 @@ export function Review({
             </div>
           ) : null}
 
+          {/* The card's own controls, on the card, above what the card has recorded: the three
+              ways to get a move on a row of their own in the middle — at 390px they do not fit
+              beside anything — and the two corner buttons underneath, one at each edge, because
+              they are about this whole Inkling rather than about the move. */}
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex justify-center">
+              <div className="flex overflow-hidden rounded-2xl border border-line bg-surface">
+                <button
+                  type="button"
+                  onClick={() => setAskOpen(true)}
+                  className="border-r border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft"
+                >
+                  Ask Friend
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComposer({ move: null })}
+                  className="bg-accent-soft px-2.5 py-2 text-xs font-semibold whitespace-nowrap text-accent"
+                >
+                  Add a Move
+                </button>
+                <button
+                  type="button"
+                  onClick={generateMove}
+                  disabled={moveLoading}
+                  className="border-l border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft disabled:opacity-40"
+                >
+                  <ButtonLabel busy={moveLoading}>
+                    {moveLoading ? 'thinking…' : 'Generate'}
+                  </ButtonLabel>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              {PROMOTE_ENABLED ? (
+                <button
+                  type="button"
+                  onClick={() => void promote()}
+                  className="rounded-2xl rounded-bl-none border border-line bg-surface px-3 py-2 text-xs font-medium whitespace-nowrap text-ink-soft"
+                >
+                  Promote
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setExporting((on) => !on)}
+                  className="rounded-2xl rounded-bl-none border border-line bg-surface px-3 py-2 text-xs font-medium whitespace-nowrap text-ink-soft"
+                >
+                  Export
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => void defer(DEFAULT_DEFERRAL)}
+                title={`Put it down until ${deferDay} — it comes back then`}
+                className="flex items-center gap-1.5 rounded-2xl rounded-br-none border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-soft"
+              >
+                <span aria-hidden="true">⏱</span>
+                <span className="whitespace-nowrap">{deferShort}</span>
+              </button>
+            </div>
+          </div>
+
           <MoveLog
             moves={current.moves}
             onForget={() => {
@@ -2057,83 +2154,6 @@ export function Review({
           </button>
         ) : null}
 
-        {/* Putting it down is about the whole card, so it marks the whole card: overlapping the
-          bottom right corner of the frame, out of the way of everything you press. */}
-        {!composer ? (
-          /* The four are not one row of equals. Three of them ask for a move — from the app,
-           from yourself, from a person — and they are centred, because they are the choice.
-           Putting it down is the other thing you can do with a card, and it keeps to the right
-           edge of the row rather than sitting in the middle of the choice. Centring the three
-           in what is left, rather than on the screen, is what keeps "Ask a Friend" and "till
-           Tuesday" from touching at 390px: there is room for one or the other. */
-          <div
-            className={`mt-6 flex flex-wrap items-end justify-center gap-2.5 ${
-              /* A phone has the swipes, so with a move on screen the three buttons are three
-                 buttons in the way of the thing they produce. With nothing on screen they are
-                 the only way in, so they stay. */
-              isTouch && (move || friendMove) ? 'hidden' : ''
-            }`}
-          >
-            {move && !friendMove ? null : (
-              <button
-                type="button"
-                onClick={generateMove}
-                disabled={moveLoading}
-                className="flex flex-col items-center gap-1.5 disabled:opacity-40"
-              >
-                <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
-                  ✦
-                </span>
-                <span className="text-xs font-medium text-ink">
-                  <ButtonLabel busy={moveLoading}>
-                    {moveLoading ? 'thinking…' : 'Generate'}
-                  </ButtonLabel>
-                </span>
-              </button>
-            )}
-
-            {/* The one you press most, and it looks like it: the only filled, round thing in
-              the row, and bigger than the others, so the thumb finds it without looking. */}
-            <button
-              type="button"
-              onClick={() => setComposer({ move: null })}
-              className="flex flex-col items-center gap-1.5"
-            >
-              <span className="circle circle--accent h-16 w-16 text-2xl">+</span>
-              <span className="text-xs font-medium text-ink">New Move</span>
-            </button>
-
-            {socialOn && !current.demo ? (
-              <button
-                type="button"
-                onClick={() => setAskOpen((open) => !open)}
-                className="flex flex-col items-center gap-1.5"
-              >
-                <span className="circle h-12 w-12 border border-accent/40 text-lg text-accent">
-                  ☺
-                </span>
-                <span className="text-xs font-medium text-accent">Ask a Friend</span>
-              </button>
-            ) : null}
-          </div>
-        ) : null}
-
-        <div className="mt-2 flex flex-wrap items-center justify-center gap-4 text-xs">
-          {PROMOTE_ENABLED ? (
-            <button type="button" onClick={() => void promote()} className="quiet underline">
-              promote
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setExporting((on) => !on)}
-              className="quiet underline"
-            >
-              export
-            </button>
-          )}
-        </div>
-
         <div className="mt-3 flex justify-center gap-4 text-xs">
           {/* "tomorrow / a week / a month" used to sit here, and nobody could say what they
             were for: three buttons that all did the same thing, differing only in a date
@@ -2166,26 +2186,84 @@ export function Review({
           />
         </div>
 
-        <div className="mt-4 flex justify-center gap-5 text-xs">
-          {current.status === 'retired' || current.status === 'promoted' ? (
-            <button type="button" onClick={() => void revive()} className="quiet underline">
-              revive — put it back in play
-            </button>
-          ) : (
+        {menuOpen ? (
+          <div className="fixed inset-0 z-40 flex flex-col justify-end">
             <button
               type="button"
-              onClick={() => setConfirming('retire')}
-              className="quiet underline"
-            >
-              retire
-            </button>
-          )}
-          {/* Both of these ask, in the middle of the screen. Deleting used to be a small word
-            beside a small word, and retiring did not ask at all. */}
-          <button type="button" onClick={() => setConfirming('delete')} className="quiet underline">
-            delete
-          </button>
-        </div>
+              aria-label="Close"
+              onClick={() => setMenuOpen(false)}
+              className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
+            />
+            <div className="tray-in relative mx-auto flex w-full max-w-xl flex-col gap-2 rounded-t-3xl border border-line bg-surface p-4 pb-6 shadow-card">
+              <p className="text-xs tracking-wide text-ink-faint uppercase">this Inkling</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftTitle(current.title)
+                  setDraftBody(current.body)
+                  setDraftType(current.type)
+                  setEditing(true)
+                  setMenuOpen(false)
+                }}
+                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+              >
+                Edit the words
+                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                  the title, what it says, and what kind of thing it is
+                </span>
+              </button>
+              {current.status === 'retired' || current.status === 'promoted' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void revive()
+                  }}
+                  className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+                >
+                  Put it back in play
+                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                    out of the attic, and into the round again
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setConfirming('retire')
+                  }}
+                  className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+                >
+                  Retire it
+                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                    not now — it goes to the attic and can come back
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setConfirming('delete')
+                }}
+                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium text-warn"
+              >
+                Delete it
+                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                  for good — it leaves the app and stops appearing anywhere
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                className="quiet mt-1 self-center text-xs underline"
+              >
+                cancel
+              </button>
+            </div>
+          </div>
+        ) : null}
 
         {confirming === 'retire' ? (
           <Confirm
@@ -2228,23 +2306,6 @@ export function Review({
           <p className="mt-3 rounded-2xl bg-canvas p-3 text-center text-xs text-good">
             “{lastNote.title}” became a note: {lastNote.path}
           </p>
-        ) : null}
-
-        {/* Putting it down, at the end of this Inkling and to the right — about the Inkling, and
-            nowhere near anything else you press. It was a mark on the frame's corner, and since
-            the card fills the screen, "the card's corner" was the bottom of the page. */}
-        {!composer ? (
-          <div className="mt-4 flex justify-end">
-            <button
-              type="button"
-              onClick={() => void defer(DEFAULT_DEFERRAL)}
-              title={`Put it down until ${deferDay} — it comes back then`}
-              className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-soft"
-            >
-              <span aria-hidden="true">⏱</span>
-              <span className="whitespace-nowrap">{deferShort}</span>
-            </button>
-          </div>
         ) : null}
 
         {promoteResults[current.id]?.ok === false ? (

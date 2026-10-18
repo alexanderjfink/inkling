@@ -308,6 +308,15 @@ site rather than by the address, and tagged with it: `en.wikipedia.org` rather t
 `https://en.wikipedia.org/wiki/Sourdough`, and `#wikipedia` rather than `#en` — a leading
 two-letter label is a locale, not a name.
 
+**And there is a name as well as a username.** The username is a handle — lowercase, no spaces,
+chosen in a hurry to sign in with — and it is what a friend types to find you. What friends *see*
+is a name you choose, kept in the You screen, and it travels with you: on a move you suggested, a
+question you asked, a note, the friends list, their history with you. Leave it empty and the handle
+stands in, which is where everybody starts.
+
+One function decides (`nameOf` in the domain): the name if there is one, the handle otherwise, and
+never an empty line. There are a dozen screens that show a person and they must not disagree.
+
 **The eight profile colours sit on a row of their own**, never wrapped. Sharing a row with the
 picture and the word "remove" put two of them on the first line and six on the second, which
 reads as a broken layout rather than a set of choices; eight at 32px with an 8px gap come to

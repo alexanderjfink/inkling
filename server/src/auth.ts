@@ -46,6 +46,8 @@ interface SessionsFile {
 }
 
 const USERS_VERSION = 1
+/** Long enough for a real name, short enough to fit on somebody else's phone. */
+const NAME_MAX = 40
 const SESSIONS_VERSION = 1
 
 function toPublic(user: StoredUser): PublicUser {
@@ -56,6 +58,7 @@ function toPublic(user: StoredUser): PublicUser {
     createdAt: user.createdAt,
     color: user.color,
     avatar: user.avatar,
+    name: user.name,
   }
 }
 
@@ -320,6 +323,34 @@ export class Auth {
       }
       if (color) user.color = color
       else delete user.color
+      await this.#saveUsers()
+      return { ok: true, value: null }
+    })
+  }
+
+  /**
+   * What they would like to be called.
+   *
+   * Bounded and trimmed here rather than only in the form: it is shown to other people, and a
+   * name three hundred characters long is a layout problem on somebody else's phone.
+   */
+  async setName(userId: string, name: string | null): Promise<Result<null>> {
+    return this.#serial(async () => {
+      const user = (await this.#loadUsers()).find((entry) => entry.id === userId)
+      if (!user) return { ok: false, error: 'no such account' }
+
+      const trimmed = name?.replace(/\s+/g, ' ').trim() ?? ''
+      if (trimmed.length === 0) {
+        // Empty means "use my username", which is the state everybody starts in.
+        delete user.name
+        await this.#saveUsers()
+        return { ok: true, value: null }
+      }
+      if (trimmed.length > NAME_MAX) {
+        return { ok: false, error: `a name can be ${NAME_MAX} characters` }
+      }
+
+      user.name = trimmed
       await this.#saveUsers()
       return { ok: true, value: null }
     })

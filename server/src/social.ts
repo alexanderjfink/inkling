@@ -68,6 +68,7 @@ export function friendsOf(
   usernames: Map<string, string>,
   colors: Map<string, string> = new Map(),
   avatars: Map<string, string> = new Map(),
+  names: Map<string, string> = new Map(),
 ): Friend[] {
   const out: Friend[] = []
   for (const event of foldFriendships(events).values()) {
@@ -82,6 +83,7 @@ export function friendsOf(
     out.push({
       userId: other,
       username: usernames.get(other) ?? 'someone',
+      name: names.get(other),
       status,
       at: event.at,
       color: colors.get(other) ?? defaultColor(other),

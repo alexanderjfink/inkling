@@ -19,6 +19,7 @@ import {
   entryContext,
   rankBlips,
   newBlock,
+  nameOf,
   pendingFriendMoves,
   REJECTION_REASONS,
   requestGuidance,
@@ -1023,8 +1024,16 @@ export function Review({
   const friendMove = pendingMoves[ringIndex]
   /** Whether a swipe has moved the ring on this card: the ask slot is not where a card opens. */
   const [ringTouched, setRingTouched] = useState(false)
+  const sender = social.friends.find((entry) => entry.userId === friendMove?.from)
   /** Their colour, from their own settings. Undefined when they have not chosen one. */
-  const friendColour = social.friends.find((entry) => entry.userId === friendMove?.from)?.color
+  const friendColour = sender?.color
+  /**
+   * What to call them.
+   *
+   * The event carries the handle they signed up with, because that is what identifies them; the
+   * name is looked up now, so somebody who changes it is called the new one everywhere.
+   */
+  const senderName = sender ? nameOf(sender) : friendMove?.fromUsername
   const atAskSlot =
     ringTouched && (pendingMoves.length > 0 ? ringIndex >= pendingMoves.length : true)
   const nextFriendMove = () => {
@@ -1409,7 +1418,7 @@ export function Review({
               } ${swipeState.armed ? 'scale-110' : 'opacity-70'}`}
             >
               {swipeState.direction === 'right'
-                ? `☺ ${friendMove ? friendMove.fromUsername : 'ask a friend'}`
+                ? `☺ ${friendMove ? senderName : 'ask a friend'}`
                 : '✦ the app'}
             </span>
           ) : null}
@@ -1598,7 +1607,7 @@ export function Review({
                   suggestion and the other source — not between whole Inklings. */}
               <span className="pointer-events-none absolute top-1/2 -left-2 flex -translate-y-1/2 items-center rounded-full bg-surface p-0.5 shadow-circle">
                 <Avatar
-                  username={friendMove.fromUsername}
+                  username={senderName ?? 'a friend'}
                   userId={friendMove.from}
                   color={friendColour}
                   hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
@@ -1610,14 +1619,14 @@ export function Review({
               </span>
               <div className="flex items-center gap-2.5">
                 <Avatar
-                  username={friendMove.fromUsername}
+                  username={senderName ?? 'a friend'}
                   userId={friendMove.from}
                   color={social.friends.find((f) => f.userId === friendMove.from)?.color}
                   hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
                   size={28}
                 />
                 <p className="text-xs tracking-wide text-ink-faint uppercase">
-                  a move from {friendMove.fromUsername}
+                  a move from {senderName}
                 </p>
               </div>
               {/* The whole title is the button: on a phone, tapping the move is how you do it. */}
@@ -1698,7 +1707,7 @@ export function Review({
               {noting && !composer ? (
                 <Note
                   kind={noting}
-                  username={friendMove.fromUsername}
+                  username={senderName ?? 'a friend'}
                   moveTitle={friendMove.spec.title}
                   busy={busy}
                   onCancel={() => setNoting(null)}
@@ -1894,7 +1903,15 @@ export function Review({
             >
               <span className="pointer-events-none absolute top-1/2 -left-2 flex -translate-y-1/2 items-center rounded-full bg-surface p-0.5 shadow-circle">
                 <Avatar
-                  username={pendingMoves[0]?.fromUsername ?? 'a friend'}
+                  username={
+                    pendingMoves[0]
+                      ? nameOf(
+                          social.friends.find((e) => e.userId === pendingMoves[0]?.from) ?? {
+                            username: pendingMoves[0].fromUsername,
+                          },
+                        )
+                      : 'a friend'
+                  }
                   userId={pendingMoves[0]?.from ?? ''}
                   color={social.friends.find((f) => f.userId === pendingMoves[0]?.from)?.color}
                   hash={social.friends.find((f) => f.userId === pendingMoves[0]?.from)?.avatar}

@@ -7,7 +7,7 @@ import {
 } from '@inkling/domain'
 import { thanksReceivedNote, validatePassword } from '@inkling/domain'
 import { useEffect, useState } from 'react'
-import { changeOwnPassword, clearMyAvatar, setMyAvatar, setMyColor } from '../admin'
+import { changeOwnPassword, clearMyAvatar, setMyAvatar, setMyColor, setMyName } from '../admin'
 import { Admin } from './Admin'
 import { APP_BUILD } from '../build'
 import type { Auth } from '../state/useAuth'
@@ -179,6 +179,9 @@ export function Settings({
   const [savingColor, setSavingColor] = useState(false)
   const [colorSaved, setColorSaved] = useState(false)
   const [avatarBusy, setAvatarBusy] = useState(false)
+  const [name, setName] = useState('')
+  const [savingName, setSavingName] = useState(false)
+  const [savedName, setSavedName] = useState(false)
 
   useEffect(() => {
     if (!config) return
@@ -239,7 +242,8 @@ export function Settings({
   /** Kept in step with whoever is signed in, including right after it changes. */
   useEffect(() => {
     setColor(auth.user?.color)
-  }, [auth.user?.color, auth.user?.id])
+    setName(auth.user?.name ?? '')
+  }, [auth.user?.color, auth.user?.name, auth.user?.id])
 
   async function saveAvatar(file: File | null) {
     setAvatarBusy(true)
@@ -256,6 +260,21 @@ export function Settings({
       )
     } finally {
       setAvatarBusy(false)
+    }
+  }
+
+  async function saveName(next: string) {
+    setSavingName(true)
+    setSavedName(false)
+    try {
+      const result = await setMyName(serverUrl, next.trim() || null)
+      if (result.ok) {
+        setName(result.value.name ?? '')
+        setSavedName(true)
+        void auth.refresh()
+      }
+    } finally {
+      setSavingName(false)
     }
   }
 
@@ -452,21 +471,58 @@ export function Settings({
       ) : null}
 
       {tab === 'you' ? (
+        <Section title="What friends call you">
+          {/* The username is a handle: lowercase, no spaces, chosen in a hurry to sign in with.
+              This is the other thing, and the app showed the handle to friends for want of it. */}
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={name}
+              onChange={(event) => {
+                setName(event.target.value)
+                setSavedName(false)
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void saveName(name)
+              }}
+              maxLength={40}
+              placeholder={auth.user?.username ?? 'your name'}
+              autoComplete="nickname"
+              className={`${inputClass} max-w-[15rem]`}
+            />
+            <button
+              type="button"
+              disabled={savingName || name === (auth.user?.name ?? '')}
+              onClick={() => void saveName(name)}
+              className={primaryButtonClass}
+            >
+              <ButtonLabel busy={savingName}>{savingName ? 'Saving…' : 'Save'}</ButtonLabel>
+            </button>
+            {savedName ? <span className="text-xs text-good">saved</span> : null}
+          </div>
+          <p className="text-xs text-ink-faint">
+            This is what friends see on your moves, your questions and your notes. Leave it empty
+            and they see {auth.user?.username ?? 'your username'} — which is also what you sign in
+            with and what a friend types to find you.
+          </p>
+        </Section>
+      ) : null}
+
+      {tab === 'you' ? (
         <Section title="How you appear">
           <p className="text-xs text-ink-faint">
-            Friends see this beside your name — on a move you suggested, on a question you asked. It
-            is yours to set, and nobody else can change it.
+            A colour and a face, beside your name wherever it appears. Yours to set, and nobody else
+            can change it.
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <span className="flex items-center gap-2 rounded-full border border-line px-3 py-1.5">
               <Avatar
                 userId={auth.user?.id}
-                username={auth.user?.username ?? '?'}
+                username={name.trim() || (auth.user?.username ?? '?')}
                 color={color}
                 hash={auth.user?.avatar}
                 size={24}
               />
-              <span className="text-xs">{auth.user?.username}</span>
+              <span className="text-xs">{name.trim() || auth.user?.username}</span>
             </span>
             <label className="cursor-pointer rounded-full border border-line px-3 py-1.5 text-xs text-ink-soft">
               {avatarBusy ? 'shrinking…' : auth.user?.avatar ? 'change picture' : 'add a picture'}

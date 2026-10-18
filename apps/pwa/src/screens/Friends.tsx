@@ -1,4 +1,4 @@
-import type { Friend } from '@inkling/domain'
+import { type Friend, nameOf } from '@inkling/domain'
 import { useState } from 'react'
 import { Avatar } from '../components/Avatar'
 import { SocialTabs } from '../components/SocialTabs'
@@ -79,13 +79,13 @@ export function Friends({
               className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-3"
             >
               <Avatar
-                username={friend.username}
+                username={nameOf(friend)}
                 userId={friend.userId}
                 color={friend.color}
                 hash={friend.avatar}
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{friend.username}</span>
+                <span className="block truncate text-sm font-medium">{nameOf(friend)}</span>
                 <span className="block text-xs text-ink-faint">
                   would like to be friends · {when(friend.at)}
                 </span>
@@ -133,13 +133,13 @@ export function Friends({
               className="card flex items-center gap-3 p-3 text-left transition active:scale-[0.99]"
             >
               <Avatar
-                username={friend.username}
+                username={nameOf(friend)}
                 userId={friend.userId}
                 color={friend.color}
                 hash={friend.avatar}
               />
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">{friend.username}</span>
+                <span className="block truncate text-sm font-medium">{nameOf(friend)}</span>
                 <span className="block text-xs text-ink-faint">
                   since {when(friend.at)} · tap for what has passed between you
                 </span>
@@ -158,7 +158,7 @@ export function Friends({
               key={friend.userId}
               className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-3"
             >
-              <span className="min-w-0 flex-1 text-sm">{friend.username}</span>
+              <span className="min-w-0 flex-1 text-sm">{nameOf(friend)}</span>
               <span className="text-xs text-ink-faint">asked {when(friend.at)}</span>
               <button
                 type="button"

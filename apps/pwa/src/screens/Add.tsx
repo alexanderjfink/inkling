@@ -4,12 +4,14 @@ import {
   type Blip,
   type BlipType,
   type FeedbackContext,
+  type Friend,
   newBlock,
   type ShareDefault,
 } from '@inkling/domain'
 import { useEffect, useRef, useState } from 'react'
 import { type CaptureDraft, findUrl, isOnlyALink } from '../capture'
 import { Feedback, type FeedbackEnv } from '../components/Feedback'
+import { nameOf } from '@inkling/domain'
 import { Avatar } from '../components/Avatar'
 import { FriendsButton } from '../components/FriendsButton'
 import { BlockPicker, DraftBlocks } from '../components/Blocks'
@@ -44,6 +46,7 @@ export function Add({
   socialOn,
   shareDefault,
   asking,
+  friends,
   onNotifications,
   friendsWaiting,
   transcribeUrl,
@@ -74,6 +77,8 @@ export function Add({
   shareDefault: ShareDefault
   /** Asks from friends, so the entry screen can say somebody is waiting. */
   asking: ReceivedAsk[]
+  /** Who your friends are, so the card below can call them by the name they chose. */
+  friends: Friend[]
   onNotifications: () => void
   /** Friends waiting on something from you, shown on the button. */
   friendsWaiting: number
@@ -243,7 +248,7 @@ export function Add({
             <span className="min-w-0 flex-1">
               <span className="block text-sm font-semibold">
                 {asking.length === 1
-                  ? `${asking[0]?.username} wants your help`
+                  ? `${asking[0] ? nameOf(friends.find((f) => f.userId === asking[0]?.userId) ?? { username: asking[0].username }) : 'somebody'} wants your help`
                   : 'Friends want your help!'}
               </span>
               <span className="block truncate text-xs text-ink-soft">

@@ -1,5 +1,5 @@
 import type { AskContext, Blip, BlipEvent, Friend, FriendTimelineEntry } from '@inkling/domain'
-import { buildFriendTimeline } from '@inkling/domain'
+import { buildFriendTimeline, nameOf } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { Avatar } from '../components/Avatar'
 import { FriendImage } from '../components/FriendImage'
@@ -117,14 +117,14 @@ export function FriendScreen({
     <div className="flex flex-col gap-5 pb-8">
       <div className="card flex items-center gap-3 p-4">
         <Avatar
-          username={friend.username}
+          username={nameOf(friend)}
           userId={friend.userId}
           color={friend.color}
           hash={friend.avatar}
           size={52}
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-base font-semibold">{friend.username}</span>
+          <span className="block truncate text-base font-semibold">{nameOf(friend)}</span>
           <span className="block text-xs text-ink-faint">
             friends since {formatShortDate(friend.at)}
           </span>
@@ -177,7 +177,7 @@ export function FriendScreen({
 
         {shown.length === 0 ? (
           <p className="text-xs text-ink-faint">
-            Nothing between you yet. Ask {friend.username} for a move on one of your Inklings, or
+            Nothing between you yet. Ask {nameOf(friend)} for a move on one of your Inklings, or
             look at what they have been noticing and suggest one.
           </p>
         ) : (
@@ -186,7 +186,7 @@ export function FriendScreen({
               <li key={entry.key}>
                 <TimelineRow
                   entry={entry}
-                  username={friend.username}
+                  username={nameOf(friend)}
                   busy={busy === entry.key}
                   onThank={thank}
                   onOpenBlip={onOpenBlip}
@@ -200,7 +200,7 @@ export function FriendScreen({
 
       <section className="flex flex-col gap-2 border-t border-line pt-4">
         <p className="text-xs tracking-wide text-ink-faint uppercase">
-          what {friend.username} has shared
+          what {nameOf(friend)} has shared
         </p>
         {loading ? (
           <p className="flex items-center gap-2 text-xs text-ink-faint">

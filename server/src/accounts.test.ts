@@ -721,3 +721,30 @@ describe('a server with no accounts configured', () => {
     expect(state.needsSetup).toBe(false)
   })
 })
+
+describe('what friends call you', () => {
+  test('a name is trimmed, collapsed, bounded, and can be taken away', async () => {
+    const { handle, auth } = await harness()
+    const sam = await setupAdmin(handle)
+
+    const set = (name: string | null) =>
+      handle(
+        api('/auth/name', authed(sam.token, { method: 'POST', body: JSON.stringify({ name }) })),
+      )
+
+    const nameOf = async () => (await auth.list()).find((user) => user.id === sam.user.id)?.name
+
+    // Whitespace is not a name.
+    expect((await set('  Sam   the   Baker  ')).status).toBe(200)
+    expect(await nameOf()).toBe('Sam the Baker')
+
+    // Long enough to break somebody else's layout is refused rather than quietly truncated.
+    expect((await set('x'.repeat(200))).status).toBe(400)
+
+    // Empty means "use my username", which is where everybody starts.
+    await set('')
+    expect(await nameOf()).toBeUndefined()
+    await set(null)
+    expect(await nameOf()).toBeUndefined()
+  })
+})

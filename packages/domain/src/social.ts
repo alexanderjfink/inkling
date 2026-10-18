@@ -24,6 +24,8 @@ export type FriendStatus = 'accepted' | 'asked' | 'asked-of-you'
 export interface Friend {
   userId: string
   username: string
+  /** What they would like to be called, when it is not their username. */
+  name?: string
   status: FriendStatus
   at: ISODate
   /** How they appear, so a friend's move is recognisably theirs at a glance. */

@@ -408,6 +408,15 @@ async function handleAccount(
     return json({ user: { ...user, color: wanted ?? undefined } })
   }
 
+  // What friends call you. Yours to set, and only yours.
+  if (path === '/auth/name' && request.method === 'POST') {
+    const body = await readJson(request)
+    const wanted = body && typeof body.name === 'string' ? body.name : null
+    const result = await auth.setName(user.id, wanted)
+    if (!result.ok) return json({ error: result.error }, 400)
+    return json({ user: { ...user, name: wanted?.trim() || undefined } })
+  }
+
   if (path === '/auth/password' && request.method === 'POST') {
     const body = await readJson(request)
     const result = await auth.changeOwnPassword(
@@ -1033,13 +1042,15 @@ async function handleSocial(
   for (const user of users) if (user.color) colors.set(user.id, user.color)
   const avatars = new Map<string, string>()
   for (const user of users) if (user.avatar) avatars.set(user.id, user.avatar)
+  const names = new Map<string, string>()
+  for (const user of users) if (user.name) names.set(user.id, user.name)
   const friendships = await social.friendships()
   const friendOf = (id: string) => users.find((entry) => entry.id === id)
 
   // --- who my friends are, and asking somebody to be one ------------------------------
   if (rest.length === 1 && rest[0] === 'friends') {
     if (request.method === 'GET') {
-      return json({ friends: friendsOf(user.id, friendships, usernames, colors, avatars) })
+      return json({ friends: friendsOf(user.id, friendships, usernames, colors, avatars, names) })
     }
 
     if (request.method === 'POST') {
@@ -1058,7 +1069,7 @@ async function handleSocial(
       // shown what they have been noticing.
       await social.addFriendEvent({ t: 'requested', from: user.id, to: target.id })
       return json({
-        friends: friendsOf(user.id, await social.friendships(), usernames, colors, avatars),
+        friends: friendsOf(user.id, await social.friendships(), usernames, colors, avatars, names),
       })
     }
 
@@ -1123,12 +1134,16 @@ async function handleSocial(
         from: other,
         to: user.id,
       })
-      return json({ friends: friendsOf(user.id, await social.friendships(), usernames) })
+      return json({
+        friends: friendsOf(user.id, await social.friendships(), usernames, colors, avatars, names),
+      })
     }
 
     if (request.method === 'DELETE') {
       await social.addFriendEvent({ t: 'removed', from: user.id, to: other })
-      return json({ friends: friendsOf(user.id, await social.friendships(), usernames) })
+      return json({
+        friends: friendsOf(user.id, await social.friendships(), usernames, colors, avatars, names),
+      })
     }
 
     return json({ error: 'method not allowed' }, 405)
@@ -1142,7 +1157,7 @@ async function handleSocial(
     return json({
       messages,
       size,
-      friends: friendsOf(user.id, friendships, usernames, colors, avatars),
+      friends: friendsOf(user.id, friendships, usernames, colors, avatars, names),
     })
   }
 

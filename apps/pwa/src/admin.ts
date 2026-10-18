@@ -86,6 +86,16 @@ export async function setMyColor(url: string, color: string | null): Promise<Out
 }
 
 /**
+ * What friends call you.
+ *
+ * Not the username: that one is for signing in, and it is a handle. This is a name.
+ */
+export async function setMyName(url: string, name: string | null): Promise<Outcome<PublicUser>> {
+  const result = await call<{ user: PublicUser }>(url, '/auth/name', json({ name }, 'POST'))
+  return result.ok ? { ok: true, value: result.value.user } : result
+}
+
+/**
  * A picture of you.
  *
  * Already shrunk by the caller: this is a face at thirty pixels, and the original photograph

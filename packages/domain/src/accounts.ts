@@ -23,6 +23,14 @@ export interface PublicUser {
    */
   color?: string
   /**
+   * What they would like to be called.
+   *
+   * Not the username: that one is for signing in and for being found by it, and it is a
+   * handle — lowercase, no spaces, chosen in a hurry. This is what friends see, so it can be
+   * a name. Optional, and the username stands in when it is empty.
+   */
+  name?: string
+  /**
    * A picture, as the content hash of an image the server holds.
    *
    * A hash rather than a URL: the server is where it lives, and the address it is served from
@@ -54,6 +62,16 @@ export function defaultColor(id: string): string {
   let hash = 0
   for (const char of id) hash = (hash * 31 + char.charCodeAt(0)) >>> 0
   return PROFILE_COLORS[hash % PROFILE_COLORS.length] as string
+}
+
+/**
+ * What to call somebody.
+ *
+ * One place, because there are a dozen screens that show a person and they must not disagree:
+ * the nickname if there is one, the username otherwise, and never an empty line.
+ */
+export function nameOf(user: { username: string; name?: string }): string {
+  return user.name?.trim() || user.username
 }
 
 export function colorOf(user: { id: string; color?: string }): string {

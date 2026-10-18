@@ -74,6 +74,7 @@ export {
   USERNAME_MAX,
   USERNAME_MIN,
   colorOf,
+  nameOf,
   defaultColor,
   isRole,
   usernameKey,

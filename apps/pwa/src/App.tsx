@@ -375,6 +375,7 @@ export default function App() {
           socialOn={socialOn}
           shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
           asking={social.asks}
+          friends={social.friends}
           onNotifications={() => go('notifications')}
           friendsWaiting={friendsWaiting}
           transcribeUrl={

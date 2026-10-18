@@ -6,7 +6,7 @@ import type {
   FriendTimelineEntry,
   MoveSpec,
 } from '@inkling/domain'
-import { buildSocialTimeline, seenNoticeIds } from '@inkling/domain'
+import { buildSocialTimeline, nameOf, seenNoticeIds } from '@inkling/domain'
 import { useMemo, useState } from 'react'
 import { Avatar } from '../components/Avatar'
 import { Linkified } from '../components/Linkified'
@@ -111,7 +111,8 @@ export function Notifications({
 
   const row = (entry: FriendTimelineEntry) => {
     const friend = friendFor(entry.userId)
-    const name = friend?.username ?? entry.username ?? 'a friend'
+    // What they would like to be called, falling back to the handle they signed up with.
+    const name = friend ? nameOf(friend) : (entry.username ?? 'a friend')
     const ask = askFor(entry)
 
     return (
@@ -192,7 +193,7 @@ export function Notifications({
       {picked ? (
         <section className="flex flex-col gap-2">
           <p className="text-xs tracking-wide text-ink-faint uppercase">
-            suggesting for {picked.friend.username}
+            suggesting for {nameOf(picked.friend)}
           </p>
           <Suggest
             context={picked.context}
@@ -232,13 +233,13 @@ export function Notifications({
             }`}
           >
             <Avatar
-              username={friend.username}
+              username={nameOf(friend)}
               userId={friend.userId}
               color={friend.color}
               hash={friend.avatar}
               size={20}
             />
-            {friend.username}
+            {nameOf(friend)}
           </button>
         ))}
       </div>

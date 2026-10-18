@@ -246,6 +246,33 @@ describe('help from a friend', () => {
     expect(blip?.friendMoves).toHaveLength(1)
   })
 
+  test('the same move shown twice for one Inkling is one move shown', () => {
+    // The card records a move whenever it is put in front of somebody, and the card remounts
+    // every time the round pages — so the log filled up with the same offering over and over, and
+    // "MOVES SO FAR · 24" was one move looked at twenty-four times.
+    const id = newId()
+    const shown = (seq: number, at: string, title = 'play it badly') =>
+      ev({ t: 'moveShown', id, moveId: 'm1', moveSpec: { ...DEMO_MOVE, id: 'm1', title } }, seq, at)
+
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      shown(1, '2026-01-02T00:00:00Z'),
+      shown(2, '2026-01-03T00:00:00Z'),
+      shown(3, '2026-01-04T00:00:00Z'),
+    ])
+
+    expect(blip?.moves).toHaveLength(1)
+    expect(blip?.schedule.timesShown).toBe(1)
+
+    // A re-worded move is a different thing shown, which is why the title is part of it.
+    const [reworded] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      shown(1, '2026-01-02T00:00:00Z'),
+      shown(2, '2026-01-03T00:00:00Z', 'play it badly, louder'),
+    ])
+    expect(reworded?.moves).toHaveLength(2)
+  })
+
   test('it is unanswered until an entry says it answers it', () => {
     const id = newId()
     const [blip] = project([

@@ -237,7 +237,22 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
     case 'blockRemoved':
       blip.blocks = blip.blocks.filter((b) => b.id !== event.blockId)
       break
-    case 'moveShown':
+    case 'moveShown': {
+      /**
+       * The same move, shown again for the same Inkling, is the same fact.
+       *
+       * It was counted rather than checked, and it happened constantly: the card recorded a move
+       * whenever it was put in front of somebody, and the card remounts — so paging back and
+       * forth over one Inkling added an entry per visit. "MOVES SO FAR · 24" was not twenty-four
+       * moves; it was one move, looked at.
+       *
+       * A re-worded move is a different thing shown, which is why the title is part of the
+       * identity as well as the id.
+       */
+      const already = blip.moves.some(
+        (entry) => entry.moveId === event.moveId && entry.spec.title === event.moveSpec.title,
+      )
+      if (already) break
       blip.moves.push({
         moveId: event.moveId,
         spec: event.moveSpec,
@@ -246,6 +261,7 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       })
       blip.schedule.timesShown += 1
       break
+    }
     case 'moveDone': {
       const move = blip.moves.find((m) => m.moveId === event.moveId)
       if (move) {

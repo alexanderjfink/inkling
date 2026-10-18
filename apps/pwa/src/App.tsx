@@ -22,6 +22,7 @@ import { storage, useInkling } from './state/useInkling'
 import { usePromote } from './state/usePromote'
 import { useRelated } from './state/useRelated'
 import { useServerConfig } from './state/useServerConfig'
+import { useHiddenWhileReadingDown } from './state/useHiddenWhileReadingDown'
 import { useServerUrl } from './state/useServerUrl'
 import { useSocial } from './state/useSocial'
 import { useSync } from './state/useSync'
@@ -165,6 +166,7 @@ export default function App() {
   const [friendId, setFriendId] = useState<string | null>(null)
   /** The tray you catch something in, from anywhere but the entry screen. */
   const [trayOpen, setTrayOpen] = useState(false)
+  const readingDown = useHiddenWhileReadingDown()
 
   const active = blips.filter((blip) => !blip.deleted).length
   const { open: tourOpen, setOpen: setTourOpen } = useTour({
@@ -527,7 +529,12 @@ export default function App() {
           type="button"
           onClick={() => setTrayOpen(true)}
           aria-label="Capture a new Inkling"
-          className="fixed bottom-5 left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle"
+          /* Out of the way while you are reading down a page, back the moment you scroll up:
+             the usual phone behaviour, and the difference between a button that floats over the
+             text and one that covers it. */
+          className={`fixed bottom-5 left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle transition-transform duration-200 ${
+            readingDown ? 'translate-y-24' : ''
+          }`}
         >
           +
         </button>

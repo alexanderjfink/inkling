@@ -139,8 +139,13 @@ export interface InklingActions {
   deleteBlip(id: string): Promise<BlipEvent>
   pinToDesktop(id: string): Promise<BlipEvent>
   unpinFromDesktop(id: string): Promise<BlipEvent>
-  /** Record that a move was put in front of the user, so it is not repeated blindly. */
-  recordMoveShown(id: string, moveSpec: MoveSpec): Promise<BlipEvent>
+  /**
+   * Record that a move was put in front of the user, so it is not repeated blindly.
+   *
+   * Null when it was already there, which is the ordinary case: the card records a move whenever
+   * it is put in front of somebody, and the card remounts every time the round pages.
+   */
+  recordMoveShown(id: string, moveSpec: MoveSpec): Promise<BlipEvent | null>
   /**
    * Mark a suggestion as bad, keeping the context it was made in.
    *
@@ -390,8 +395,18 @@ export function useInkling(accountId: string | null = null) {
       promote(id, notePath) {
         return storage().append({ t: 'promoted', id, notePath })
       },
-      recordMoveShown(id, moveSpec) {
-        return storage().append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
+      async recordMoveShown(id, moveSpec) {
+        // Checked against the log rather than against whatever the screen happens to be holding:
+        // the card remounts every time the round pages, and a screen that has just mounted knows
+        // nothing about what it recorded a moment ago. Without this the log filled up with the
+        // same offering over and over.
+        const store = storage()
+        const before = project(await store.allEvents()).find((blip) => blip.id === id)
+        const already = before?.moves.some(
+          (entry) => entry.moveId === moveSpec.id && entry.spec.title === moveSpec.title,
+        )
+        if (already) return null
+        return store.append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
       },
       rejectMove(id, moveSpec, context, reason, note) {
         return storage().append({

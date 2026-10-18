@@ -2158,16 +2158,6 @@ export function Review({
                   Export
                 </button>
               )}
-
-              <button
-                type="button"
-                onClick={() => void defer(DEFAULT_DEFERRAL)}
-                title={`Put it down until ${deferDay} — it comes back then`}
-                className="flex items-center gap-1.5 rounded-2xl rounded-br-none border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-soft"
-              >
-                <span aria-hidden="true">⏱</span>
-                <span className="whitespace-nowrap">{deferShort}</span>
-              </button>
             </div>
           </div>
 
@@ -2219,6 +2209,23 @@ export function Review({
             />
           ) : null}
         </div>
+
+        {/* On the card's bottom right corner, and there whatever part of the Inkling you are
+              reading: `sticky`, inside the card's own scroller, above the strip that says where
+              the next one is. Outside the scroller it landed below the card — the frame it would
+              hang from also holds the two lines under the card — and in the flow it scrolled
+              away, which is the thing being fixed. */}
+        {!composer ? (
+          <button
+            type="button"
+            onClick={() => void defer(DEFAULT_DEFERRAL)}
+            title={`Put it down until ${deferDay} — it comes back then`}
+            className="sticky bottom-7 z-10 mr-1 self-end rounded-2xl border border-line bg-surface px-3 py-2 text-xs font-medium text-ink-soft shadow-circle"
+          >
+            <span aria-hidden="true">⏱</span>{' '}
+            <span className="whitespace-nowrap">{deferShort}</span>
+          </button>
+        ) : null}
 
         {round.showNext ? (
           <button

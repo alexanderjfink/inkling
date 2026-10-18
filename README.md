@@ -520,11 +520,13 @@ thought of, an answer, a thank-you. Editing a title is not a moment, and a green
 would make the check mean nothing. It takes no touches, so it cannot trap anybody already
 typing the next thing.
 
-**Retiring and deleting live behind "edit", in a menu that says what they do.** "Edit" had grown
-to mean three different things, and the two that end an Inkling were small words at the bottom of
-the card. The menu has *Edit the words*, *Retire it — not now, it goes to the attic and can come
-back*, and *Delete it — for good, it leaves the app*, each with the sentence under it. Both still
-ask properly before doing anything.
+**Everything about the Inkling itself is behind three dots in its top right corner.** The trigger
+is a small round ⋯ rather than the word "edit", because the menu holds four different things and
+two of them have nothing to do with editing — and "edit" was the smallest word on the card for the
+largest set of choices on it. It has *Edit the words*, *Retire it — not now, it goes to the attic
+and can come back*, *Export it — a note you can download, copy or share*, and *Delete it — for good,
+it leaves the app*, each with the sentence under it. Export was a button in the card's bottom left
+corner; that corner is now the Inkling's controls and nothing else.
 
 **Retiring and deleting ask in the middle of the screen.** The footer still holds the two
 words, but pressing one raises "Retire?" or "Delete?" with the question large and two large
@@ -898,8 +900,7 @@ was not twenty-four moves — it was one move, looked at. The fold refuses a rep
 tidies the counts already in the log, and the write itself is a no-op when it is already there.
 
 **The card's controls are on the card**: a three-way control in the middle — *Ask Friend* · *Add a
-Move* · *Generate* — with *Export* in the bottom left corner and putting it down in the bottom
-right. Nothing of the kind sits below the card any more; three round buttons under a card read as
+Move* · *Generate* — and putting it down in the bottom right corner. Nothing of the kind sits below the card any more; three round buttons under a card read as
 the page's, not this Inkling's. The three sit on a row of their own because at 390px they do not
 fit beside the two corner buttons, and squeezing them made every label wrap.
 

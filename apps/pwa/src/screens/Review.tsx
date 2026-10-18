@@ -1464,14 +1464,16 @@ export function Review({
             {current.schedule.timesSkipped > 0 ? (
               <span className="text-ink-faint">put down {current.schedule.timesSkipped}×</span>
             ) : null}
-            {/* One menu, because "edit" had grown to mean three different things and the two
-                that end an Inkling were small words at the bottom of the card. */}
+            {/* Three dots rather than the word "edit": the menu holds four different things, two
+                of which have nothing to do with editing, and "edit" was the smallest word on the
+                card for the biggest set of choices on it. */}
             <button
               type="button"
               onClick={() => setMenuOpen(true)}
-              className="quiet ml-auto text-xs underline"
+              aria-label="More about this Inkling"
+              className="circle ml-auto h-9 w-9 shrink-0 text-lg leading-none"
             >
-              edit
+              ⋯
             </button>
           </div>
 
@@ -2089,26 +2091,6 @@ export function Review({
                 </button>
               </div>
             </div>
-
-            <div className="flex items-center justify-between">
-              {PROMOTE_ENABLED ? (
-                <button
-                  type="button"
-                  onClick={() => void promote()}
-                  className="rounded-2xl rounded-bl-none border border-line bg-surface px-3 py-2 text-xs font-medium whitespace-nowrap text-ink-soft"
-                >
-                  Promote
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setExporting((on) => !on)}
-                  className="rounded-2xl rounded-bl-none border border-line bg-surface px-3 py-2 text-xs font-medium whitespace-nowrap text-ink-soft"
-                >
-                  Export
-                </button>
-              )}
-            </div>
           </div>
 
           <MoveLog
@@ -2288,6 +2270,22 @@ export function Review({
                   </span>
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  if (PROMOTE_ENABLED) void promote()
+                  else setExporting(true)
+                }}
+                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+              >
+                {PROMOTE_ENABLED ? 'Put it in your notes' : 'Export it'}
+                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                  {PROMOTE_ENABLED
+                    ? 'writes a note in your vault, with the next steps as checkboxes'
+                    : 'a note you can download, copy, or share, with the next steps as checkboxes'}
+                </span>
+              </button>
               <button
                 type="button"
                 onClick={() => {

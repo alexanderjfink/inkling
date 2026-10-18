@@ -865,6 +865,24 @@ swipe changes between.
 card's bottom-right corner and it read as the bottom of the page, which is what it was: the card
 fills the screen, so its corner *is* the page's corner.
 
+**Putting it down is stuck to the card's bottom right corner**, so it is there whatever part of the
+Inkling you are reading — `sticky` inside the card's own scroller, above the strip that says where
+the next one is. It sat in the content and scrolled away; it sat on the frame before that and read
+as the page's corner, which it was, because the frame it hangs from also holds the two lines under
+the card.
+
+**And the + steps aside while you are reading down**, coming back the moment you scroll up at all —
+the usual phone behaviour, and the difference between a button that floats over the text and one
+that covers it. It listens in the capture phase, because scroll events do not bubble: the thing
+that scrolls is sometimes the page and sometimes a card inside it.
+
+**The same move shown again for one Inkling is the same fact.** It was counted rather than checked,
+and it happened constantly: the card records a move whenever it is put in front of somebody, the
+guard was a ref that lives as long as the card does, and the card remounts every time the round
+pages. So paging back and forth over one Inkling added an entry per visit, and "MOVES SO FAR · 24"
+was not twenty-four moves — it was one move, looked at. The fold refuses a repeat, which also
+tidies the counts already in the log, and the write itself is a no-op when it is already there.
+
 **The card's controls are on the card**: a three-way control in the middle — *Ask Friend* · *Add a
 Move* · *Generate* — with *Export* in the bottom left corner and putting it down in the bottom
 right. Nothing of the kind sits below the card any more; three round buttons under a card read as

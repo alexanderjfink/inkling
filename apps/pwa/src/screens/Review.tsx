@@ -919,23 +919,18 @@ export function Review({
 
   // Freeze the round when it starts, so acting on an Inkling cannot reshuffle it.
   /**
-   * What the round pages through: what is due, and then everything else in play.
+   * The round is the window you are looking through, and paging stays inside it.
    *
-   * The due ones come first and are what the round *is* — "1 of 4" counts those, and the round
-   * ends when they have all been dealt with. The rest are there so that paging up and down has
-   * somewhere to go: an Inkling you are not due to see is still one you might want to look at,
-   * and a card you can only scroll inside of is a card you cannot leave.
+   * It used to widen into everything in play, so that a round with one Inkling due still had
+   * somewhere to page to — which meant scrolling through "Today" carried on into what you had put
+   * down. A window is a window: if you want to see the rest, widen it, which is what the Today /
+   * Near Future / All switches are for.
    */
-  const pagingPool = useMemo(() => {
-    const extra = everything.filter((blip) => !candidates.some((entry) => entry.id === blip.id))
-    return [...candidates, ...extra]
-  }, [candidates, everything])
-
   useEffect(() => {
     if (session !== null) return
-    const ordered = buildRound(pagingPool, byId, focusKey)
+    const ordered = buildRound(candidates, byId, focusKey)
     if (ordered.length > 0) setSession(ordered)
-  }, [pagingPool, session, focusKey, byId])
+  }, [candidates, session, focusKey, byId])
 
   /**
    * Inklings waved past this round by swiping up.
@@ -953,7 +948,7 @@ export function Review({
   // deleting the last Inkling in a round would read as "nothing was waiting". It counts
   // everything the round will page through, which is what "2 of 4" has to mean when swiping up
   // and down moves through four cards.
-  const total = session?.length ?? pagingPool.length
+  const total = session?.length ?? candidates.length
   const done = total - queue.length
   const current = queue[0]
   const currentRelated = current ? (related.get(current.id) ?? []) : []

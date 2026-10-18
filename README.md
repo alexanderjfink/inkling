@@ -931,9 +931,14 @@ scroll container, so the browser keeps the vertical gesture and never lets a dra
 hand over the wheel and the touch moves, with `overscroll-contain` so the page does not take the
 leftover.
 
-**Up and down moves between the Inklings of the round** — through everything in play, not only
-what is due, so paging always has somewhere to go — with a strip at the top and another at the
-bottom of the card that says so, brightens as a pull gets far enough, and can simply be tapped.
+**Up and down moves between the Inklings you are looking at, and no further.** The round is the
+window — Today, Near Future, or All — and paging stays inside it. It widened into everything in
+play once, so that a window holding one Inkling still had somewhere to page to, and the result was
+that scrolling through *Today* carried on into what you had put down. A window is a window: to see
+the rest, widen it, which is what the three switches are for.
+
+The way there is a strip at the top of the card and another at the bottom, which says where you are
+going, brightens as a pull gets far enough, and can simply be tapped.
 The strips are the way it works, after two attempts at taking over the card's own vertical drags:
 the card scrolls, so the browser reads the gesture as a scroll and cancels the pointer before it
 can mean anything. The strips are `touch-action: none`, which is what makes a swipe on them a

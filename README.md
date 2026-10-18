@@ -9,73 +9,11 @@ without turning them into a guilty to-do list.
 The design follows Andy Matuschak, *Towards scalable blip cultivation* (2024), and the
 companion talk. Full plan: `~/.opencode/plan/blip-cultivation-mvp.md`.
 
-## Status — the MVP, complete
-
-| Piece | State |
-|---|---|
-| Event schema + `project()` fold | done, tested |
-| Scheduler v1 (finite feed, no overdue term) | done, tested |
-| Append-only local storage (IndexedDB, `durability: 'strict'`) | done |
-| Capture — text / URL / image | done |
-| Review loop — decision per blip, session receipt, sessions frozen | done |
-| Retire / attic / revive | done |
-| Sync — append-only log union, byte-offset watermarks, content-addressed blobs | done, tested |
-| Handoff — a blip goes first in the queue, on any device | done |
-| State digest — convergence check across devices | done, tested |
-| **Moves** — a 22-move playbook, time-boxed, goal-bearing, no repeats | done, tested |
-| **Models** — a provider registry: OpenCode Go by default, plus hosted and local | done, tested |
-| **Related blips** — links, topics and wording first; embeddings optional | done, tested |
-| **Contextual resurfacing** — a topic match overrides a snooze | done, tested |
-| **URL fetch** — server-side, so a saved link has something to react to | done, tested |
-| **Promotion** — ↑ on a blip writes an Obsidian note with specific next steps | done, tested |
-| **Embeddings** — a separate provider, so vectors can come from a local model | done, tested |
-| **Share target** — share a link or text from any app into Capture | done |
-| **Voice** — 🎙 Ramble transcribes on the device | done |
-| **Installable** — manifest, icons, service worker, offline shell | done |
-| **Backups** — the log exports as the JSONL it already is, plus a readable Markdown one | done |
-| **Accounts** — username, password, per-account settings and Inklings, an admin page | done |
-| Storage engine | **decided**: IndexedDB (10.3k writes/s vs OPFS 806/s on the Android phone) |
-
-## Layout
-
-```
-inkling/
-├── packages/domain/   pure TypeScript core — no framework, no I/O
-│   └── src/
-│       ├── ids.ts        ULID-style sortable ids
-│       ├── events.ts     the append-only event union + deterministic total order
-│       ├── project.ts    fold(events) -> Blip[]
-│       ├── schedule.ts   scoring + finite daily feed
-│       ├── log.ts        JSONL wire format, idempotent merge
-│       ├── hash.ts       sha256 (client and server share one implementation)
-│       ├── digest.ts     state digest for convergence checks
-│       ├── moves.ts      the playbook, selection, prompt and reply validation
-│       ├── related.ts    how blips relate: links, topics, wording, embeddings
-│       ├── obsidian.ts   note rendering, and drafting the next steps
-│       └── llm.ts        the provider seam (nothing model-shaped lives elsewhere)
-├── server/            Bun + file-backed store; sync, model proxy, url fetch
-│   └── src/
-│       ├── store.ts      append-only logs, content-addressed blobs, digests
-│       ├── handler.ts    the HTTP API
-│       ├── providerConfig.ts  presets, and where credentials come from
-│       ├── provider.ts   OpenAI-compatible + Anthropic transports
-│       ├── fetchPage.ts  url -> title + excerpt, with private-network guards
-│       ├── vault.ts      writing notes into the Obsidian vault, path-guarded
-│       └── index.ts      entry point
-└── apps/pwa/          React 19 + Vite + Tailwind, installable PWA
-    └── src/
-        ├── storage/      StorageAdapter + AppendOnlyLog (IndexedDB), blobs
-        ├── sync/         SyncTransport (HTTP) + Syncer
-        ├── llm/          ProxyProvider — the client's view of the model
-        ├── embeddings.ts cached vectors, by content hash
-        ├── state/        useInkling(), useSync(), useRelated(), usePromote()
-        ├── screens/      Home, Add, Review, AllBlips, Settings
-        └── spike/        in-app storage benchmark
-```
-
-Everything in `packages/domain` is pure and framework-free, so the same core runs on
-the server, on the desktop, and in the browser. The server imports it directly, so
-client and server can never disagree about the log format.
+The code is three packages: `packages/domain` is pure TypeScript with no framework and no I/O —
+the events, the fold, the schedule, the playbook; `server` is Bun and a file-backed store; and
+`apps/pwa` is the React app. Everything in the domain package runs on the server, in the browser
+and on the desktop, and the server imports it directly, so the two can never disagree about the
+log format.
 
 ## Getting it running
 

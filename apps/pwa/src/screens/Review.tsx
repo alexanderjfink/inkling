@@ -37,6 +37,7 @@ import { imageFrom, isOnlyALink, findUrl } from '../capture'
 import type { EntryDraft } from '../capture'
 import { Markdown } from '../components/Markdown'
 import { ButtonLabel, Spinner } from '../components/Spinner'
+import { Tray } from '../components/Tray'
 import { StoredImage } from '../components/StoredImage'
 import { formatDeferral, formatShortWeekday, formatWhen } from '../format'
 import { type LookupResult, lookupVia } from '../llm/proxy'
@@ -2131,15 +2132,6 @@ export function Review({
 
           {/* Taking the note does not finish the Inkling — you may well come back to it —
             so this sits on the card rather than replacing the card with a receipt. */}
-          {exporting ? (
-            <ExportNote
-              blip={current}
-              related={currentRelated.map((entry_) => entry_.blip)}
-              provider={provider}
-              onClose={() => setExporting(false)}
-              onPromoted={(filename) => setLastNote({ title: current.title, path: filename })}
-            />
-          ) : null}
         </div>
 
         {/* On the card's bottom right corner, and there whatever part of the Inkling you are
@@ -2157,10 +2149,10 @@ export function Review({
             {/* A circle rather than a pill: it is the one control on the card that is always
                 there, and the round shape says so — the shape the buttons along the bottom used
                 to have. */}
-            <span className="circle flex h-14 w-14 items-center justify-center border border-line text-2xl">
+            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle">
               ⏱
             </span>
-            <span className="rounded-full border border-line bg-surface px-2 py-0.5 text-[10px] font-medium whitespace-nowrap text-ink-soft">
+            <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap text-surface">
               {deferShort}
             </span>
           </button>
@@ -2215,99 +2207,104 @@ export function Review({
           </div>
         )}
 
+        {/* Its own tray rather than a panel inside the card: exporting is something you do to the
+            Inkling and then leave, and the note it makes is longer than a card's worth of text. */}
+        {exporting ? (
+          <Tray title="export it as a note" onClose={() => setExporting(false)}>
+            <ExportNote
+              blip={current}
+              related={currentRelated.map((entry_) => entry_.blip)}
+              provider={provider}
+              onClose={() => setExporting(false)}
+              onPromoted={(filename) => setLastNote({ title: current.title, path: filename })}
+            />
+          </Tray>
+        ) : null}
+
         {menuOpen ? (
-          <div className="fixed inset-0 z-40 flex flex-col justify-end">
+          <Tray title="this Inkling" onClose={() => setMenuOpen(false)}>
             <button
               type="button"
-              aria-label="Close"
+              onClick={() => {
+                setDraftTitle(current.title)
+                setDraftBody(current.body)
+                setDraftType(current.type)
+                setEditing(true)
+                setMenuOpen(false)
+              }}
+              className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+            >
+              Edit the words
+              <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                the title, what it says, and what kind of thing it is
+              </span>
+            </button>
+            {current.status === 'retired' || current.status === 'promoted' ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  void revive()
+                }}
+                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+              >
+                Put it back in play
+                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                  out of the attic, and into the round again
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setConfirming('retire')
+                }}
+                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+              >
+                Retire it
+                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                  not now — it goes to the attic and can come back
+                </span>
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false)
+                if (PROMOTE_ENABLED) void promote()
+                else setExporting(true)
+              }}
+              className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+            >
+              {PROMOTE_ENABLED ? 'Put it in your notes' : 'Export it'}
+              <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                {PROMOTE_ENABLED
+                  ? 'writes a note in your vault, with the next steps as checkboxes'
+                  : 'a note you can download, copy, or share, with the next steps as checkboxes'}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMenuOpen(false)
+                setConfirming('delete')
+              }}
+              className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium text-warn"
+            >
+              Delete it
+              <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                for good — it leaves the app and stops appearing anywhere
+              </span>
+            </button>
+            <button
+              type="button"
               onClick={() => setMenuOpen(false)}
-              className="absolute inset-0 bg-ink/40 backdrop-blur-[2px]"
-            />
-            <div className="tray-in relative mx-auto flex w-full max-w-xl flex-col gap-2 rounded-t-3xl border border-line bg-surface p-4 pb-6 shadow-card">
-              <p className="text-xs tracking-wide text-ink-faint uppercase">this Inkling</p>
-              <button
-                type="button"
-                onClick={() => {
-                  setDraftTitle(current.title)
-                  setDraftBody(current.body)
-                  setDraftType(current.type)
-                  setEditing(true)
-                  setMenuOpen(false)
-                }}
-                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
-              >
-                Edit the words
-                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                  the title, what it says, and what kind of thing it is
-                </span>
-              </button>
-              {current.status === 'retired' || current.status === 'promoted' ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    void revive()
-                  }}
-                  className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
-                >
-                  Put it back in play
-                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                    out of the attic, and into the round again
-                  </span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMenuOpen(false)
-                    setConfirming('retire')
-                  }}
-                  className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
-                >
-                  Retire it
-                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                    not now — it goes to the attic and can come back
-                  </span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false)
-                  if (PROMOTE_ENABLED) void promote()
-                  else setExporting(true)
-                }}
-                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
-              >
-                {PROMOTE_ENABLED ? 'Put it in your notes' : 'Export it'}
-                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                  {PROMOTE_ENABLED
-                    ? 'writes a note in your vault, with the next steps as checkboxes'
-                    : 'a note you can download, copy, or share, with the next steps as checkboxes'}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false)
-                  setConfirming('delete')
-                }}
-                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium text-warn"
-              >
-                Delete it
-                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                  for good — it leaves the app and stops appearing anywhere
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setMenuOpen(false)}
-                className="quiet mt-1 self-center text-xs underline"
-              >
-                cancel
-              </button>
-            </div>
-          </div>
+              className="quiet mt-1 self-center text-xs underline"
+            >
+              cancel
+            </button>
+          </Tray>
         ) : null}
 
         {confirming === 'retire' ? (

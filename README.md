@@ -873,7 +873,10 @@ swipe changes between.
 card's bottom-right corner and it read as the bottom of the page, which is what it was: the card
 fills the screen, so its corner *is* the page's corner.
 
-**And it is a circle, not a pill.** It is the one control on the card that is always there, and
+**And it wears the accent**, like the + it sits above: it is the one control on the card that is
+always there, and a grey circle among grey borders did not say so.
+
+**It is a circle, not a pill.** It is the one control on the card that is always there, and
 the round shape says so — the shape the buttons along the bottom used to have — with the day in a
 small label under it.
 
@@ -1129,6 +1132,13 @@ nobody has to find and re-paste a key because of a change they did not ask for.
 The vault stays per account: a note goes into one person's folder, not everybody's.
 
 ## Writing a note out
+
+**Export comes up in a tray over the card**, like the menu it is reached through. It was a panel
+inside the card, which is the wrong shape for something you do *to* an Inkling and then leave —
+and the note it renders is longer than a card's worth of text, so the tray is scrollable. The card
+stays visible behind the backdrop, so you can see what you are exporting while you decide.
+
+
 
 **Promoting to a note is switched off for now** (`PROMOTE_ENABLED` in
 `apps/pwa/src/features.ts`). Putting a file into somebody's vault is a promise about their

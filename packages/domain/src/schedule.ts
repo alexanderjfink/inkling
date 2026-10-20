@@ -30,11 +30,15 @@ export function isDue(blip: Blip, now: Date, activeTopics: string[] = []): boole
   if (blip.deleted) return false
   if (blip.status === 'retired' || blip.status === 'promoted') return false
 
-  // Somebody having thought about this on your behalf overrides everything, including a
-  // snooze and a retirement. A move from a friend is the one thing here that another
-  // person is waiting on, and letting it sit behind a deferral would be letting the
-  // scheduling quietly ignore the only part of this that involves somebody else.
-  if (unansweredFriendMove(blip)) return true
+  /*
+   * A move from a friend does *not* override a deferral.
+   *
+   * It used to, on the grounds that somebody was waiting on you. But "put this down until
+   * Tuesday" is a promise about when, made by the person whose attention it is, and a card that
+   * comes back the next morning anyway makes the button a lie. The friend's move is announced
+   * where that belongs — in the notifications — and it is still on the card, untouched, when the
+   * deferral ends. It only affects the ordering now (see `scoreBlip`), not whether it is due.
+   */
 
   // A matching topic overrides a snooze: "show me this when I'm thinking about X
   // again" is exactly the safety the design depends on. Explicit triggers are

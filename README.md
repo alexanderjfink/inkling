@@ -982,6 +982,13 @@ complete: every ask, every suggested move and every thank-you was written down h
 directions when it happened, and the server only ever carried the messages. It survives the
 server being unreachable, and it works for the things that never needed a network at all.
 
+**A deferral wins.** Putting something down until Tuesday takes it out of today's review, and it
+comes back on Tuesday. A move from a friend used to override that — the reasoning being that
+somebody was waiting on you — and the effect was that "put this down until Tuesday" came back the
+next morning, which makes the button a lie. The move is announced in the notifications, where that
+belongs, and it is still on the card, untouched, when the deferral ends. It only affects the
+ordering now, not whether something is due.
+
 **An ask says whether it is still waiting** — one you sent until something comes back, one they
 sent until something goes back. An answer counts whether it came from the ask in the
 notifications list or from browsing their Inklings, because the match is on the Inkling as well

@@ -282,9 +282,11 @@ describe('a move from a friend', () => {
     generatedBy: 'friend' as const,
   }
 
-  test('is due even when the Inkling has been put down for a month', () => {
-    // Somebody thought about this on your behalf. Letting it sit behind a deferral would
-    // let the scheduling quietly ignore the only part of this that involves anyone else.
+  test('a deferral wins, even when a friend has suggested something', () => {
+    // It used to be the other way round, on the grounds that somebody was waiting on you — and
+    // the effect was that "put this down until Tuesday" came back the next morning, which makes
+    // the button a lie. The move is announced in the notifications and is still on the card
+    // when the deferral ends; it does not drag the card into today.
     const { id, events } = blipFrom('learn a few chords', '2026-02-01T12:00:00Z')
     const snoozed = [
       ...events,
@@ -300,7 +302,11 @@ describe('a move from a friend', () => {
         '2026-02-03T12:00:00Z',
       ),
     ]
-    expect(isDue(only(withMove), NOW)).toBe(true)
+    expect(isDue(only(withMove), NOW)).toBe(false)
+
+    // And it is back, move and all, when the day arrives.
+    const later = new Date('2026-04-02T12:00:00Z')
+    expect(isDue(only(withMove), later)).toBe(true)
   })
 
   test('leads the round, and stops leading once something is written against it', () => {

@@ -402,9 +402,8 @@ export function useInkling(accountId: string | null = null) {
         // same offering over and over.
         const store = storage()
         const before = project(await store.allEvents()).find((blip) => blip.id === id)
-        const already = before?.moves.some(
-          (entry) => entry.moveId === moveSpec.id && entry.spec.title === moveSpec.title,
-        )
+        // By id: one move is one row, however it was worded when it was shown.
+        const already = before?.moves.some((entry) => entry.moveId === moveSpec.id)
         if (already) return null
         return store.append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
       },

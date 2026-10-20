@@ -547,11 +547,10 @@ describe('forgetting what was only offered', () => {
     expect(blip?.moves).toHaveLength(2)
   })
 
-  test('a re-adapted move is recorded again, so it does not come back as if it were new', () => {
-    // The old guard skipped the write whenever the move *id* was already in the history,
-    // so "Who has already made a notes app social?" and "Who has already tried a social,
-    // learning-first platform?" looked like one event to the app — and the second kept
-    // being offered because nothing recorded that it had been.
+  test('a re-adapted move is still recorded, and is still one row', () => {
+    // Two things have to be true at once. A re-worded showing must be *recorded*, or the move
+    // looks unoffered and comes back as if it were new — and it must be one row, because three
+    // rows all saying the same thing is what "shows that move a bunch of times" was.
     const [blip] = project([
       { ...meta(1), t: 'captured', id: 'x', input: { kind: 'text', text: 'social' }, type: 'idea' },
       {
@@ -569,10 +568,11 @@ describe('forgetting what was only offered', () => {
         moveSpec: spec('idea.prior', 'second wording'),
       },
     ])
-    expect(blip?.moves.map((entry) => entry.spec.title)).toEqual([
-      'first wording',
-      'second wording',
-    ])
+    expect(blip?.moves).toHaveLength(1)
+    // The newest words, because that is the version that was last in front of them — and the id
+    // is what the selector avoids, so it cannot be offered again either way.
+    expect(blip?.moves[0]?.spec.title).toBe('second wording')
+    expect(blip?.moves[0]?.moveId).toBe('idea.prior')
   })
 })
 

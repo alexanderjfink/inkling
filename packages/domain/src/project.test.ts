@@ -264,13 +264,15 @@ describe('help from a friend', () => {
     expect(blip?.moves).toHaveLength(1)
     expect(blip?.schedule.timesShown).toBe(1)
 
-    // A re-worded move is a different thing shown, which is why the title is part of it.
+    // A re-worded move is the same move: the title was in the identity once, and three rows all
+    // saying the same thing is what "shows that move a bunch of times" was.
     const [reworded] = project([
       captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
       shown(1, '2026-01-02T00:00:00Z'),
       shown(2, '2026-01-03T00:00:00Z', 'play it badly, louder'),
     ])
-    expect(reworded?.moves).toHaveLength(2)
+    expect(reworded?.moves).toHaveLength(1)
+    expect(reworded?.moves[0]?.spec.title).toBe('play it badly, louder')
   })
 
   test('it is unanswered until an entry says it answers it', () => {

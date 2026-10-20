@@ -239,20 +239,23 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       break
     case 'moveShown': {
       /**
-       * The same move, shown again for the same Inkling, is the same fact.
+       * One move is one row, however many times it was put in front of you and however many times
+       * the app re-worded it on the way.
        *
-       * It was counted rather than checked, and it happened constantly: the card recorded a move
-       * whenever it was put in front of somebody, and the card remounts — so paging back and
-       * forth over one Inkling added an entry per visit. "MOVES SO FAR · 24" was not twenty-four
-       * moves; it was one move, looked at.
-       *
-       * A re-worded move is a different thing shown, which is why the title is part of the
-       * identity as well as the id.
+       * The identity is the move's id, not its title. The title used to be part of it, on the
+       * grounds that a re-adapted move is a different thing shown — true about the record, and
+       * wrong about the display: a playbook move the model re-worded three times was three rows
+       * on the card, all saying the same thing. That is what "shows that move a bunch of times
+       * on top of each other" was.
        */
-      const already = blip.moves.some(
-        (entry) => entry.moveId === event.moveId && entry.spec.title === event.moveSpec.title,
-      )
-      if (already) break
+      const known = blip.moves.find((entry) => entry.moveId === event.moveId)
+      if (known) {
+        // Shown again: keep the newest words and the newest time, and leave the outcome alone —
+        // having done it once is not undone by looking at it again.
+        known.spec = event.moveSpec
+        known.shownAt = event.at
+        break
+      }
       blip.moves.push({
         moveId: event.moveId,
         spec: event.moveSpec,

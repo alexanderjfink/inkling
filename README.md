@@ -842,6 +842,12 @@ the usual phone behaviour, and the difference between a button that floats over 
 that covers it. It listens in the capture phase, because scroll events do not bubble: the thing
 that scrolls is sometimes the page and sometimes a card inside it.
 
+**One move is one row, however it was worded.** The identity of a row in the history is the
+move's id — not its title. The title was in it once, on the grounds that a re-adapted move is a
+different thing shown, which is true about the record and wrong about the card: a playbook move the
+model re-worded three times was three rows saying the same thing, which reads as the app having
+lost track. The newest wording is kept, and the outcome is not undone by looking again.
+
 **The same move shown again for one Inkling is the same fact.** It was counted rather than checked,
 and it happened constantly: the card records a move whenever it is put in front of somebody, the
 guard was a ref that lives as long as the card does, and the card remounts every time the round

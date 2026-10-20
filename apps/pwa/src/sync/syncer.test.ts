@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { BlipEvent } from '@inkling/domain'
-import { mimeFor, referencedHashes } from './syncer'
+import { mimeFor, pushOffsetFor, referencedHashes } from './syncer'
 
 /**
  * Which blobs a log refers to.
@@ -126,5 +126,27 @@ describe('mimeFor', () => {
 
   test('an unknown hash falls back rather than throwing', () => {
     expect(mimeFor([], 'nope')).toBe('application/octet-stream')
+  })
+})
+
+describe('how much of our log the server already has', () => {
+  const log = new TextEncoder().encode('{"a":1}\n{"b":2}\n')
+
+  test('the server’s size wins, because ours is only a memory', () => {
+    // The bug this exists for: after the server's data was rebuilt, the client still believed
+    // everything had been pushed and pushed nothing — so every Inkling written on that computer
+    // stayed invisible to the phone, while the phone's writes arrived fine. One direction dead,
+    // no error anywhere.
+    expect(pushOffsetFor(log, 0)).toBe(0)
+    expect(pushOffsetFor(log, log.length)).toBe(log.length)
+  })
+
+  test('a size that lands mid-line is not trusted', () => {
+    // Rather than split a line in half, replay: ingest dedupes, so a replay costs bytes only.
+    expect(pushOffsetFor(log, 3)).toBe(0)
+  })
+
+  test('a server holding more than we do replays from the start', () => {
+    expect(pushOffsetFor(log, log.length + 100)).toBe(0)
   })
 })

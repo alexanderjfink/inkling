@@ -6,7 +6,6 @@ import type { SyncTransport } from './transport'
 
 export const SERVER_URL_KEY = 'sync:serverUrl'
 export const DEFAULT_SERVER_URL = defaultServerUrl()
-const PUSHED_KEY = 'sync:pushedOffset'
 const NEWLINE = 0x0a
 const watermarkKey = (deviceId: string) => `sync:watermark:${deviceId}`
 
@@ -84,6 +83,26 @@ export function mimeFor(events: BlipEvent[], hash: string): string {
  * sizes. Mixing those with JavaScript string indices splits a line in half the
  * moment a blip contains an em dash.
  */
+/**
+ * How much of our own log the server already has.
+ *
+ * The **server's size for our device** is the authority — not a number we wrote down last time.
+ * That number lied in the worst possible way. After the server's data was rebuilt or restored,
+ * the client still believed everything had been pushed, so it pushed nothing: every Inkling
+ * written on that computer stayed invisible to the phone for ever, while the phone's own writes
+ * arrived fine, because the phone still had bytes it had never sent. One direction works, the
+ * other is silent, and nothing reports an error.
+ *
+ * Where the two disagree the server is right. If it has more than we do — a shared device id, a
+ * log we no longer hold — replay from the start; ingest is idempotent at both ends, so a replay
+ * costs bytes and never correctness.
+ */
+export function pushOffsetFor(bytes: Uint8Array, serverSize: number): number {
+  const onBoundary = (offset: number) => offset === 0 || bytes[offset - 1] === NEWLINE
+  if (serverSize > 0 && serverSize <= bytes.length && onBoundary(serverSize)) return serverSize
+  return 0
+}
+
 export class Syncer {
   #store: StorageAdapter
   #transport: SyncTransport
@@ -91,21 +110,6 @@ export class Syncer {
   constructor(store: StorageAdapter, transport: SyncTransport) {
     this.#store = store
     this.#transport = transport
-  }
-
-  /** A usable byte offset for our own log, self-healing if the stored one is bad. */
-  async #pushOffset(bytes: Uint8Array, serverSize: number): Promise<number> {
-    const stored = Number((await this.#store.getSetting(PUSHED_KEY)) ?? '0')
-    const atBoundary = (offset: number) => offset === 0 || bytes[offset - 1] === NEWLINE
-    if (stored <= bytes.length && atBoundary(stored)) return stored
-
-    // The stored offset is unusable — written by an older version, or the log
-    // diverged. The server's size for our own log is authoritative when it lands
-    // on a line boundary; otherwise replay from zero (ingest dedupes by device:seq,
-    // so a replay costs bytes, never correctness).
-    const recovered = serverSize <= bytes.length && atBoundary(serverSize) ? serverSize : 0
-    await this.#store.setSetting(PUSHED_KEY, String(recovered))
-    return recovered
   }
 
   async sync(): Promise<SyncReport> {
@@ -131,12 +135,11 @@ export class Syncer {
 
       // 1. push our own tail
       const bytes = await this.#store.localLogBytes()
-      const offset = await this.#pushOffset(bytes, ourServerSize)
+      const offset = pushOffsetFor(bytes, ourServerSize)
       if (bytes.length > offset) {
         const payload = bytes.slice(offset)
-        const { size } = await this.#transport.push(this.#store.deviceId, payload)
+        await this.#transport.push(this.#store.deviceId, payload)
         report.pushedBytes = payload.length
-        await this.#store.setSetting(PUSHED_KEY, String(size))
       }
 
       // 2. pull peers

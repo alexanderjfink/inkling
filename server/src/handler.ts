@@ -967,8 +967,29 @@ export function createHandler(
         if (!text.endsWith('\n')) {
           return json({ error: 'payload must end at a line boundary' }, 400)
         }
-        const size = await store.appendLog(deviceId, encoder.encode(text))
-        return json({ size, appended: events.length })
+        /**
+         * Only what is new.
+         *
+         * A client that is unsure how much of its log the server holds replays from the start,
+         * and a client is unsure whenever the server's data is rebuilt. Appending that blindly
+         * would double the log and make every size — and so every offset — a lie in turn. The
+         * events carry their sequence numbers, so the overlap can simply be dropped.
+         */
+        const existing = await store.readLog(deviceId, 0)
+        const lastSeq = existing.byteLength
+          ? Math.max(...parseLog(new TextDecoder().decode(existing)).map((event) => event.seq), -1)
+          : -1
+        const fresh = events.filter((event) => event.seq > lastSeq)
+
+        if (fresh.length === 0) {
+          return json({ size: await store.logSize(deviceId), appended: 0 })
+        }
+
+        const size = await store.appendLog(
+          deviceId,
+          encoder.encode(`${fresh.map((event) => JSON.stringify(event)).join('\n')}\n`),
+        )
+        return json({ size, appended: fresh.length })
       }
 
       return json({ error: 'method not allowed' }, 405)

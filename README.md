@@ -73,6 +73,25 @@ remembers its account, so a change is a save and a reload rather than a build an
 4. **All blips** (from the bottom of Home) — everything, including the attic, where you
    can revive what you let go of.
 
+## Sync, and the number that lied
+
+**The server's size for your device decides how much to push, not a number the client wrote
+down.** That number — "you have already sent 5000 bytes" — was stored on the device and trusted
+absolutely, and it produced the worst kind of failure: after the server's data was rebuilt or
+restored, the client still believed everything had been pushed, so it pushed *nothing*. Every
+Inkling written on that computer stayed invisible on the phone for ever, while the phone's writes
+arrived perfectly, because the phone still had bytes it had never sent. One direction dead, no
+error anywhere, and no reason to suspect the server was empty.
+
+Now the server's own size is the authority, and the client replays whatever it is missing. A
+replay is free: the server drops events it already has by their sequence number, and the receiving
+device drops duplicates by `device:seq` — so a replay costs bytes and never correctness.
+
+**The delay is a separate thing.** Sync runs when the app opens, when it regains focus, when the
+network returns, and on a sixty-second timer. A phone only receives while the app is open: the web
+cannot be woken, so a phone in a pocket is a phone that is not syncing. Open it, and the pull
+happens immediately.
+
 ## Sync
 
 The server is what syncs your blips between devices, and where the model and the

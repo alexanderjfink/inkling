@@ -537,21 +537,23 @@ export function Add({
 
         {columns ? (
           <aside aria-label="The round" className="flex w-72 shrink-0 flex-col gap-1 pt-1">
-            <div className="mb-1 flex items-baseline justify-between px-3">
-              <h2 className="text-xs tracking-wide text-ink-faint uppercase">
-                The round · {round.length}
-              </h2>
-              <button
-                type="button"
-                onClick={onReview}
-                className="quiet text-xs underline"
-                disabled={round.length === 0}
-              >
-                start
-              </button>
-            </div>
+            <h2 className="mb-2 px-3 text-xs tracking-wide text-ink-faint uppercase">
+              Next Round · {round.length}
+            </h2>
+            {/* A button, not a link: starting the round is the one thing you can do from this
+                column, and it looked like a footnote. */}
+            <button
+              type="button"
+              onClick={onReview}
+              disabled={round.length === 0}
+              className="mx-3 mb-3 self-start rounded-xl bg-accent px-5 py-2 text-sm font-semibold text-surface transition disabled:opacity-40"
+            >
+              Start
+            </button>
             {round.length === 0 ? (
-              <p className="px-3 text-xs text-ink-faint">Nothing is waiting.</p>
+              <p className="px-3 text-xs text-ink-faint">
+                Nothing is waiting. Keep an Inkling and it comes back here.
+              </p>
             ) : null}
             {round.slice(0, 12).map((blip) => (
               <button

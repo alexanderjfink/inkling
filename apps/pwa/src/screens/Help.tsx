@@ -66,7 +66,7 @@ function Row({ term, children }: { term: string; children: ReactNode }) {
  */
 export function Help({ onStartTour }: { onStartTour: () => void }) {
   return (
-    <div className="flex flex-1 flex-col gap-5 pb-8">
+    <div className="flex max-w-2xl flex-1 flex-col gap-5 pb-8">
       <button
         type="button"
         onClick={onStartTour}

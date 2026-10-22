@@ -82,6 +82,15 @@ export function useSuggestedMove(
    * exactly the suggestion you just asked to be reconsidered.
    */
   revision = 0,
+  /**
+   * Whether the model may be asked at all.
+   *
+   * Off is not "a model that happens to be missing": nothing is requested and nothing spins.
+   * A move you saved earlier is still what this reports — it is yours and needs no model — but
+   * the card only has somewhere to show it when the slot exists, so turning the model back on
+   * brings it back rather than losing it.
+   */
+  enabled = true,
 ): {
   move: MoveSpec | null
   loading: boolean
@@ -157,7 +166,7 @@ export function useSuggestedMove(
     }
 
     // Nobody has asked. This is the whole point: opening a card costs nothing.
-    if (!wanted) {
+    if (!wanted || !enabled) {
       setMove(null)
       setLoading(false)
       return
@@ -177,7 +186,7 @@ export function useSuggestedMove(
       cancelled = true
     }
     // `related` is covered by relatedIds; `avoidIds` and `wanted` by key; the blip by blipId.
-  }, [key, relatedIds, provider, blipId, savedId, wanted])
+  }, [key, relatedIds, provider, blipId, savedId, wanted, enabled])
 
   // Seeded rather than initialised: the blip is not known on the first render, and the
   // answer is remembered across the screen being torn down and rebuilt.

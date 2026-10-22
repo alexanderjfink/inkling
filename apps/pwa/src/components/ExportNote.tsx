@@ -31,7 +31,8 @@ export function ExportNote({
 }: {
   blip: Blip
   related: Blip[]
-  provider: LLMProvider
+  /** Absent means the steps are written by the heuristics, which need no model. */
+  provider?: LLMProvider
   onClose: () => void
   /** Called once it has been taken, so the card can say so. */
   onPromoted: (filename: string) => void

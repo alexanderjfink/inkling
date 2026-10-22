@@ -139,6 +139,7 @@ function configPatch(body: Record<string, unknown>): ServerConfig {
   // missing here, so the social settings saved nothing at all — a form that appears to
   // work and silently discards what you told it.
   if (typeof body.socialEnabled === 'boolean') target.socialEnabled = body.socialEnabled
+  if (typeof body.aiEnabled === 'boolean') target.aiEnabled = body.aiEnabled
   if (body.shareDefault === 'friends' || body.shareDefault === 'private') {
     target.shareDefault = body.shareDefault
   }
@@ -280,6 +281,23 @@ function splitPatch(patch: ServerConfig): { server: ServerConfig; account: Serve
   return { server, account }
 }
 
+/**
+ * A new account starts with the model off.
+ *
+ * The app works without it — the playbook writes the moves, a friend can suggest one — and
+ * the walkthrough is where it is offered, with what it would do. A setting nobody was asked
+ * about should not be quietly spending somebody's tokens. An account with no value stored
+ * reads as on, so nobody who was already using it loses it to a setting invented later.
+ */
+async function startWithoutAi(options: HandlerOptions, user: PublicUser): Promise<void> {
+  try {
+    const context = options.accountFor ? await options.accountFor(user) : null
+    await context?.settings?.update({ aiEnabled: false })
+  } catch {
+    // A server that cannot write it is a server where the walkthrough's button does it.
+  }
+}
+
 function str(body: Record<string, unknown> | null, key: string): string {
   const value = body?.[key]
   return typeof value === 'string' ? value : ''
@@ -318,6 +336,7 @@ async function handlePublic(
     const body = await readJson(request)
     const result = await auth.setup(str(body, 'username'), str(body, 'password'))
     if (!result.ok) return json({ error: result.error }, 400)
+    await startWithoutAi(options, result.value.user)
     return json({ token: result.value.token, user: result.value.user })
   }
 
@@ -343,6 +362,8 @@ async function handleAccount(
   storeSource: StoreSource,
   social: SocialStore | undefined,
   config: ServerConfig,
+  /** What a newly created account starts with: the model off, offered in the walkthrough. */
+  onAccountCreated: (user: PublicUser) => Promise<void>,
 ): Promise<Response | null> {
   if (path === '/social' || path.startsWith('/social/')) {
     if (!social) return json({ error: 'social features are not available here' }, 404)
@@ -431,7 +452,7 @@ async function handleAccount(
 
   if (path === '/admin' || path.startsWith('/admin/')) {
     if (user.role !== 'admin') return json({ error: 'admins only' }, 403)
-    return handleAdmin(path, request, user, auth, storeSource)
+    return handleAdmin(path, request, user, auth, storeSource, onAccountCreated)
   }
 
   return null
@@ -444,6 +465,8 @@ async function handleAdmin(
   actor: PublicUser,
   auth: Auth,
   storeSource: StoreSource,
+  /** What a newly created account starts with: the model off, offered in the walkthrough. */
+  onAccountCreated: (user: PublicUser) => Promise<void>,
 ): Promise<Response> {
   const rest = path
     .slice('/admin/'.length)
@@ -474,6 +497,7 @@ async function handleAdmin(
       const role = isRole(body?.role) ? body.role : 'member'
       const result = await auth.add(str(body, 'username'), str(body, 'password'), role)
       if (!result.ok) return json({ error: result.error }, 400)
+      await onAccountCreated(result.value)
       return json({ user: result.value })
     }
 
@@ -588,6 +612,7 @@ export function createHandler(
         storeSource,
         options.social,
         liveConfig,
+        (created) => startWithoutAi(options, created),
       )
       if (accountRoute) return accountRoute
     }
@@ -836,6 +861,13 @@ export function createHandler(
     }
 
     if (parts.length === 2 && parts[0] === 'llm' && request.method === 'POST') {
+      // The switch is only honest if it is enforced here too: a disabled feature that still
+      // answers when asked is a checkbox, not a setting. The app removes every way to reach
+      // this; the server refuses the rest.
+      if (liveConfig.aiEnabled === false) {
+        return json({ error: 'AI features are off for this account', aiOff: true }, 403)
+      }
+
       const body = await readJson(request)
       if (!body) return json({ error: 'invalid json body' }, 400)
 

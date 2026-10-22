@@ -220,6 +220,54 @@ describe('config routes', () => {
     expect(current().folder).toBe('Notes')
   })
 
+  test('the AI switch is stored per account and read back', async () => {
+    const { handle, current, server } = withBridge()
+    // Nothing stored reads as on: an account made before the setting existed keeps what it had.
+    const before = await handle(new Request(`${BASE}/config`)).then((res) => res.json())
+    expect(before.config.aiEnabled).toBe(true)
+
+    const res = await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ aiEnabled: false }),
+      }),
+    )
+    expect(res.status).toBe(200)
+    expect((await res.json()).config.aiEnabled).toBe(false)
+    // Per account, not per server: it is a decision about this person's notes.
+    expect(current().aiEnabled).toBe(false)
+    expect(server().aiEnabled).toBeUndefined()
+  })
+
+  test('turning AI off refuses the model routes instead of pretending', async () => {
+    // A model that is present and answering, so what refuses the request is the switch.
+    const llm = {
+      available: async () => true,
+      completeStructured: async () => 'a move',
+    } as unknown as NonNullable<Runtime['llm']>
+    const runtime: Runtime = { ...buildRuntime({}), llm }
+    let config: ServerConfig = { aiEnabled: false }
+    const handle = createHandler(new FileStore(dir), {
+      runtime: () => runtime,
+      settings: {
+        read: async () => ({ config, runtime }),
+        update: async (patch) => {
+          config = mergeConfig(config, patch)
+          return { config, runtime, problems: [] }
+        },
+      },
+    })
+
+    const res = await handle(
+      new Request(`${BASE}/llm/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ prompt: 'think of a move' }),
+      }),
+    )
+    expect(res.status).toBe(403)
+    expect((await res.json()).aiOff).toBe(true)
+  })
+
   test('rejects an invalid patch with a reason, and changes nothing', async () => {
     const { handle, current } = withBridge({ provider: 'ollama' })
     const res = await handle(

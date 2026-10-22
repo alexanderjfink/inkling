@@ -10,7 +10,21 @@ import type { TourStep } from '../tour'
  * which is the usual way this kind of overlay breaks, and it breaks differently in every
  * browser's stacking rules.
  */
-export function Tour({ steps, onDone }: { steps: TourStep[]; onDone: () => void }) {
+export function Tour({
+  steps,
+  onDone,
+  aiOn,
+  socialOn,
+  onSetAi,
+  onSetSocial,
+}: {
+  steps: TourStep[]
+  onDone: () => void
+  aiOn: boolean
+  socialOn: boolean
+  onSetAi: (on: boolean) => void
+  onSetSocial: (on: boolean) => void
+}) {
   const [index, setIndex] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
 
@@ -81,7 +95,7 @@ export function Tour({ steps, onDone }: { steps: TourStep[]; onDone: () => void 
         role="dialog"
         aria-modal="true"
         aria-label="How Inkling works"
-        className="card fixed left-4 right-4 z-50 p-4"
+        className="card fixed left-4 right-4 z-50 mx-auto max-w-xl p-4"
         style={
           rect
             ? placeAbove
@@ -101,6 +115,32 @@ export function Tour({ steps, onDone }: { steps: TourStep[]; onDone: () => void 
             {paragraph}
           </p>
         ))}
+
+        {step.action
+          ? // In the card rather than beside the highlighted control: the control it is about
+            // is the one that is not there yet, and asking beside a missing button is a riddle.
+            (() => {
+              const on = step.action === 'ai' ? aiOn : socialOn
+              const set = step.action === 'ai' ? onSetAi : onSetSocial
+              return (
+                <button
+                  type="button"
+                  onClick={() => set(!on)}
+                  className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-semibold transition ${
+                    on ? 'border border-line text-ink-soft' : 'bg-accent text-surface'
+                  }`}
+                >
+                  {step.action === 'ai'
+                    ? on
+                      ? 'Turn AI moves off'
+                      : 'Turn AI moves on'
+                    : on
+                      ? 'Turn social features off'
+                      : 'Turn social features on'}
+                </button>
+              )
+            })()
+          : null}
 
         <div className="mt-4 flex items-center gap-3">
           <button type="button" onClick={onDone} className="quiet text-xs underline">

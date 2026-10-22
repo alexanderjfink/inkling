@@ -402,7 +402,7 @@ const SWIPE_TRAVEL = 460
 
 type SwipeDirection = 'left' | 'right'
 
-function useMoveSwipe(onSwipe: (direction: SwipeDirection) => void) {
+function useMoveSwipe(onSwipe: (direction: SwipeDirection) => void, enabled = true) {
   const [dx, setDx] = useState(0)
   const [dy, setDy] = useState(0)
   const [dragging, setDragging] = useState(false)
@@ -413,6 +413,9 @@ function useMoveSwipe(onSwipe: (direction: SwipeDirection) => void) {
 
   const handlers = {
     onPointerDown: (event: React.PointerEvent) => {
+      // Nothing to swipe to, so nothing to drag: a gesture that ended in "no" would be worse
+      // than a gesture that never started.
+      if (!enabled) return
       if (event.pointerType === 'mouse' && event.button !== 0) return
       from.current = { x: event.clientX, y: event.clientY }
       dragged.current = false
@@ -806,6 +809,8 @@ export function Review({
   onFeedback,
   social,
   socialOn,
+  /** Whether this account lets the model think of moves. */
+  aiOn,
   fabVisible,
 }: {
   blips: Blip[]
@@ -824,6 +829,8 @@ export function Review({
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
   social: SocialState
   socialOn: boolean
+  /** Off means no Generate, no help from a model, and nothing to swipe left to. */
+  aiOn: boolean
   /** Whether the floating + is on screen: the bottom of the page gives way to it. */
   fabVisible: boolean
 }) {
@@ -1005,6 +1012,7 @@ export function Review({
     currentRelated.map((entry_) => entry_.blip),
     provider,
     moveRevision,
+    aiOn,
   )
 
   const deferLabel = formatDeferral(deferUntil(DEFAULT_DEFERRAL, new Date()))
@@ -1089,7 +1097,12 @@ export function Review({
    * opens on; swiping left moves to the app's own, and swiping right moves back.
    */
   const [slot, setSlot] = useState<'friend' | 'ai'>('friend')
-  const slotNow: 'friend' | 'ask' | 'ai' = slot === 'ai' ? 'ai' : atAskSlot ? 'ask' : 'friend'
+  /**
+   * With the model off there is no second slot to swipe to: the card shows a friend's move, or
+   * the form for asking one, and nothing pretends there is something behind it.
+   */
+  const slotNow: 'friend' | 'ask' | 'ai' =
+    aiOn && slot === 'ai' ? 'ai' : atAskSlot ? 'ask' : 'friend'
 
   const swipe = (direction: SwipeDirection) => {
     if (direction === 'right') {
@@ -1099,11 +1112,12 @@ export function Review({
       nextFriendMove()
       return
     }
+    if (!aiOn) return
     setSlot('ai')
     nextAiMove()
   }
 
-  const swipeState = useMoveSwipe(swipe)
+  const swipeState = useMoveSwipe(swipe, aiOn)
   const round = useRoundSwipe({
     hasNext: queue.length > 1,
     hasPrevious: skipped.length > 0,
@@ -1715,9 +1729,13 @@ export function Review({
                     size={20}
                   />
                 </span>
-                <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
-                  ✦
-                </span>
+                {/* The other thing behind this move, on the side you swipe to reach it. With
+                    the model off there is nothing there, so the spark goes with it. */}
+                {aiOn ? (
+                  <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
+                    ✦
+                  </span>
+                ) : null}
                 <div className="flex items-center gap-2.5">
                   <Avatar
                     username={senderName ?? 'a friend'}
@@ -1929,7 +1947,7 @@ export function Review({
                     onAdd={(kind) => actions.addBlock(current.id, newBlock(kind))}
                   />
                 </div>
-                {composer.move ? (
+                {composer.move && aiOn ? (
                   <div className="flex flex-wrap items-center gap-4 text-xs">
                     <button
                       type="button"
@@ -1947,7 +1965,7 @@ export function Review({
                     </button>
                   </div>
                 ) : null}
-                <Guidance items={guidance} className="" />
+                {aiOn ? <Guidance items={guidance} className="" /> : null}
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => setComposer(null)} className="quiet text-xs">
                     cancel
@@ -2084,16 +2102,18 @@ export function Review({
                   >
                     save for later
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void askForGuidance()}
-                    disabled={guidanceLoading}
-                    className="quiet underline disabled:no-underline disabled:opacity-60"
-                  >
-                    <ButtonLabel busy={guidanceLoading}>
-                      {guidanceLoading ? 'thinking…' : 'help me with the next step'}
-                    </ButtonLabel>
-                  </button>
+                  {aiOn ? (
+                    <button
+                      type="button"
+                      onClick={() => void askForGuidance()}
+                      disabled={guidanceLoading}
+                      className="quiet underline disabled:no-underline disabled:opacity-60"
+                    >
+                      <ButtonLabel busy={guidanceLoading}>
+                        {guidanceLoading ? 'thinking…' : 'help me with the next step'}
+                      </ButtonLabel>
+                    </button>
+                  ) : null}
                   {/* A different signal from "not this one", which means "not at the moment".
                   This one says the suggestion itself was wrong, and it is kept. */}
                   <button
@@ -2170,7 +2190,7 @@ export function Review({
                   </div>
                 ) : null}
 
-                <Guidance items={guidance} />
+                {aiOn ? <Guidance items={guidance} /> : null}
               </div>
             ) : null}
 
@@ -2195,16 +2215,20 @@ export function Review({
                   >
                     Add a Move
                   </button>
-                  <button
-                    type="button"
-                    onClick={generateMove}
-                    disabled={moveLoading}
-                    className="border-l border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft disabled:opacity-40"
-                  >
-                    <ButtonLabel busy={moveLoading}>
-                      {moveLoading ? 'thinking…' : 'Generate'}
-                    </ButtonLabel>
-                  </button>
+                  {/* Two ways to get a move when the model is off — ask a person, or write
+                      one yourself — and no third button that would have to explain itself. */}
+                  {aiOn ? (
+                    <button
+                      type="button"
+                      onClick={generateMove}
+                      disabled={moveLoading}
+                      className="border-l border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft disabled:opacity-40"
+                    >
+                      <ButtonLabel busy={moveLoading}>
+                        {moveLoading ? 'thinking…' : 'Generate'}
+                      </ButtonLabel>
+                    </button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -2333,7 +2357,7 @@ export function Review({
               <ExportNote
                 blip={current}
                 related={currentRelated.map((entry_) => entry_.blip)}
-                provider={provider}
+                provider={aiOn ? provider : undefined}
                 onClose={() => setExporting(false)}
                 onPromoted={(filename) => setLastNote({ title: current.title, path: filename })}
               />

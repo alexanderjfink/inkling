@@ -46,7 +46,7 @@ import type { useSync } from '../state/useSync'
 import type { useTheme } from '../state/useTheme'
 import { THEME_CHOICES } from '../theme'
 
-type Tab = 'you' | 'sync' | 'notes' | 'friends' | 'about' | 'admin'
+type Tab = 'you' | 'sync' | 'notes' | 'moves' | 'friends' | 'about' | 'admin'
 
 /**
  * The tabs, and which of them are showing.
@@ -57,6 +57,7 @@ type Tab = 'you' | 'sync' | 'notes' | 'friends' | 'about' | 'admin'
  */
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'you', label: 'You' },
+  { id: 'moves', label: 'Moves' },
   { id: 'friends', label: 'Friends' },
   { id: 'about', label: 'About' },
 ]
@@ -170,6 +171,7 @@ export function Settings({
   const [twaFingerprint, setTwaFingerprint] = useState('')
   const [folder, setFolder] = useState('')
   const [socialEnabled, setSocialEnabled] = useState(true)
+  const [aiEnabled, setAiEnabled] = useState(false)
   const [shareDefault, setShareDefault] = useState<ShareDefault>('friends')
   const visible = only ? TABS.filter((entry) => only.includes(entry.id)) : TABS
   /** Thank-yous this account has been sent. Read from the log, like everything else. */
@@ -190,6 +192,7 @@ export function Settings({
     setVault(config.vault)
     setFolder(config.folder)
     setSocialEnabled(config.socialEnabled)
+    setAiEnabled(config.aiEnabled)
     setShareDefault(config.shareDefault)
     setTwaPackage(config.twaPackage ?? '')
     setTwaFingerprint(config.twaFingerprint ?? '')
@@ -293,6 +296,10 @@ export function Settings({
     }
   }
 
+  async function saveAi() {
+    if (await save({ aiEnabled })) setSaved('ai')
+  }
+
   async function saveSocial() {
     if (await save({ socialEnabled, shareDefault })) setSaved('social')
   }
@@ -330,7 +337,9 @@ export function Settings({
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
+    /* A form is read in lines, not across a desk: the sections keep a measure however wide the
+       window is, and the tabs stay with them. */
+    <div className="flex max-w-2xl flex-1 flex-col gap-6">
       {/* Tabs, because there is genuinely more than one kind of thing on this screen and a
           single column of twelve sections is a screen you scroll past rather than read. */}
       <div className="flex flex-wrap gap-1.5">
@@ -739,6 +748,50 @@ export function Settings({
               </button>
             </>
           ) : null}
+        </Section>
+      ) : null}
+
+      {tab === 'moves' ? (
+        <Section title="The model">
+          <p className="text-xs text-ink-faint">
+            The app can ask a model to write the move for an Inkling: one small thing to do with it,
+            out of what you have already written. It is off until you turn it on, because none of
+            this needs one — the playbook writes the moves, and a friend can suggest one.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => setAiEnabled((on) => !on)}
+            className={`self-start rounded-full px-4 py-2 text-xs font-medium ${
+              aiEnabled ? 'bg-accent text-surface' : 'border border-line text-ink-soft'
+            }`}
+          >
+            {aiEnabled ? 'AI moves are on' : 'AI moves are off'}
+          </button>
+
+          {config?.configured === false ? (
+            <p className="text-xs text-warn">
+              This server has no model set up yet. An admin can add one in Settings → Admin; until
+              then Generate has nothing to ask.
+            </p>
+          ) : null}
+
+          <p className="text-xs text-ink-faint">
+            {aiEnabled
+              ? 'The card offers Generate, and help with the next step. Turn it off and those disappear; nothing else changes, and the moves you have already made stay.'
+              : 'Generate is not on the card. The playbook still writes moves from your own words, and you can still ask a friend for one.'}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => void saveAi()}
+            disabled={saving}
+            className={primaryButtonClass}
+          >
+            <ButtonLabel busy={saving}>
+              {saving ? 'Saving…' : saved === 'ai' ? 'Saved' : 'Save'}
+            </ButtonLabel>
+          </button>
         </Section>
       ) : null}
 

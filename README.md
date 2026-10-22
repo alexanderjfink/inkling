@@ -240,6 +240,28 @@ The key stays on the server; devices only ever talk to the proxy. Settings shows
 provider and model are in play, so it is never a mystery why a move says "from the
 playbook".
 
+## The model is optional
+
+**A new account starts with AI off.** The app is complete without it: the playbook writes moves
+from your own words, a friend can suggest one, and capturing, reviewing, deferring and retiring
+are untouched. What the model adds is a second opinion — *Generate* on the card, and help with
+the next step when a move is not obvious.
+
+It is a switch in **Settings → Moves** (`aiEnabled`), per account, and it is enforced on both
+sides. The app removes every route to a model: the Generate button, the app's half of the move
+slot, the help links, and the embeddings behind related Inklings (topics, links and wording still
+carry the relation). The note's next steps fall back to the heuristics, which need nothing. And
+the server refuses `/llm/*` for that account — a switch that only hides buttons is a switch that
+has already been bypassed.
+
+**An account with no value stored reads as on.** That is the migration: nobody who was already
+using Generate loses it to a setting invented afterwards. New accounts get `aiEnabled: false`
+written when they are created, which is why the walkthrough offers to turn it on instead of
+assuming it.
+
+Moves you have already made, and the history of them, are untouched by the switch — turning it
+off stops new suggestions, it does not rewrite what you did.
+
 ## On a big screen
 
 The phone layout is the one that matters, and it is untouched: one card, one page, swipes, a
@@ -261,6 +283,12 @@ card should scroll, not flip.
 **Picking from the list is not a second path through the card.** The chosen Inkling becomes the
 `current` one, so every rule about settling, deferring, moves and history applies unchanged; a
 decision clears the pick and the card moves on by itself.
+
+**The rail carries the app's own mark**, not just its name: the phone's header shows the logo,
+and the wide screen should not be the one place it disappears.
+
+**The column is headed Next Round and starts with a Start button.** From the home screen starting
+the round is the one thing that column is for, and a link under a heading read as a footnote.
 
 **Capture sits beside the round** on the home screen, with what is waiting next to it, instead
 of a preview card and a floating +. The + is still on every other screen; on a wide screen it
@@ -400,7 +428,7 @@ less than a project — an idea, a question, or a problem you do not have the ti
 the know-how to get moving.** Everything else in the walkthrough is about how, and this is the
 only place that says why.
 
-Someone opening Inkling for the first time gets a five-step **walkthrough** that points at
+Someone opening Inkling for the first time gets an **eight-step walkthrough** that points at
 the actual controls — the field, the button that keeps it, the Review card, Settings — with
 a ring drawn around the real thing rather than a slideshow describing it. The dimming is
 done by that ring's own shadow, so the highlighted control cannot end up hidden behind the
@@ -414,6 +442,13 @@ everyone.
 playbook, asking a friend. Nothing said it. The step where you first meet one is the place to
 define it — a single small thing to do with an Inkling, a couple of minutes long, made out of
 your own words rather than invented for you.
+
+**Two of the steps ask a question rather than describe a screen.** The one after it explains what
+*Generate* would add and offers to **turn the model on**; the friends step explains what the
+social half does and offers to **turn it off**. Both buttons read their own state, so a step is
+never offering to switch on something that is already on. Choosing here is the same as choosing
+in Settings — the walkthrough is the first place the choice is put in front of you, not a second
+place to keep it.
 
 **It is only offered to an account that has never been used**, and that is decided from two
 sources, because they cover opposite cases. A fresh device looking at an account whose

@@ -15,6 +15,15 @@ export interface TourStep {
   radius?: number
   title: string
   body: string
+  /**
+   * A switch this step is about, offered where it is explained.
+   *
+   * The two things a new person should decide for themselves, asked at the moment they
+   * understand what they are deciding — not buried in Settings for them to find later, and
+   * not decided for them silently. The label follows the current state, so a step is never
+   * offering to turn on something that is already on.
+   */
+  action?: 'ai' | 'social'
 }
 
 /**
@@ -51,10 +60,16 @@ export const TOUR_STEPS: TourStep[] = [
     body: 'When something is ready to return it waits here — one at a time, and never more than you could get through in a sitting. Each one comes with a move: a single small thing to do with it, a couple of minutes long, made out of your own words rather than invented for you. Do it, ask for a different one, or put it down and come back to it.',
   },
   {
+    title: 'A model can help find the move',
+    body: 'Generate asks a model to write that move for you, out of what you have already written — and when a move is not obvious, it can offer help with the next step.\n\nIt is off until you turn it on, because the app does not need it: the playbook writes moves from your own words, and a friend can suggest one. Capturing, reviewing and putting things down are identical either way.',
+    action: 'ai',
+  },
+  {
     anchor: 'friends',
     radius: 999,
     title: 'A friend can suggest a move too',
-    body: 'Add somebody by their username — they have to say yes, and nothing of yours is visible until they do. Then when a suggestion is not it, you can ask them for one. Their move arrives on the Inkling with their name on it, and comes first until you have done something with it.',
+    body: 'Add somebody by their username — they have to say yes, and nothing of yours is visible until they do. Then when a suggestion is not it, you can ask them for one. Their move arrives on the Inkling with their name on it, and comes first until you have done something with it.\n\nThis half is on unless you turn it off. Nothing leaves this device for a friend until they have accepted, and every Inkling keeps its own switch.',
+    action: 'social',
   },
   {
     title: 'And you can help them',
@@ -64,6 +79,6 @@ export const TOUR_STEPS: TourStep[] = [
     anchor: 'settings',
     radius: 999,
     title: 'Everything else lives here',
-    body: 'Theme, sync, the model, your notes, backups, and the switch for the social half if you would rather not have it. And Help — where this walkthrough is waiting whenever you want it again.',
+    body: 'Theme, sync, your notes, backups, and the two switches: the social half, and whether the model thinks of moves. Both can be changed whenever you like — the model lives under Moves, the friends half under Friends. And Help — where this walkthrough is waiting whenever you want it again.',
   },
 ]

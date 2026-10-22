@@ -145,15 +145,24 @@ export default function App() {
     enabled: signedIn,
     accountId: auth.user?.id ?? null,
   })
-  const related = useRelated(
-    blips,
-    syncState.provider,
-    syncState.model?.embeddings ?? false,
-    syncState.model?.embedSimilarity ?? null,
-  )
   const promoteState = usePromote()
   const serverConfig = useServerConfig(server.serverUrl, auth.user?.id ?? null)
   const theme = useTheme()
+
+  /**
+   * AI is off unless the account has turned it on.
+   *
+   * Everything the model does hangs off this one flag — generating a move, help with the next
+   * step — so a person who does not want a model in their notes has one switch, not six. The
+   * relations between Inklings still work without it: topics, links and wording carry them.
+   */
+  const aiOn = serverConfig.config?.aiEnabled === true
+  const related = useRelated(
+    blips,
+    syncState.provider,
+    aiOn && (syncState.model?.embeddings ?? false),
+    syncState.model?.embedSimilarity ?? null,
+  )
 
   /**
    * Social is on unless the account has turned it off, and the server says the same thing
@@ -432,6 +441,7 @@ export default function App() {
             onFeedback={actions.giveFeedback}
             social={social}
             socialOn={socialOn}
+            aiOn={aiOn}
             fabVisible={!readingDown}
           />
         ) : null}
@@ -548,7 +558,7 @@ export default function App() {
             onFeedback={actions.giveFeedback}
             social={social}
             onOpenFriends={() => go('notifications')}
-            only={['friends', 'about', 'admin']}
+            only={['moves', 'friends', 'about', 'admin']}
           />
         ) : null}
 
@@ -583,7 +593,16 @@ export default function App() {
         ) : null}
 
         {/* Last, so it sits over whatever screen it is explaining. */}
-        {tourOpen ? <Tour steps={TOUR_STEPS} onDone={dismissTour} /> : null}
+        {tourOpen ? (
+          <Tour
+            steps={TOUR_STEPS}
+            onDone={dismissTour}
+            aiOn={aiOn}
+            socialOn={socialOn}
+            onSetAi={(on) => void serverConfig.save({ aiEnabled: on })}
+            onSetSocial={(on) => void serverConfig.save({ socialEnabled: on })}
+          />
+        ) : null}
         {/* And last of all, because it is about what you just did. */}
         <SavedTick />
       </div>

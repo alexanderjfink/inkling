@@ -51,6 +51,18 @@ export interface ServerConfig {
    */
   socialEnabled?: boolean
   /**
+   * Whether this account lets the model think of moves.
+   *
+   * Off unless it has been turned on, which is the opposite of the social switch and
+   * deliberate: the app is complete without a model — the playbook writes the moves, a
+   * friend can suggest one — and a walkthrough that offers to turn it on is a better
+   * introduction to it than a feature that appears out of nowhere and costs money.
+   *
+   * Accounts made before this setting existed have no value here and are treated as on:
+   * nobody should lose a feature because a setting was invented after they started.
+   */
+  aiEnabled?: boolean
+  /**
    * Whether new Inklings start shared with friends.
    *
    * Defaults to shared, because the feature is about helping each other and an app where
@@ -176,6 +188,7 @@ export function publicConfig(config: ServerConfig, runtime: Runtime) {
     apiKeySet: Boolean(config.apiKey),
     embedApiKeySet: Boolean(config.embedApiKey),
     socialEnabled: config.socialEnabled !== false,
+    aiEnabled: config.aiEnabled !== false,
     shareDefault: config.shareDefault ?? 'friends',
     transcribeProvider: config.transcribeProvider ?? null,
     transcribeModel: config.transcribeModel ?? null,
@@ -344,6 +357,7 @@ export function mergeConfig(current: ServerConfig, patch: ServerConfig): ServerC
       key === 'transcribeBaseUrl' ||
       key === 'transcribeApiKey' ||
       key === 'socialEnabled' ||
+      key === 'aiEnabled' ||
       key === 'shareDefault' ||
       key === 'embedSimilarity'
     ) {

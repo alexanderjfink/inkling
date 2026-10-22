@@ -59,9 +59,10 @@ export function Rail({
       <button
         type="button"
         onClick={() => onGo('add')}
-        className="mb-4 px-3 text-left text-lg font-semibold tracking-tight"
+        className="mb-4 flex items-center gap-2.5 rounded-xl px-3 py-1 text-left"
       >
-        Inkling
+        <img src="/icon-192.png" alt="" width={28} height={28} className="h-7 w-7 rounded-lg" />
+        <span className="text-lg font-semibold tracking-tight">Inkling</span>
       </button>
 
       {items.map((item) => {

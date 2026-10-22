@@ -23,6 +23,8 @@ export interface PublicConfig {
   embedApiKeySet: boolean
   /** On unless this account has turned it off. */
   socialEnabled: boolean
+  /** Off unless this account has turned it on. Without it, the playbook writes the moves. */
+  aiEnabled: boolean
   /** Whether new Inklings start shared with friends. */
   shareDefault: ShareDefault
   /** Where speech is transcribed, when the server has been given somewhere. */

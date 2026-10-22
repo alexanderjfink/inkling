@@ -112,6 +112,21 @@ export default function App() {
   }, [])
   /** A blip chosen from the list, to open straight away in Review. */
   const [focusId, setFocusId] = useState<string | null>(null)
+  /**
+   * A friend's move to open on, when the card was reached from its notification.
+   *
+   * Cleared by every other way of opening a card, so it cannot linger and re-target a move
+   * the next time the same Inkling is opened from somewhere else.
+   */
+  const [focusMessage, setFocusMessage] = useState<string | null>(null)
+  const openBlip = useCallback(
+    (id: string, messageId?: string) => {
+      setFocusId(id)
+      setFocusMessage(messageId ?? null)
+      go('review')
+    },
+    [go],
+  )
 
   const server = useServerUrl()
   const auth = useAuth(server.serverUrl)
@@ -389,10 +404,7 @@ export default function App() {
             waiting={waiting}
             next={upNext}
             round={feed}
-            onOpenBlip={(id) => {
-              setFocusId(id)
-              go('review')
-            }}
+            onOpenBlip={(id) => openBlip(id)}
             serverWarning={
               serverConfig.status === 'ok' ||
               serverConfig.status === 'loading' ||
@@ -434,8 +446,9 @@ export default function App() {
               go('add')
             }}
             onBrowse={() => go('all')}
-            onOpenBlip={(id) => setFocusId(id)}
+            onOpenBlip={(id) => openBlip(id)}
             focusId={focusId}
+            focusMessageId={focusMessage}
             serverUrl={syncState.serverUrl}
             feedbackEnv={feedbackEnv}
             onFeedback={actions.giveFeedback}
@@ -451,10 +464,7 @@ export default function App() {
             blips={blips}
             actions={actions}
             vault={serverConfig.config?.vault ?? ''}
-            onOpen={(id) => {
-              setFocusId(id)
-              go('review')
-            }}
+            onOpen={(id) => openBlip(id)}
           />
         ) : null}
         {ready && screen === 'friends' ? (
@@ -483,10 +493,7 @@ export default function App() {
                   serverUrl={server.serverUrl}
                   events={events}
                   blips={blips}
-                  onOpenBlip={(id) => {
-                    setFocusId(id)
-                    go('review')
-                  }}
+                  onOpenBlip={(id) => openBlip(id)}
                   onAnswer={() => go('notifications')}
                   onUnfriended={() => go('friends')}
                 />
@@ -503,10 +510,7 @@ export default function App() {
             serverUrl={server.serverUrl}
             onClearPicked={() => setPicked(null)}
             onOpenFriends={() => go('friends')}
-            onOpenBlip={(id) => {
-              setFocusId(id)
-              go('review')
-            }}
+            onOpenBlip={(id, messageId) => openBlip(id, messageId)}
           />
         ) : null}
 

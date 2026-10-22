@@ -25,7 +25,6 @@ export function Suggest({
 }) {
   const [text, setText] = useState('')
   const [minutes, setMinutes] = useState('5')
-  const [note, setNote] = useState('')
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<string | null>(null)
 
@@ -53,7 +52,7 @@ export function Suggest({
           playbook: 'friend',
           generatedBy: 'friend',
         },
-        note.trim(),
+        '',
       )
       if (problemText) setProblem(problemText)
       else onCancel()
@@ -77,12 +76,6 @@ export function Suggest({
           ? `“${title}” — done when: ${goal}`
           : 'first line is the move; a second line says what done looks like'}
       </p>
-      <input
-        value={note}
-        onChange={(event) => setNote(event.target.value)}
-        placeholder="anything you want to say with it (optional)"
-        className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
-      />
       {problem ? <p className="text-xs text-warn">{problem}</p> : null}
       <div className="flex items-center gap-3">
         <button type="button" onClick={onCancel} className="quiet text-xs underline">

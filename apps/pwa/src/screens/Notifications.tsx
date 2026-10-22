@@ -52,7 +52,8 @@ export function Notifications({
   onClearPicked: () => void
   onOpenFriends: () => void
   /** Open the Inkling a move landed on, which is where doing it happens. */
-  onOpenBlip: (id: string) => void
+  /** The move to open on, when the entry is about a particular one. */
+  onOpenBlip: (id: string, messageId?: string) => void
 }) {
   const [openAsk, setOpenAsk] = useState<string | null>(null)
   const [clearing, setClearing] = useState<string | null>(null)
@@ -140,11 +141,13 @@ export function Notifications({
         }
         /* Looking at it, or saying thank you, is "interacted with": the notice stops being new
            even though the move is still on the Inkling, because nothing has been lost either way. */
-        onOpenBlip={(id) => {
+        /* The message id goes with it: tapping "Open it" on a particular move is asking for
+           that move, and the card would otherwise open on whoever has been waiting longest. */
+        onOpenBlip={(id, messageId) => {
           if (entry.messageId && entry.blipId) {
             void social.clearMove({ messageId: entry.messageId, blipId: entry.blipId })
           }
-          onOpenBlip(id)
+          onOpenBlip(id, messageId)
         }}
         onThank={() => {
           if (!friend || !entry.blipId) return
@@ -349,7 +352,8 @@ function Row({
   onOpenAsk: () => void
   onCloseAsk: () => void
   onClear: () => void
-  onOpenBlip: (id: string) => void
+  /** The move to open on, when the entry is about a particular one. */
+  onOpenBlip: (id: string, messageId?: string) => void
   onThank: () => void
   onSuggest: (context: AskContext, move: MoveSpec, note: string) => Promise<string | null>
 }) {
@@ -387,7 +391,7 @@ function Row({
               ) : (
                 <button
                   type="button"
-                  onClick={() => entry.blipId && onOpenBlip(entry.blipId)}
+                  onClick={() => entry.blipId && onOpenBlip(entry.blipId, entry.messageId)}
                   className="text-left font-medium underline decoration-dotted"
                 >
                   {entry.title}
@@ -479,7 +483,7 @@ function Row({
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={() => entry.blipId && onOpenBlip(entry.blipId)}
+            onClick={() => entry.blipId && onOpenBlip(entry.blipId, entry.messageId)}
             className="rounded-full px-4 py-2.5 text-xs font-semibold text-white"
             style={{ background: friend?.color ?? 'var(--color-ink)' }}
           >

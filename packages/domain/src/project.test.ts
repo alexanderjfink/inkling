@@ -275,6 +275,84 @@ describe('help from a friend', () => {
     expect(reworded?.moves[0]?.spec.title).toBe('play it badly, louder')
   })
 
+  test('the same words under two ids are one row', () => {
+    // This is the duplicate that survived being deduped by id: a friend suggests the move the app
+    // had already offered, and the two arrive with different ids — `friend.<the words>` and
+    // `idea.smallestTest` — saying the same sentence. Two rows, because the ids differed, and
+    // nothing about the display could tell they were one thing.
+    const id = newId()
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      ev(
+        {
+          t: 'moveShown',
+          id,
+          moveId: 'idea.smallestTest',
+          moveSpec: { ...DEMO_MOVE, id: 'idea.smallestTest', title: 'What is the smallest test?' },
+        },
+        1,
+        '2026-01-02T00:00:00Z',
+      ),
+      ev(
+        {
+          t: 'moveShown',
+          id,
+          moveId: 'friend.whatisthesmallesttest',
+          moveSpec: {
+            ...DEMO_MOVE,
+            id: 'friend.whatisthesmallesttest',
+            title: 'what is the smallest test',
+            generatedBy: 'friend',
+          },
+        },
+        2,
+        '2026-01-03T00:00:00Z',
+      ),
+    ])
+
+    expect(blip?.moves).toHaveLength(1)
+    // The other id is remembered, so what happens to the move under either name still lands here.
+    expect(blip?.moves[0]?.alsoIds).toEqual(['friend.whatisthesmallesttest'])
+  })
+
+  test('doing it under the other id marks the one row done', () => {
+    const id = newId()
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      ev(
+        {
+          t: 'moveShown',
+          id,
+          moveId: 'idea.smallestTest',
+          moveSpec: { ...DEMO_MOVE, id: 'idea.smallestTest', title: 'What is the smallest test?' },
+        },
+        1,
+        '2026-01-02T00:00:00Z',
+      ),
+      // The friend's copy is shown on the card too — the app writes that down, which is what
+      // records the second id.
+      ev(
+        {
+          t: 'moveShown',
+          id,
+          moveId: 'friend.whatisthesmallesttest',
+          moveSpec: {
+            ...DEMO_MOVE,
+            id: 'friend.whatisthesmallesttest',
+            title: 'What is the smallest test?',
+            generatedBy: 'friend',
+          },
+        },
+        2,
+        '2026-01-03T00:00:00Z',
+      ),
+      ev({ t: 'moveDone', id, moveId: 'friend.whatisthesmallesttest' }, 3, '2026-01-04T00:00:00Z'),
+    ])
+
+    expect(blip?.moves).toHaveLength(1)
+    expect(blip?.moves[0]?.outcome).toBe('done')
+  })
+
   test('it is unanswered until an entry says it answers it', () => {
     const id = newId()
     const [blip] = project([

@@ -13,7 +13,15 @@ import type {
   Visibility,
   RejectionContext,
 } from '@inkling/domain'
-import { DEMO_INPUT, DEMO_MOVE, DEMO_TYPE, newId, project, snoozeUntil } from '@inkling/domain'
+import {
+  DEMO_INPUT,
+  DEMO_MOVE,
+  DEMO_TYPE,
+  newId,
+  project,
+  snoozeUntil,
+  movesAreOne,
+} from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { type CaptureDraft, type EntryDraft, extractTopics, guessType, inferBody } from '../capture'
 import { AppendOnlyLog } from '../storage/appendOnlyLog'
@@ -402,8 +410,14 @@ export function useInkling(accountId: string | null = null) {
         // same offering over and over.
         const store = storage()
         const before = project(await store.allEvents()).find((blip) => blip.id === id)
-        // By id: one move is one row, however it was worded when it was shown.
-        const already = before?.moves.some((entry) => entry.moveId === moveSpec.id)
+        // One move is one row: by id, by an id it has already had, or by what it says. A friend's
+        // suggestion and the app's own can be the same sentence under two names.
+        const already = before?.moves.some(
+          (entry) =>
+            entry.moveId === moveSpec.id ||
+            entry.alsoIds?.includes(moveSpec.id) ||
+            movesAreOne(entry.spec, moveSpec),
+        )
         if (already) return null
         return store.append({ t: 'moveShown', id, moveId: moveSpec.id, moveSpec })
       },

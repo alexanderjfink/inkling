@@ -808,7 +808,10 @@ Inkling from what you wrote — and a one-line suggestion works too, the line be
 minutes are underneath, because a friend knows how long it takes as well as what it is.
 
 It used to be three small inputs stacked with placeholders, which is a form, and a form asks you
-to think about a move in fields rather than in sentences.
+to think about a move in fields rather than in sentences. The third of them came back later as an
+optional "anything you want to say with it" box, and that was a second thing to fill in for no
+reason — the move is the message. It is gone, and the note field stays in the protocol so a note
+already sitting in somebody's history still renders.
 
 It is one component (`Suggest.tsx`) rather than two, because it is reachable from two places
 now: answering somebody who asked, and suggesting something unprompted after looking at what a
@@ -938,6 +941,20 @@ move's id — not its title. The title was in it once, on the grounds that a re-
 different thing shown, which is true about the record and wrong about the card: a playbook move the
 model re-worded three times was three rows saying the same thing, which reads as the app having
 lost track. The newest wording is kept, and the outcome is not undone by looking again.
+
+**Two ids for one sentence is still one row.** Deduping by id was not enough, and that is why the
+same advice kept appearing twice: a friend's suggestion arrives as `friend.<the words>` and the
+app's own copy of the same advice as `idea.smallestTest`, so a friend suggesting what the app had
+already offered put one sentence on the card under two names. `movesAreOne` is the rule now — same
+id, or the same words **when one of them came from a friend**. Two *playbook* moves stay two
+moves even if they ever share a title: they are different prompts about different things, and
+merging those would lose one. A row also remembers every id it has been recorded under, so
+finishing it under either name lands on the same row.
+
+**A friend's move is put in front of you, so it is written down too.** It is a move that was
+shown, and recording it under the id it arrived with is what lets *done* find the row later —
+without it, doing a friend's suggestion left the app's look-alike sitting there marked "offered".
+It is also what clears the notification: a thing you are looking at is no longer news.
 
 **The same move shown again for one Inkling is the same fact.** It was counted rather than checked,
 and it happened constantly: the card records a move whenever it is put in front of somebody, the
@@ -1093,6 +1110,18 @@ as on the ask. It has to: only one of those two ways knows which ask it is answe
 
 **Both directions are on by default.** A list of only what you asked for reads as an invoice;
 the half where you helped them is what makes it a friendship.
+
+**"Open it" opens *that* move.** A notification about a suggestion is about one particular
+suggestion, so tapping it puts the card on that one — not on whoever has been waiting longest,
+which is what the ring does when you arrive by yourself. The message id travels with the
+tap; without it the card looked correct and answered the wrong question, which is the sort of
+bug that reads as "it opened the wrong move" and is blamed on the Inkling.
+
+**Seeing the move clears the notification, however you got there.** The card writes down a
+friend's move the moment it shows it — it is a move that was put in front of you — and the same
+pass marks the notice seen. So opening the notification and opening the Inkling from Review both
+end with it out of the unread count, because in both cases you have read it. Clearing is not
+dismissing: the move stays on the card until you do something with it.
 
 **Thanking is one tap**, on anything they did for you — a move they suggested, and no form
 asking what you are grateful for, because that is a form nobody fills in. It sends 🙏 with the

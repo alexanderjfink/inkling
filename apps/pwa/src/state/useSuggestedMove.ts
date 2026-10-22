@@ -174,7 +174,11 @@ export function useSuggestedMove(
 
     let cancelled = false
     setLoading(true)
-    const seen = [...target.moves.map((entry) => entry.moveId), ...avoidIds]
+    // Including the ids a row has also been known by: an aliased template is still seen.
+    const seen = [
+      ...target.moves.flatMap((entry) => [entry.moveId, ...(entry.alsoIds ?? [])]),
+      ...avoidIds,
+    ]
     void requestMove(key, { blip: target, related, seenMoveIds: seen }, { provider, related }).then(
       (spec) => {
         if (cancelled) return

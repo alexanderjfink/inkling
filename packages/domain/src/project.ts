@@ -26,11 +26,69 @@ export interface ScheduleState {
 
 export interface MoveHistoryEntry {
   moveId: string
+  /**
+   * Other ids this same move has been recorded under.
+   *
+   * One move can arrive with two: a friend suggests something the app also offers, and the two
+   * come from different places with different ids and the same words. The row is one row, and
+   * every id that has meant it is kept here so a "done" arriving under either of them still
+   * finds it.
+   */
+  alsoIds?: string[]
   spec: MoveSpec
   shownAt: string
   outcome: 'shown' | 'done' | 'skipped' | 'rejected'
   /** When it was completed, if it was. */
   doneAt?: string
+}
+
+/**
+ * How two moves are compared when deciding they are the same one.
+ *
+ * Lowercased, punctuation flattened to spaces: "What is the smallest test?" and "what is the
+ * smallest test" are one move to everybody but a computer. Non-Latin titles are kept as words
+ * rather than stripped to nothing, or every title in a script without ASCII letters would
+ * compare equal.
+ */
+export function moveTitleKey(title: string): string {
+  const key = title
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N} ]+/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  return key.length > 0 ? key : title.trim()
+}
+
+/**
+ * Whether two moves are the same move to the person looking at them.
+ *
+ * Ids first, because that is what an id is for. Then the words — but only when one of them came
+ * from a friend. A suggestion arrives as `friend.<the words>` and the app's own copy of the same
+ * advice as `idea.smallestTest`, so suggesting what the app had already offered put one sentence
+ * on the card twice under two names. Two *playbook* moves stay two moves even if they ever share
+ * a title: they are different prompts about different things, and merging those would be losing
+ * one.
+ */
+export function movesAreOne(a: MoveSpec, b: MoveSpec): boolean {
+  if (a.id === b.id) return true
+  if (a.generatedBy !== 'friend' && b.generatedBy !== 'friend') return false
+  return moveTitleKey(a.title) === moveTitleKey(b.title)
+}
+
+/** The row a move is recorded under: by id, by any id it has had, or by what it says. */
+function findMove(blip: Blip, moveId: string, spec?: MoveSpec): MoveHistoryEntry | undefined {
+  const byId = blip.moves.find(
+    (entry) => entry.moveId === moveId || entry.alsoIds?.includes(moveId),
+  )
+  if (byId) return byId
+  if (!spec) return undefined
+  return blip.moves.find((entry) => movesAreOne(entry.spec, spec))
+}
+
+/** Record that this row has also been known by `moveId`, without changing the row. */
+function rememberId(entry: MoveHistoryEntry, moveId: string): void {
+  if (entry.moveId === moveId || entry.alsoIds?.includes(moveId)) return
+  entry.alsoIds = [...(entry.alsoIds ?? []), moveId]
 }
 
 /** A suggestion judged bad, with the evidence for why. */
@@ -248,10 +306,11 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
        * on the card, all saying the same thing. That is what "shows that move a bunch of times
        * on top of each other" was.
        */
-      const known = blip.moves.find((entry) => entry.moveId === event.moveId)
+      const known = findMove(blip, event.moveId, event.moveSpec)
       if (known) {
         // Shown again: keep the newest words and the newest time, and leave the outcome alone —
         // having done it once is not undone by looking at it again.
+        rememberId(known, event.moveId)
         known.spec = event.moveSpec
         known.shownAt = event.at
         break
@@ -266,7 +325,7 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       break
     }
     case 'moveDone': {
-      const move = blip.moves.find((m) => m.moveId === event.moveId)
+      const move = findMove(blip, event.moveId)
       if (move) {
         move.outcome = 'done'
         move.doneAt = event.at
@@ -290,9 +349,11 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       // And in the history, so it is not offered again — and so the move log shows it as
       // rejected rather than as something that was merely put in front of you.
       {
-        const entry = blip.moves.find((move) => move.moveId === event.moveId)
-        if (entry) entry.outcome = 'rejected'
-        else {
+        const entry = findMove(blip, event.moveId, event.moveSpec)
+        if (entry) {
+          rememberId(entry, event.moveId)
+          entry.outcome = 'rejected'
+        } else {
           blip.moves.push({
             moveId: event.moveId,
             spec: event.moveSpec,
@@ -323,7 +384,7 @@ function applyEvent(blips: Map<string, Blip>, event: BlipEvent): void {
       if (event.type !== undefined) blip.type = event.type
       break
     case 'moveSkipped': {
-      const move = blip.moves.find((m) => m.moveId === event.moveId)
+      const move = findMove(blip, event.moveId)
       if (move) move.outcome = 'skipped'
       blip.schedule.heat = clamp01(blip.schedule.heat - 0.1)
       blip.schedule.timesSkipped += 1

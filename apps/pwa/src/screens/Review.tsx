@@ -804,6 +804,7 @@ export function Review({
   onBrowse,
   onOpenBlip,
   focusId,
+  focusMessageId,
   serverUrl,
   feedbackEnv,
   onFeedback,
@@ -824,6 +825,13 @@ export function Review({
   onOpenBlip: (id: string) => void
   /** An Inkling picked from the list, or from the related list, to open first. */
   focusId?: string | null
+  /**
+   * A particular friend's move to open on, when the card was opened from its notification.
+   *
+   * You tapped *that* move; opening the Inkling on whoever was waiting longest answers a
+   * question nobody asked.
+   */
+  focusMessageId?: string | null
   serverUrl: string
   feedbackEnv: FeedbackEnv
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
@@ -1118,6 +1126,42 @@ export function Review({
   }
 
   const swipeState = useMoveSwipe(swipe, aiOn)
+
+  /**
+   * Open on the move a notification was about.
+   *
+   * The ring starts at the oldest unanswered move, which is right for a card you arrived at
+   * yourself and wrong for one you tapped through: you asked for that one and were shown
+   * somebody else's. Position, not identity — the ring is what the card reads from.
+   */
+  useEffect(() => {
+    if (!focusMessageId || !current) return
+    const at = pendingMoves.findIndex((entry) => entry.messageId === focusMessageId)
+    if (at < 0 || at === ringIndex) return
+    setRingIndex(at)
+    setSlot('friend')
+  }, [focusMessageId, current?.id, pendingMoves, ringIndex])
+
+  /**
+   * A friend's move on the card: written into the history, and taken off the notifications.
+   *
+   * The same fact twice. The history wants it because it is a move that was put in front of
+   * you — and because recording it under the id it arrived with is what lets "done" find the
+   * row later. The notification wants it because a thing you are looking at is no longer news.
+   */
+  const friendShown = slotNow === 'friend' && !askOpen ? friendMove : undefined
+  const friendShownId = friendShown?.messageId ?? ''
+  const notedRef = useRef(new Set<string>())
+  useEffect(() => {
+    if (!current || !friendShown || notedRef.current.has(friendShownId)) return
+    notedRef.current.add(friendShownId)
+    void actions.recordMoveShown(current.id, friendShown.spec)
+    if (socialOn && social.moves.some((entry) => entry.messageId === friendShownId)) {
+      void actions.markMoveSeen(current.id, friendShownId)
+    }
+    // `friendShown` is covered by its message id; `social.moves` only decides whether the
+    // notification is still there to clear.
+  }, [current?.id, friendShownId, socialOn, social.moves, actions])
   const round = useRoundSwipe({
     hasNext: queue.length > 1,
     hasPrevious: skipped.length > 0,

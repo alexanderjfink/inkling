@@ -3,6 +3,7 @@ import { APP_BUILD } from './build'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FeedbackEnv } from './components/Feedback'
 import { FriendsButton } from './components/FriendsButton'
+import { Rail } from './components/Rail'
 import { Spinner } from './components/Spinner'
 import { Tour } from './components/Tour'
 import { NUDGE_KEY, NUDGE_LAST_KEY, clearSharedQuery, notify, readSharedContent } from './pwa'
@@ -23,6 +24,7 @@ import { usePromote } from './state/usePromote'
 import { useRelated } from './state/useRelated'
 import { useServerConfig } from './state/useServerConfig'
 import { useHiddenWhileReadingDown } from './state/useHiddenWhileReadingDown'
+import { useLayout } from './state/useLayout'
 import { useServerUrl } from './state/useServerUrl'
 import { useSocial } from './state/useSocial'
 import { useSync } from './state/useSync'
@@ -59,6 +61,11 @@ export default function App() {
   const incoming = useMemo(() => readSharedContent(), [])
   const [shared, setShared] = useState(incoming)
   const [screen, setScreen] = useState<Screen>('add')
+  /**
+   * The phone layout is not touched by the wider ones: `compact` renders exactly what it did
+   * before there was a desktop, and everything else is additive.
+   */
+  const layout = useLayout()
 
   /**
    * The back gesture goes back a screen.
@@ -311,250 +318,275 @@ export default function App() {
     /* The Review screen is a fixed height, so the card inside it scrolls and not the page. With
        `min-h-dvh` the column grew to fit its content instead, the page did the scrolling, and the
        card's own scroll position meant nothing — which is why "at the bottom of the card" was true
-       the whole time, and reading to the end of an Inkling flipped to the next one. */
-    <div
-      className={`mx-auto flex max-w-xl flex-col p-4 ${
-        screen === 'review' ? 'h-dvh overflow-hidden' : 'min-h-dvh'
-      }`}
-    >
-      {/* The entry screen carries its own header, because it is where you start. */}
-      {screen !== 'add' ? (
-        <header className="mb-4 flex items-center gap-3">
-          <button
-            type="button"
-            onClick={() => window.history.back()}
-            aria-label="Back"
-            className="circle h-10 w-10 text-lg"
-          >
-            ‹
-          </button>
-          {/* A friend's screen is about a person, so it says their name. */}
-          <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
-            {screen === 'friend'
-              ? (social.friends.find((entry) => entry.userId === friendId)?.username ??
-                TITLES.friend)
-              : TITLES[screen]}
-          </h1>
-          {socialOn ? (
-            <FriendsButton count={friendsWaiting} onClick={() => go('notifications')} />
-          ) : null}
-        </header>
-      ) : null}
+       the whole time, and reading to the end of an Inkling flipped to the next one.
 
-      {!ready ? (
-        <div className="flex flex-1 items-center justify-center">
-          <Spinner className="h-6 w-6 text-ink-faint" />
-        </div>
-      ) : null}
-
-      {ready && screen === 'add' ? (
-        <Add
-          onCapture={actions.capture}
-          onAddBlock={(id, block) => actions.addBlock(id, block)}
-          onStoreImage={actions.storeImage}
-          initial={shared}
-          onConsumed={() => setShared(null)}
-          waiting={waiting}
-          next={upNext}
-          serverWarning={
-            serverConfig.status === 'ok' ||
-            serverConfig.status === 'loading' ||
-            serverConfig.status === 'signed-out'
-              ? null
-              : 'the server is not reachable, so sync and the model are off'
-          }
-          onReview={() => go('review')}
-          onSettings={() => go('settings')}
-          onYou={() => go('you')}
+       A wide screen gets a rail beside a wider frame. The phone keeps the single centred column
+       it has always had — the wider layouts are additive, not a rewrite of this one. */
+    <div className={`flex ${screen === 'review' ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}>
+      {layout !== 'wide' ? null : (
+        <Rail
+          screen={screen}
+          onGo={go}
+          socialOn={socialOn}
+          friendsWaiting={friendsWaiting}
           userId={auth.user?.id}
-          username={auth.user?.username ?? 'you'}
+          username={auth.user?.name ?? auth.user?.username ?? 'you'}
           userColor={auth.user?.color}
           userAvatar={auth.user?.avatar}
-          feedbackEnv={feedbackEnv}
-          onFeedback={actions.giveFeedback}
-          socialOn={socialOn}
-          shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
-          asking={social.asks}
-          friends={social.friends}
-          onNotifications={() => go('notifications')}
-          friendsWaiting={friendsWaiting}
-          transcribeUrl={
-            serverConfig.config?.transcribeModel ? server.serverUrl.replace(/\/+$/, '') : null
-          }
         />
-      ) : null}
+      )}
+      <div
+        className={`mx-auto flex min-w-0 flex-1 flex-col p-4 ${
+          layout === 'compact' ? 'max-w-xl' : 'max-w-[1400px] px-8 py-6'
+        } ${screen === 'review' ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}
+      >
+        {/* The entry screen carries its own header, because it is where you start. */}
+        {screen !== 'add' ? (
+          <header className="mb-4 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => window.history.back()}
+              aria-label="Back"
+              className="circle h-10 w-10 text-lg"
+            >
+              ‹
+            </button>
+            {/* A friend's screen is about a person, so it says their name. */}
+            <h1 className="min-w-0 flex-1 truncate text-base font-semibold">
+              {screen === 'friend'
+                ? (social.friends.find((entry) => entry.userId === friendId)?.username ??
+                  TITLES.friend)
+                : TITLES[screen]}
+            </h1>
+            {socialOn ? (
+              <FriendsButton count={friendsWaiting} onClick={() => go('notifications')} />
+            ) : null}
+          </header>
+        ) : null}
 
-      {ready && screen === 'review' ? (
-        <Review
-          blips={blips}
-          actions={actions}
-          provider={syncState.provider}
-          related={related}
-          onPromote={onPromote}
-          promoteResults={promoteState.results}
-          onExit={() => {
-            setFocusId(null)
-            go('add')
-          }}
-          onBrowse={() => go('all')}
-          onOpenBlip={(id) => setFocusId(id)}
-          focusId={focusId}
-          serverUrl={syncState.serverUrl}
-          feedbackEnv={feedbackEnv}
-          onFeedback={actions.giveFeedback}
-          social={social}
-          socialOn={socialOn}
-          fabVisible={!readingDown}
-        />
-      ) : null}
+        {!ready ? (
+          <div className="flex flex-1 items-center justify-center">
+            <Spinner className="h-6 w-6 text-ink-faint" />
+          </div>
+        ) : null}
 
-      {ready && screen === 'all' ? (
-        <AllBlips
-          blips={blips}
-          actions={actions}
-          vault={serverConfig.config?.vault ?? ''}
-          onOpen={(id) => {
-            setFocusId(id)
-            go('review')
-          }}
-        />
-      ) : null}
-      {ready && screen === 'friends' ? (
-        <Friends
-          social={social}
-          onNotifications={() => go('notifications')}
-          onOpen={(friend) => {
-            setFriendId(friend.userId)
-            go('friend')
-          }}
-        />
-      ) : null}
-
-      {ready && screen === 'friend'
-        ? (() => {
-            const friend = social.friends.find((entry) => entry.userId === friendId)
-            // The friendship can be gone while the screen is open — the other end can end it —
-            // so there is nothing to show rather than a screen about nobody.
-            if (!friend) {
-              return <p className="text-xs text-ink-faint">That is no longer a friendship.</p>
+        {ready && screen === 'add' ? (
+          <Add
+            onCapture={actions.capture}
+            onAddBlock={(id, block) => actions.addBlock(id, block)}
+            onStoreImage={actions.storeImage}
+            initial={shared}
+            onConsumed={() => setShared(null)}
+            waiting={waiting}
+            next={upNext}
+            round={feed}
+            onOpenBlip={(id) => {
+              setFocusId(id)
+              go('review')
+            }}
+            serverWarning={
+              serverConfig.status === 'ok' ||
+              serverConfig.status === 'loading' ||
+              serverConfig.status === 'signed-out'
+                ? null
+                : 'the server is not reachable, so sync and the model are off'
             }
-            return (
-              <FriendScreen
-                friend={friend}
-                social={social}
-                serverUrl={server.serverUrl}
-                events={events}
-                blips={blips}
-                onOpenBlip={(id) => {
-                  setFocusId(id)
-                  go('review')
-                }}
-                onAnswer={() => go('notifications')}
-                onUnfriended={() => go('friends')}
-              />
-            )
-          })()
-        : null}
+            onReview={() => go('review')}
+            onSettings={() => go('settings')}
+            onYou={() => go('you')}
+            userId={auth.user?.id}
+            username={auth.user?.username ?? 'you'}
+            userColor={auth.user?.color}
+            userAvatar={auth.user?.avatar}
+            feedbackEnv={feedbackEnv}
+            onFeedback={actions.giveFeedback}
+            socialOn={socialOn}
+            shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
+            asking={social.asks}
+            friends={social.friends}
+            onNotifications={() => go('notifications')}
+            friendsWaiting={friendsWaiting}
+            transcribeUrl={
+              serverConfig.config?.transcribeModel ? server.serverUrl.replace(/\/+$/, '') : null
+            }
+          />
+        ) : null}
 
-      {ready && screen === 'notifications' ? (
-        <Notifications
-          social={social}
-          picked={picked}
-          blips={blips}
-          events={events}
-          serverUrl={server.serverUrl}
-          onClearPicked={() => setPicked(null)}
-          onOpenFriends={() => go('friends')}
-          onOpenBlip={(id) => {
-            setFocusId(id)
-            go('review')
-          }}
-        />
-      ) : null}
+        {ready && screen === 'review' ? (
+          <Review
+            blips={blips}
+            actions={actions}
+            provider={syncState.provider}
+            related={related}
+            onPromote={onPromote}
+            promoteResults={promoteState.results}
+            onExit={() => {
+              setFocusId(null)
+              go('add')
+            }}
+            onBrowse={() => go('all')}
+            onOpenBlip={(id) => setFocusId(id)}
+            focusId={focusId}
+            serverUrl={syncState.serverUrl}
+            feedbackEnv={feedbackEnv}
+            onFeedback={actions.giveFeedback}
+            social={social}
+            socialOn={socialOn}
+            fabVisible={!readingDown}
+          />
+        ) : null}
 
-      {ready && screen === 'you' ? (
-        <Settings
-          syncState={syncState}
-          events={events}
-          blips={blips}
-          serverConfig={serverConfig}
-          theme={theme}
-          serverUrl={server.serverUrl}
-          onSaveServerUrl={server.save}
-          auth={auth}
-          onOpenHelp={() => go('help')}
-          feedbackEnv={feedbackEnv}
-          onFeedback={actions.giveFeedback}
-          social={social}
-          onOpenFriends={() => go('notifications')}
-          adminServerConfig={serverConfig}
-          adminModelStatus={syncState.model}
-          onRefreshAdminModel={syncState.refreshModel}
-          only={['you']}
-        />
-      ) : null}
+        {ready && screen === 'all' ? (
+          <AllBlips
+            blips={blips}
+            actions={actions}
+            vault={serverConfig.config?.vault ?? ''}
+            onOpen={(id) => {
+              setFocusId(id)
+              go('review')
+            }}
+          />
+        ) : null}
+        {ready && screen === 'friends' ? (
+          <Friends
+            social={social}
+            onNotifications={() => go('notifications')}
+            onOpen={(friend) => {
+              setFriendId(friend.userId)
+              go('friend')
+            }}
+          />
+        ) : null}
 
-      {ready && screen === 'help' ? (
-        <Help
-          onStartTour={() => {
-            go('add')
-            setTourOpen(true)
-          }}
-        />
-      ) : null}
-      {ready && screen === 'settings' ? (
-        <Settings
-          syncState={syncState}
-          events={events}
-          blips={blips}
-          serverConfig={serverConfig}
-          theme={theme}
-          serverUrl={server.serverUrl}
-          onSaveServerUrl={server.save}
-          auth={auth}
-          onOpenHelp={() => go('help')}
-          adminServerConfig={serverConfig}
-          adminModelStatus={syncState.model}
-          onRefreshAdminModel={syncState.refreshModel}
-          feedbackEnv={feedbackEnv}
-          onFeedback={actions.giveFeedback}
-          social={social}
-          onOpenFriends={() => go('notifications')}
-          only={['friends', 'about', 'admin']}
-        />
-      ) : null}
+        {ready && screen === 'friend'
+          ? (() => {
+              const friend = social.friends.find((entry) => entry.userId === friendId)
+              // The friendship can be gone while the screen is open — the other end can end it —
+              // so there is nothing to show rather than a screen about nobody.
+              if (!friend) {
+                return <p className="text-xs text-ink-faint">That is no longer a friendship.</p>
+              }
+              return (
+                <FriendScreen
+                  friend={friend}
+                  social={social}
+                  serverUrl={server.serverUrl}
+                  events={events}
+                  blips={blips}
+                  onOpenBlip={(id) => {
+                    setFocusId(id)
+                    go('review')
+                  }}
+                  onAnswer={() => go('notifications')}
+                  onUnfriended={() => go('friends')}
+                />
+              )
+            })()
+          : null}
 
-      {/* Not on the entry screen: capture is what that screen is. Everywhere else this is the
+        {ready && screen === 'notifications' ? (
+          <Notifications
+            social={social}
+            picked={picked}
+            blips={blips}
+            events={events}
+            serverUrl={server.serverUrl}
+            onClearPicked={() => setPicked(null)}
+            onOpenFriends={() => go('friends')}
+            onOpenBlip={(id) => {
+              setFocusId(id)
+              go('review')
+            }}
+          />
+        ) : null}
+
+        {ready && screen === 'you' ? (
+          <Settings
+            syncState={syncState}
+            events={events}
+            blips={blips}
+            serverConfig={serverConfig}
+            theme={theme}
+            serverUrl={server.serverUrl}
+            onSaveServerUrl={server.save}
+            auth={auth}
+            onOpenHelp={() => go('help')}
+            feedbackEnv={feedbackEnv}
+            onFeedback={actions.giveFeedback}
+            social={social}
+            onOpenFriends={() => go('notifications')}
+            adminServerConfig={serverConfig}
+            adminModelStatus={syncState.model}
+            onRefreshAdminModel={syncState.refreshModel}
+            only={['you']}
+          />
+        ) : null}
+
+        {ready && screen === 'help' ? (
+          <Help
+            onStartTour={() => {
+              go('add')
+              setTourOpen(true)
+            }}
+          />
+        ) : null}
+        {ready && screen === 'settings' ? (
+          <Settings
+            syncState={syncState}
+            events={events}
+            blips={blips}
+            serverConfig={serverConfig}
+            theme={theme}
+            serverUrl={server.serverUrl}
+            onSaveServerUrl={server.save}
+            auth={auth}
+            onOpenHelp={() => go('help')}
+            adminServerConfig={serverConfig}
+            adminModelStatus={syncState.model}
+            onRefreshAdminModel={syncState.refreshModel}
+            feedbackEnv={feedbackEnv}
+            onFeedback={actions.giveFeedback}
+            social={social}
+            onOpenFriends={() => go('notifications')}
+            only={['friends', 'about', 'admin']}
+          />
+        ) : null}
+
+        {/* Not on the entry screen: capture is what that screen is. Everywhere else this is the
           way to notice something without leaving what you were reading. */}
-      {screen !== 'add' && !tourOpen ? (
-        <button
-          type="button"
-          onClick={() => setTrayOpen(true)}
-          aria-label="Capture a new Inkling"
-          /* Out of the way while you are reading down a page, back the moment you scroll up:
+        {screen !== 'add' && !tourOpen ? (
+          <button
+            type="button"
+            onClick={() => setTrayOpen(true)}
+            aria-label="Capture a new Inkling"
+            /* Out of the way while you are reading down a page, back the moment you scroll up:
              the usual phone behaviour, and the difference between a button that floats over the
-             text and one that covers it. */
-          className={`fixed bottom-5 left-1/2 z-30 flex h-14 w-14 -translate-x-1/2 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle transition-transform duration-200 ${
-            readingDown ? 'translate-y-24' : ''
-          }`}
-        >
-          +
-        </button>
-      ) : null}
+             text and one that covers it. On a wide screen it goes to the corner instead: the
+             middle of a desktop window is where the reading is. */
+            className={`fixed z-30 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle transition-transform duration-200 ${
+              layout === 'compact'
+                ? `bottom-5 left-1/2 -translate-x-1/2 ${readingDown ? 'translate-y-24' : ''}`
+                : 'right-6 bottom-6'
+            }`}
+          >
+            +
+          </button>
+        ) : null}
 
-      {trayOpen ? (
-        <CaptureTray
-          onCapture={actions.capture}
-          onClose={() => setTrayOpen(false)}
-          shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
-          socialOn={socialOn}
-        />
-      ) : null}
+        {trayOpen ? (
+          <CaptureTray
+            onCapture={actions.capture}
+            onClose={() => setTrayOpen(false)}
+            shareDefault={serverConfig.config?.shareDefault ?? 'friends'}
+            socialOn={socialOn}
+          />
+        ) : null}
 
-      {/* Last, so it sits over whatever screen it is explaining. */}
-      {tourOpen ? <Tour steps={TOUR_STEPS} onDone={dismissTour} /> : null}
-      {/* And last of all, because it is about what you just did. */}
-      <SavedTick />
+        {/* Last, so it sits over whatever screen it is explaining. */}
+        {tourOpen ? <Tour steps={TOUR_STEPS} onDone={dismissTour} /> : null}
+        {/* And last of all, because it is about what you just did. */}
+        <SavedTick />
+      </div>
     </div>
   )
 }

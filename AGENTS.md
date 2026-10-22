@@ -57,6 +57,12 @@ same app and skips a step.
   the anchor was "the third `</div>`"; anchor on text that appears once, and let it fail loudly.
 - **Poll, do not sleep.** `sleep 12` is either too short or twelve seconds too long. Loop on the
   thing you are waiting for: `until curl -sf localhost:8787/api/health; do sleep 0.2; done`.
+- **The browser panel is about 626 CSS pixels wide and cannot be resized past it.** Asking for
+  the desktop viewport reports 1440 and applies nothing, so the rail-and-columns layout never
+  appears there and `body` measures 626. Check wide layouts with the installed Chrome instead —
+  `/tmp/shot/shoot.mjs` logs in with a token from `/api/auth/login`, sets `auth:token` in
+  `localStorage`, and screenshots at 1440, 900 and 390 in dark mode. It has already caught a
+  great deal that a 626px window could not.
 - **The 390px viewport is the binding constraint.** Rows that fit on a laptop do not fit on a
   phone, and the failure looks like a collision, not an overflow. Read the element bounds from a
   snapshot instead of judging a screenshot — they show it before it is visible to the eye.

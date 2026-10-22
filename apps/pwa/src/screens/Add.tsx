@@ -18,6 +18,7 @@ import { BlockPicker, DraftBlocks } from '../components/Blocks'
 import { ButtonLabel } from '../components/Spinner'
 import type { ReceivedAsk } from '../state/useSocial'
 import { useSpeech } from '../state/useSpeech'
+import { useLayout } from '../state/useLayout'
 
 /**
  * The screen the app opens on.
@@ -33,6 +34,8 @@ export function Add({
   onConsumed,
   waiting,
   next,
+  round = [],
+  onOpenBlip,
   serverWarning,
   onReview,
   onSettings,
@@ -62,6 +65,10 @@ export function Add({
   waiting: number
   /** The first Inkling up for review, shown as the preview. */
   next?: Blip | null
+  /** What is waiting, in order — the wide screen shows the whole round beside the field. */
+  round?: Blip[]
+  /** Open one of them in Review. */
+  onOpenBlip?: (id: string) => void
   serverWarning: string | null
   onReview: () => void
   onSettings: () => void
@@ -184,323 +191,387 @@ export function Add({
     }
   }
 
+  /**
+   * Wide screens put the field and the round side by side.
+   *
+   * The phone's argument for a single column is the keyboard and the thumb; neither exists on a
+   * desk, and a composer floating in the middle of a thousand empty pixels is a worse use of the
+   * space than the same field with the round beside it. `contents` keeps the phone's markup
+   * exactly as it was: the wrappers below only exist when there is a second column to hold.
+   */
+  const layout = useLayout()
+  const columns = layout !== 'compact'
+  /** The header is the navigation where there is no rail; with a rail it is a second title. */
+  const rail = layout === 'wide'
+
   return (
     <div className="flex flex-1 flex-col gap-3">
-      <div className="mb-1 flex items-center gap-2">
-        <img
-          src="/icon-192.png"
-          alt=""
-          width={36}
-          height={36}
-          className="h-9 w-9 shrink-0 rounded-xl"
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base leading-tight font-semibold">Inkling</p>
-        </div>
-        <span data-tour="friends">
-          {/* Notifications, not the list of names: it is the area's default view, and the two
+      {rail ? null : (
+        <div className="mb-1 flex items-center gap-2">
+          <img
+            src="/icon-192.png"
+            alt=""
+            width={36}
+            height={36}
+            className="h-9 w-9 shrink-0 rounded-xl"
+          />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-base leading-tight font-semibold">Inkling</p>
+          </div>
+          <span data-tour="friends">
+            {/* Notifications, not the list of names: it is the area's default view, and the two
               are tabs of one screen anyway. Being sent to the list of friends is what this
               button used to do, which nobody ever wanted. */}
-          <FriendsButton count={friendsWaiting} onClick={onNotifications} />
-        </span>
-        <button
-          type="button"
-          onClick={onSettings}
-          aria-label="Settings"
-          className="circle h-10 w-10 shrink-0 text-lg"
-          data-tour="settings"
-        >
-          ⚙
-        </button>
-        {/* Your own face, at the far right, because it is you. It goes to you — your picture,
-            your colour, your password — which is not the same place as the app's settings, and
-            used to be the fourth of four identical circles. Help moved into Settings with it:
-            five did not fit on a phone, and the name was what got squeezed. */}
-        <button type="button" onClick={onYou} aria-label="You" className="shrink-0">
-          <Avatar
-            userId={userId}
-            username={username}
-            color={userColor}
-            hash={userAvatar}
-            size={40}
-          />
-        </button>
-      </div>
-
-      {/* Centred as a group: what you came for is the Review card and the field, and a
-            screen that starts at the top of a phone leaves them both in its upper third, with
-            the keyboard covering the rest. The header stays where it is — it is the one thing
-            that should not move. */}
-      <div className="flex flex-1 flex-col justify-center gap-3">
-        {/* The slogan has room here. In the header at 390px it truncated to "Make Moves on
-            your Inkli…", which is worse than not saying it — and this is the screen it is
-            about. */}
-        <p className="mb-1 text-center text-sm text-ink-faint">Make Moves on your Inklings</p>
-        {/* Above the field on purpose: with the keyboard up, anything below it is gone. */}
-        {socialOn && asking.length > 0 ? (
-          <button
-            type="button"
-            onClick={onNotifications}
-            className="card flex items-center gap-3 border border-accent/40 p-4 text-left transition active:scale-[0.99]"
-          >
-            {/* A face, because it is a person asking; the ✎ is what the card below it is for. */}
-            <span className="circle h-10 w-10 shrink-0 text-base leading-none">☺</span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">
-                {asking.length === 1
-                  ? `${asking[0] ? nameOf(friends.find((f) => f.userId === asking[0]?.userId) ?? { username: asking[0].username }) : 'somebody'} wants your help`
-                  : 'Friends want your help!'}
-              </span>
-              <span className="block truncate text-xs text-ink-soft">
-                {asking[0]?.context.title}
-              </span>
-            </span>
-          </button>
-        ) : null}
-
-        {waiting > 0 ? (
-          <button
-            type="button"
-            onClick={onReview}
-            className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
-            data-tour="review"
-          >
-            <span className="circle circle--accent h-10 w-10 shrink-0 text-lg leading-none">◷</span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-semibold">Review · {waiting} waiting</span>
-              {next ? (
-                <span className="block truncate text-xs text-ink-soft">{next.title}</span>
-              ) : null}
-            </span>
-          </button>
-        ) : null}
-
-        {serverWarning ? (
+            <FriendsButton count={friendsWaiting} onClick={onNotifications} />
+          </span>
           <button
             type="button"
             onClick={onSettings}
-            className="rounded-2xl border border-line bg-surface/70 p-3 text-left text-xs text-warn"
+            aria-label="Settings"
+            className="circle h-10 w-10 shrink-0 text-lg"
+            data-tour="settings"
           >
-            ⚠ {serverWarning} — tap to fix
+            ⚙
           </button>
-        ) : null}
+          {/* Your own face, at the far right, because it is you. It goes to you — your picture,
+            your colour, your password — which is not the same place as the app's settings, and
+            used to be the fourth of four identical circles. Help moved into Settings with it:
+            five did not fit on a phone, and the name was what got squeezed. */}
+          <button type="button" onClick={onYou} aria-label="You" className="shrink-0">
+            <Avatar
+              userId={userId}
+              username={username}
+              color={userColor}
+              hash={userAvatar}
+              size={40}
+            />
+          </button>
+        </div>
+      )}
 
-        {/* One field for everything: words, a link, or a picture pasted or dropped into it.
-          It used to be three — a box for the text, a box for the address, a box for the
-          image — which asked you to decide what you had noticed before you had written it
-          down, and made the common case (writing a sentence) look like paperwork. */}
-        <div
-          onDragOver={(event) => {
-            // Without this the browser refuses the drop and navigates to the image instead,
-            // which is a memorable way to lose a capture.
-            event.preventDefault()
-          }}
-          onDrop={(event) => {
-            if (!takeImage(event.dataTransfer)) return
-            event.preventDefault()
-          }}
-          className="flex flex-col gap-2"
-        >
-          {/* One box, holding the words and the structure chosen for them. A chip under the
-            field is attached to nothing in particular; a chip inside the box is part of what
-            you are writing, which is what it is. */}
+      <div className={columns ? 'flex min-h-0 flex-1 justify-center gap-10' : 'contents'}>
+        <div className={columns ? 'flex w-full max-w-2xl flex-col gap-3' : 'contents'}>
+          {/* Centred as a group: what you came for is the Review card and the field, and a
+            screen that starts at the top of a phone leaves them both in its upper third, with
+            the keyboard covering the rest. The header stays where it is — it is the one thing
+            that should not move. */}
           <div
-            ref={boxRef}
             className={
-              started
-                ? 'flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent'
-                : ''
+              columns ? 'flex flex-col gap-3 pt-4' : 'flex flex-1 flex-col justify-center gap-3'
             }
           >
-            {started ? (
-              <textarea
-                ref={(node) => {
-                  // Focused **once**, when it appears. A callback ref runs on every render, so
-                  // asking "is this focused" here pulled the cursor back out of whatever else
-                  // you had started typing in — which made the checklist take one keystroke at
-                  // a time, each one landing back up here.
-                  if (node && !focusedOnce.current) {
-                    focusedOnce.current = true
-                    node.focus()
-                  }
-                }}
-                value={text}
-                onChange={(event) => setText(event.target.value)}
-                onPaste={(event) => {
-                  // A copied image attaches; copied words paste as words, which may include a
-                  // link — that is found when it is kept.
-                  takeImage(event.clipboardData)
-                }}
-                onBlur={() => {
-                  // Tapping in and then tapping away leaves the box as it was: back to the
-                  // question it asks, rather than a large empty form you did not start
-                  // filling in. Deferred by a moment because a blur also happens when the
-                  // tap went to something that belongs to the box — the paperclip, the type,
-                  // the microphone — and clearing the field then would take it away from
-                  // under the tap.
-                  window.setTimeout(() => {
-                    if (boxRef.current?.contains(document.activeElement)) return
-                    if (text.trim() || file || blocks.length > 0) return
-                    setStarted(false)
-                  }, 150)
-                }}
-                onKeyDown={(event) => {
-                  // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
-                  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                    event.preventDefault()
-                    void submit()
-                  }
-                }}
-                placeholder="What did you notice?"
-                rows={6}
-                data-tour="field"
-                className="w-full resize-none bg-transparent text-lg text-ink outline-none"
-              />
-            ) : (
-              /* The same shape as the Review card it sits under: a card with an icon, what it
-                 is for, and a line under that. It used to be a large empty box with a question
-                 in it, which read as a different kind of thing from the card beside it — two
-                 boxes, one of which you were supposed to understand and the other to use. */
+            {/* The slogan has room here. In the header at 390px it truncated to "Make Moves on
+            your Inkli…", which is worse than not saying it — and this is the screen it is
+            about. */}
+            <p className="mb-1 text-center text-sm text-ink-faint">Make Moves on your Inklings</p>
+            {/* Above the field on purpose: with the keyboard up, anything below it is gone. */}
+            {socialOn && asking.length > 0 ? (
               <button
                 type="button"
-                onClick={() => setStarted(true)}
-                data-tour="field"
-                className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
+                onClick={onNotifications}
+                className="card flex items-center gap-3 border border-accent/40 p-4 text-left transition active:scale-[0.99]"
               >
-                {/* A different colour from the Review card above it: they are the two things you
-                    came to do, and they were two grey circles with grey words under them. */}
-                <span
-                  className="circle h-10 w-10 shrink-0 text-base leading-none text-surface"
-                  style={{ background: 'var(--color-good)' }}
-                >
-                  ✎
-                </span>
+                {/* A face, because it is a person asking; the ✎ is what the card below it is for. */}
+                <span className="circle h-10 w-10 shrink-0 text-base leading-none">☺</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">What’s your Inkling?</span>
-                  <span className="block text-xs text-ink-soft">
-                    a photo, a link, an idea, a question, or a quest — paste one in, or just write
+                  <span className="block text-sm font-semibold">
+                    {asking.length === 1
+                      ? `${asking[0] ? nameOf(friends.find((f) => f.userId === asking[0]?.userId) ?? { username: asking[0].username }) : 'somebody'} wants your help`
+                      : 'Friends want your help!'}
+                  </span>
+                  <span className="block truncate text-xs text-ink-soft">
+                    {asking[0]?.context.title}
                   </span>
                 </span>
               </button>
-            )}
-
-            {file ? (
-              <span className="flex items-center gap-3 rounded-xl border border-line bg-surface/60 p-2 pl-3 text-xs">
-                <span className="text-ink-soft">🖼</span>
-                <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                <button
-                  type="button"
-                  onClick={() => setFile(undefined)}
-                  className="quiet underline"
-                  aria-label="Remove the image"
-                >
-                  remove
-                </button>
-              </span>
             ) : null}
 
-            {/* The structure itself, and usable: a checklist you cannot tick is a drawing of
+            {waiting > 0 && !columns ? (
+              <button
+                type="button"
+                onClick={onReview}
+                className="card flex items-center gap-3 p-4 text-left transition active:scale-[0.99]"
+                data-tour="review"
+              >
+                <span className="circle circle--accent h-10 w-10 shrink-0 text-lg leading-none">
+                  ◷
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold">Review · {waiting} waiting</span>
+                  {next ? (
+                    <span className="block truncate text-xs text-ink-soft">{next.title}</span>
+                  ) : null}
+                </span>
+              </button>
+            ) : null}
+
+            {serverWarning ? (
+              <button
+                type="button"
+                onClick={onSettings}
+                className="rounded-2xl border border-line bg-surface/70 p-3 text-left text-xs text-warn"
+              >
+                ⚠ {serverWarning} — tap to fix
+              </button>
+            ) : null}
+
+            {/* One field for everything: words, a link, or a picture pasted or dropped into it.
+          It used to be three — a box for the text, a box for the address, a box for the
+          image — which asked you to decide what you had noticed before you had written it
+          down, and made the common case (writing a sentence) look like paperwork. */}
+            <div
+              onDragOver={(event) => {
+                // Without this the browser refuses the drop and navigates to the image instead,
+                // which is a memorable way to lose a capture.
+                event.preventDefault()
+              }}
+              onDrop={(event) => {
+                if (!takeImage(event.dataTransfer)) return
+                event.preventDefault()
+              }}
+              className="flex flex-col gap-2"
+            >
+              {/* One box, holding the words and the structure chosen for them. A chip under the
+            field is attached to nothing in particular; a chip inside the box is part of what
+            you are writing, which is what it is. */}
+              <div
+                ref={boxRef}
+                className={
+                  started
+                    ? 'flex flex-col gap-2 rounded-2xl border border-line bg-surface p-3 transition focus-within:border-accent'
+                    : ''
+                }
+              >
+                {started ? (
+                  <textarea
+                    ref={(node) => {
+                      // Focused **once**, when it appears. A callback ref runs on every render, so
+                      // asking "is this focused" here pulled the cursor back out of whatever else
+                      // you had started typing in — which made the checklist take one keystroke at
+                      // a time, each one landing back up here.
+                      if (node && !focusedOnce.current) {
+                        focusedOnce.current = true
+                        node.focus()
+                      }
+                    }}
+                    value={text}
+                    onChange={(event) => setText(event.target.value)}
+                    onPaste={(event) => {
+                      // A copied image attaches; copied words paste as words, which may include a
+                      // link — that is found when it is kept.
+                      takeImage(event.clipboardData)
+                    }}
+                    onBlur={() => {
+                      // Tapping in and then tapping away leaves the box as it was: back to the
+                      // question it asks, rather than a large empty form you did not start
+                      // filling in. Deferred by a moment because a blur also happens when the
+                      // tap went to something that belongs to the box — the paperclip, the type,
+                      // the microphone — and clearing the field then would take it away from
+                      // under the tap.
+                      window.setTimeout(() => {
+                        if (boxRef.current?.contains(document.activeElement)) return
+                        if (text.trim() || file || blocks.length > 0) return
+                        setStarted(false)
+                      }, 150)
+                    }}
+                    onKeyDown={(event) => {
+                      // Cmd/Ctrl + Enter keeps it, so a desktop capture never needs the mouse.
+                      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                        event.preventDefault()
+                        void submit()
+                      }
+                    }}
+                    placeholder="What did you notice?"
+                    rows={6}
+                    data-tour="field"
+                    className="w-full resize-none bg-transparent text-lg text-ink outline-none"
+                  />
+                ) : (
+                  /* The same shape as the Review card it sits under: a card with an icon, what it
+                 is for, and a line under that. It used to be a large empty box with a question
+                 in it, which read as a different kind of thing from the card beside it — two
+                 boxes, one of which you were supposed to understand and the other to use. */
+                  <button
+                    type="button"
+                    onClick={() => setStarted(true)}
+                    data-tour="field"
+                    className="card flex w-full items-center gap-3 p-4 text-left transition active:scale-[0.99]"
+                  >
+                    {/* A different colour from the Review card above it: they are the two things you
+                    came to do, and they were two grey circles with grey words under them. */}
+                    <span
+                      className="circle h-10 w-10 shrink-0 text-base leading-none text-surface"
+                      style={{ background: 'var(--color-good)' }}
+                    >
+                      ✎
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold">What’s your Inkling?</span>
+                      <span className="block text-xs text-ink-soft">
+                        a photo, a link, an idea, a question, or a quest — paste one in, or just
+                        write
+                      </span>
+                    </span>
+                  </button>
+                )}
+
+                {file ? (
+                  <span className="flex items-center gap-3 rounded-xl border border-line bg-surface/60 p-2 pl-3 text-xs">
+                    <span className="text-ink-soft">🖼</span>
+                    <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setFile(undefined)}
+                      className="quiet underline"
+                      aria-label="Remove the image"
+                    >
+                      remove
+                    </button>
+                  </span>
+                ) : null}
+
+                {/* The structure itself, and usable: a checklist you cannot tick is a drawing of
               a checklist, and the point of adding one while you write is to put the parts
               down as you think of them. It is attached when the Inkling is made. */}
-            <DraftBlocks blocks={blocks} onChange={setBlocks} onStoreImage={onStoreImage} />
-          </div>
-        </div>
+                <DraftBlocks blocks={blocks} onChange={setBlocks} onStoreImage={onStoreImage} />
+              </div>
+            </div>
 
-        {started ? (
-          <p className="text-xs text-ink-faint">
-            a photo, a link, an idea, a question, or a quest — paste one in, or just write
-          </p>
-        ) : null}
+            {started ? (
+              <p className="text-xs text-ink-faint">
+                a photo, a link, an idea, a question, or a quest — paste one in, or just write
+              </p>
+            ) : null}
 
-        {/* Stacked, not beside the hint: side by side, the picker squeezed the sentence into
+            {/* Stacked, not beside the hint: side by side, the picker squeezed the sentence into
           one word a line, which is how it looked broken while it was working. */}
-        {/* Only once there is something to give structure to. It was there from the first
+            {/* Only once there is something to give structure to. It was there from the first
           moment, on an empty screen, asking about a shape for something that did not exist. */}
-        {started ? (
-          <div className="self-start">
-            <BlockPicker
-              count={blocks.length}
-              onAdd={async (kind) => setBlocks((list) => [...list, newBlock(kind)])}
-            />
-          </div>
-        ) : null}
+            {started ? (
+              <div className="self-start">
+                <BlockPicker
+                  count={blocks.length}
+                  onAdd={async (kind) => setBlocks((list) => [...list, newBlock(kind)])}
+                />
+              </div>
+            ) : null}
 
-        {/* Kept and attached: everything that acts on what you have written appears with the
+            {/* Kept and attached: everything that acts on what you have written appears with the
             field rather than before it, so the screen you land on is one card and a question
             rather than a form waiting to be filled in. */}
-        <div className={`flex items-center gap-2 ${started ? '' : 'hidden'}`}>
-          {/* The only thing left that is not the field: a way in for a picture that cannot be
+            <div className={`flex items-center gap-2 ${started ? '' : 'hidden'}`}>
+              {/* The only thing left that is not the field: a way in for a picture that cannot be
             pasted, and a type you can overrule if the guess is wrong. */}
-          <label
-            className="circle h-11 w-11 shrink-0 cursor-pointer text-base"
-            title="Add an image"
-          >
-            📎
-            <input
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(event) => {
-                const chosen = event.target.files?.[0]
-                setFile(chosen)
-                if (chosen) setStarted(true)
-              }}
+              <label
+                className="circle h-11 w-11 shrink-0 cursor-pointer text-base"
+                title="Add an image"
+              >
+                📎
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(event) => {
+                    const chosen = event.target.files?.[0]
+                    setFile(chosen)
+                    if (chosen) setStarted(true)
+                  }}
+                />
+              </label>
+              <select
+                value={type}
+                onChange={(event) => setType(event.target.value as BlipType | 'auto')}
+                aria-label="Kind of Inkling"
+                className="shrink-0 rounded-2xl border border-line bg-surface px-2 py-2.5 text-xs text-ink-soft outline-none"
+              >
+                <option value="auto">auto</option>
+                {BLIP_TYPES.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={() => (speech.listening ? speech.stop() : speech.start())}
+                disabled={!speech.supported}
+                className={`circle h-12 w-12 shrink-0 ${speech.listening ? 'circle--accent' : ''}`}
+                title={speech.supported ? 'Ramble, and it transcribes as you talk' : ''}
+              >
+                <span>🎙</span>
+              </button>
+              <span className="min-w-0 flex-1 truncate text-xs text-ink-faint">
+                {!speech.supported
+                  ? 'no mic here'
+                  : speech.thinking
+                    ? 'writing…'
+                    : speech.listening
+                      ? 'listening…'
+                      : 'ramble'}
+              </span>
+
+              <button
+                type="button"
+                onClick={() => void submit()}
+                disabled={!canSubmit || busy}
+                className="shrink-0 rounded-full bg-ink px-5 py-3.5 text-sm font-semibold whitespace-nowrap text-surface disabled:opacity-40"
+                data-tour="keep"
+              >
+                <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
+              </button>
+            </div>
+
+            {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
+            <Feedback
+              env={feedbackEnv}
+              screen="entry"
+              onSend={onFeedback}
+              className="text-xs text-ink-faint"
             />
-          </label>
-          <select
-            value={type}
-            onChange={(event) => setType(event.target.value as BlipType | 'auto')}
-            aria-label="Kind of Inkling"
-            className="shrink-0 rounded-2xl border border-line bg-surface px-2 py-2.5 text-xs text-ink-soft outline-none"
-          >
-            <option value="auto">auto</option>
-            {BLIP_TYPES.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
-
-          <button
-            type="button"
-            onClick={() => (speech.listening ? speech.stop() : speech.start())}
-            disabled={!speech.supported}
-            className={`circle h-12 w-12 shrink-0 ${speech.listening ? 'circle--accent' : ''}`}
-            title={speech.supported ? 'Ramble, and it transcribes as you talk' : ''}
-          >
-            <span>🎙</span>
-          </button>
-          <span className="min-w-0 flex-1 truncate text-xs text-ink-faint">
-            {!speech.supported
-              ? 'no mic here'
-              : speech.thinking
-                ? 'writing…'
-                : speech.listening
-                  ? 'listening…'
-                  : 'ramble'}
-          </span>
-
-          <button
-            type="button"
-            onClick={() => void submit()}
-            disabled={!canSubmit || busy}
-            className="shrink-0 rounded-full bg-ink px-5 py-3.5 text-sm font-semibold whitespace-nowrap text-surface disabled:opacity-40"
-            data-tour="keep"
-          >
-            <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
-          </button>
+          </div>
         </div>
 
-        {speech.error ? <p className="text-xs text-warn">{speech.error}</p> : null}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs">
-        <Feedback
-          env={feedbackEnv}
-          screen="entry"
-          onSend={onFeedback}
-          className="text-xs text-ink-faint"
-        />
+        {columns ? (
+          <aside aria-label="The round" className="flex w-72 shrink-0 flex-col gap-1 pt-1">
+            <div className="mb-1 flex items-baseline justify-between px-3">
+              <h2 className="text-xs tracking-wide text-ink-faint uppercase">
+                The round · {round.length}
+              </h2>
+              <button
+                type="button"
+                onClick={onReview}
+                className="quiet text-xs underline"
+                disabled={round.length === 0}
+              >
+                start
+              </button>
+            </div>
+            {round.length === 0 ? (
+              <p className="px-3 text-xs text-ink-faint">Nothing is waiting.</p>
+            ) : null}
+            {round.slice(0, 12).map((blip) => (
+              <button
+                key={blip.id}
+                type="button"
+                onClick={() => onOpenBlip?.(blip.id)}
+                className="flex flex-col gap-1 rounded-xl px-3 py-2 text-left transition hover:bg-surface"
+              >
+                <span className="truncate text-sm">{blip.title}</span>
+                <span className="text-[11px] text-ink-faint">
+                  {blip.type} · {blip.entries.length}{' '}
+                  {blip.entries.length === 1 ? 'entry' : 'entries'}
+                </span>
+              </button>
+            ))}
+            {round.length > 12 ? (
+              <p className="px-3 text-xs text-ink-faint">and {round.length - 12} more…</p>
+            ) : null}
+          </aside>
+        ) : null}
       </div>
     </div>
   )

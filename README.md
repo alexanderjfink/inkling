@@ -240,6 +240,43 @@ The key stays on the server; devices only ever talk to the proxy. Settings shows
 provider and model are in play, so it is never a mystery why a move says "from the
 playbook".
 
+## On a big screen
+
+The phone layout is the one that matters, and it is untouched: one card, one page, swipes, a
+tray. A wider window gets **more of the same app, not a different one** — same components, same
+data, a different arrangement.
+
+| width | what you get |
+|---|---|
+| **under 768** | the phone: one column, one card at a time, gestures |
+| **768 – 1180** | two columns: the round on the left, the card beside it. No rail |
+| **1180 and up** | a rail, the round, and the card |
+
+**The round is a list.** On a phone it is a thing you page through, because a card and a thumb
+cannot share 390px. Beside a card it is simply a list: what is waiting, all of it, the open one
+marked, one click or `j` / `k` / the arrow keys to move between them. Paging still exists on a
+narrow screen and is deliberately off where the list is visible — a wheel at the bottom of a
+card should scroll, not flip.
+
+**Picking from the list is not a second path through the card.** The chosen Inkling becomes the
+`current` one, so every rule about settling, deferring, moves and history applies unchanged; a
+decision clears the pick and the card moves on by itself.
+
+**Capture sits beside the round** on the home screen, with what is waiting next to it, instead
+of a preview card and a floating +. The + is still on every other screen; on a wide screen it
+sits in the corner rather than bottom centre, out of the reading column.
+
+**All Inklings is a table** where there is room: title, type, state, last touched, entries —
+sortable by title and by date, the three groups as filters, and the whole row as the target.
+Cards are the right shape when each one is the whole screen; a hundred of them is not a list
+you can scan.
+
+**A card stays a readable width** (780px) however wide the window: a line of prose a thousand
+pixels long is not a wider view, it is a harder read.
+
+What is not done yet: notifications and the friend list are still one column with tabs, Settings
+is still one long scroll, and the keyboard drives the round but not the rest of the app.
+
 ## The interface
 
 **The app opens on entry.** Not a menu, and not a dashboard: the assumption is that you

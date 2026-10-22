@@ -46,6 +46,7 @@ import type { InklingActions } from '../state/useInkling'
 import type { PromoteResult } from '../state/usePromote'
 import type { SocialState } from '../state/useSocial'
 import { useSuggestedMove } from '../state/useSuggestedMove'
+import { useLayout } from '../state/useLayout'
 
 type Decision =
   | 'advanced'
@@ -826,6 +827,14 @@ export function Review({
   /** Whether the floating + is on screen: the bottom of the page gives way to it. */
   fabVisible: boolean
 }) {
+  /**
+   * Wide screens get the round as a list beside the card, so paging is something you *can* do
+   * rather than something you must do to see what else is in the round.
+   */
+  const layout = useLayout()
+  const wide = layout !== 'compact'
+  /** The Inkling picked from the list. Null means "whatever the round put first". */
+  const [picked, setPicked] = useState<string | null>(null)
   const [session, setSession] = useState<string[] | null>(null)
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
   const [busy, setBusy] = useState(false)
@@ -901,6 +910,7 @@ export function Review({
     setDecisions({})
     setComposer(null)
     setLastNote(null)
+    setPicked(null)
   }, [scope])
 
   const SCOPES: Array<{ id: Scope; label: string; count: number }> = [
@@ -916,6 +926,7 @@ export function Review({
     setSession(null)
     setDecisions({})
     setComposer(null)
+    setPicked(null)
   }, [focusKey])
 
   // Freeze the round when it starts, so acting on an Inkling cannot reshuffle it.
@@ -951,8 +962,37 @@ export function Review({
   // and down moves through four cards.
   const total = session?.length ?? candidates.length
   const done = total - queue.length
-  const current = queue[0]
+  /** Where the round would have put you, if nobody had picked from the list. */
+  const roundHead = queue[0]
+  /**
+   * The Inkling on the card: the one picked from the list, or the round's next.
+   *
+   * Everything downstream already reads `current`, so choosing from the list is not a second
+   * path through the card — it is the same path with a different starting point. Settling a
+   * decision clears the pick, which is what makes the card move on by itself afterwards.
+   */
+  const pickedBlip = picked ? byId.get(picked) : undefined
+  const current = pickedBlip ?? roundHead
   const currentRelated = current ? (related.get(current.id) ?? []) : []
+
+  /**
+   * A pick that is no longer in the round — because it was decided, deleted, or the scope
+   * changed — would otherwise leave the card holding an Inkling the list no longer shows.
+   */
+  useEffect(() => {
+    if (picked && !queue.some((blip) => blip.id === picked)) setPicked(null)
+  }, [picked, queue])
+
+  /** Move the list selection by one, for the arrow keys. */
+  function pickNeighbour(delta: number) {
+    if (queue.length === 0) return
+    const at = Math.max(
+      0,
+      queue.findIndex((blip) => blip.id === current?.id),
+    )
+    const next = queue[Math.min(queue.length - 1, Math.max(0, at + delta))]
+    if (next) setPicked(next.id === roundHead?.id ? null : next.id)
+  }
   const {
     move,
     loading: moveLoading,
@@ -1102,6 +1142,7 @@ export function Review({
   function settle(decision: Decision) {
     if (!current) return
     setDecisions((previous) => ({ ...previous, [current.id]: decision }))
+    setPicked(null)
     setComposer(null)
     setEntry('')
     setGuidance(null)
@@ -1348,1025 +1389,1092 @@ export function Review({
     moveId ? current.moves.find((entry_) => entry_.moveId === moveId)?.spec : undefined
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-3 flex items-center gap-2">
-        {/* Three windows on the same list: what is due now, what is coming back inside the
+    <div className="flex min-h-0 flex-1 gap-6">
+      {/* The round, visible all at once. On a phone this is what paging is for; on a wide
+          screen paging hides four Inklings behind a gesture for no reason. */}
+      {wide ? (
+        <aside
+          aria-label="The round"
+          // Focusable so the arrow keys work as soon as you have clicked a row.
+          tabIndex={0}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowDown' || event.key === 'j') {
+              event.preventDefault()
+              pickNeighbour(1)
+            } else if (event.key === 'ArrowUp' || event.key === 'k') {
+              event.preventDefault()
+              pickNeighbour(-1)
+            }
+          }}
+          className="flex w-64 shrink-0 flex-col gap-1 overflow-y-auto pb-2 outline-none"
+        >
+          <h2 className="mb-1 px-3 text-xs tracking-wide text-ink-faint uppercase">
+            The round · {queue.length}
+          </h2>
+          {queue.length === 0 ? (
+            <p className="px-3 text-xs text-ink-faint">Nothing left in this round.</p>
+          ) : null}
+          {queue.map((blip) => {
+            const open = blip.id === current?.id
+            return (
+              <button
+                key={blip.id}
+                type="button"
+                onClick={() => setPicked(blip.id === roundHead?.id ? null : blip.id)}
+                aria-current={open ? 'true' : undefined}
+                className={`flex flex-col gap-1 rounded-xl px-3 py-2 text-left transition hover:bg-surface ${
+                  open ? 'bg-accent-soft' : ''
+                }`}
+              >
+                <span
+                  className={`truncate text-sm ${open ? 'font-medium text-accent' : 'text-ink'}`}
+                >
+                  {blip.title}
+                </span>
+                <span className="text-[11px] text-ink-faint">
+                  {blip.type} · {blip.entries.length}{' '}
+                  {blip.entries.length === 1 ? 'entry' : 'entries'}
+                </span>
+              </button>
+            )
+          })}
+        </aside>
+      ) : null}
+
+      <div className="flex min-w-0 max-w-[780px] flex-1 flex-col">
+        <div className="mb-3 flex items-center gap-2">
+          {/* Three windows on the same list: what is due now, what is coming back inside the
             week, and everything. "All" used to mean "everything active", which is not a
             thing anybody is looking for at a glance — the useful middle is what is near. */}
-        {SCOPES.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            onClick={() => setScope(option.id)}
-            /* `whitespace-nowrap`, because "Today · 1" is now wider than the chip and wraps
+          {SCOPES.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setScope(option.id)}
+              /* `whitespace-nowrap`, because "Today · 1" is now wider than the chip and wraps
                into "Today ·" over "1", which reads as a broken chip rather than a tight one. */
-            className={`rounded-full px-3 py-1 text-xs whitespace-nowrap transition ${
-              scope === option.id
-                ? 'bg-ink font-medium text-surface'
-                : 'border border-line text-ink-soft'
-            }`}
-          >
-            {option.label}
-            {option.count > 0 ? ` · ${option.count}` : ''}
+              className={`rounded-full px-3 py-1 text-xs whitespace-nowrap transition ${
+                scope === option.id
+                  ? 'bg-ink font-medium text-surface'
+                  : 'border border-line text-ink-soft'
+              }`}
+            >
+              {option.label}
+              {option.count > 0 ? ` · ${option.count}` : ''}
+            </button>
+          ))}
+          <button type="button" onClick={onBrowse} className="quiet text-xs underline">
+            browse
           </button>
-        ))}
-        <button type="button" onClick={onBrowse} className="quiet text-xs underline">
-          browse
-        </button>
-        <span className="ml-auto text-xs whitespace-nowrap text-ink-faint">
-          {done + 1} of {total}
-        </span>
-      </div>
+          {/* On a phone this is the only way to know where you are in the round. Beside a list
+              of it, the list says so, and a count of what you have already decided would read
+              as the position of the Inkling you picked. */}
+          {wide ? null : (
+            <span className="ml-auto text-xs whitespace-nowrap text-ink-faint">
+              {done + 1} of {total}
+            </span>
+          )}
+        </div>
 
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        <div
-          ref={round.cardRef}
-          onWheel={round.handlers.onWheel}
-          onTouchStart={round.handlers.onTouchStart}
-          onTouchMove={round.handlers.onTouchMove}
-          key={current.id}
-          style={round.slide}
-          className={`card ${round.arrival} flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-6`}
-        >
-          {/* The way to the other Inklings in this round, stuck to the top and the bottom of the
+        <div className="relative flex min-h-0 flex-1 flex-col">
+          <div
+            ref={round.cardRef}
+            onWheel={wide ? undefined : round.handlers.onWheel}
+            onTouchStart={wide ? undefined : round.handlers.onTouchStart}
+            onTouchMove={wide ? undefined : round.handlers.onTouchMove}
+            key={current.id}
+            style={round.slide}
+            className={`card ${round.arrival} flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-6`}
+          >
+            {/* The way to the other Inklings in this round, stuck to the top and the bottom of the
               card so it is always there — and `touch-action: none`, so a swipe on it is a swipe
               and never a scroll. Taking over the whole card's vertical drags instead was the
               first two attempts, and both failed for the same reason: the card scrolls, so the
               browser takes the gesture and cancels the pointer before it can mean anything.
               Tapping works too, which is what a hint strip should have been all along. */}
-          {round.showPrevious ? (
-            <button
-              type="button"
-              {...round.handlers}
-              onClick={() => round.previous()}
-              className={`sticky top-0 z-10 -mt-2 mb-2 w-full touch-none py-1 text-center text-[11px] ${
-                round.pull === 'down' && round.armed
-                  ? 'font-semibold text-accent'
-                  : 'text-ink-faint'
-              }`}
-            >
-              ▲ the previous Inkling
-            </button>
-          ) : null}
-          {/* What a drag in each direction would do, shown while you are pulling and highlighted
+            {round.showPrevious && !wide ? (
+              <button
+                type="button"
+                {...round.handlers}
+                onClick={() => round.previous()}
+                className={`sticky top-0 z-10 -mt-2 mb-2 w-full touch-none py-1 text-center text-[11px] ${
+                  round.pull === 'down' && round.armed
+                    ? 'font-semibold text-accent'
+                    : 'text-ink-faint'
+                }`}
+              >
+                ▲ the previous Inkling
+              </button>
+            ) : null}
+            {/* What a drag in each direction would do, shown while you are pulling and highlighted
             once it would happen. On the card rather than on the move, so it stays put while
             the move slides away underneath it. */}
-          {swipeState.direction ? (
-            <span
-              className={`pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 rounded-full bg-accent px-3 py-2 text-xs font-semibold text-surface transition-transform ${
-                swipeState.direction === 'right' ? 'left-3' : 'right-3'
-              } ${swipeState.armed ? 'scale-110' : 'opacity-70'}`}
-            >
-              {swipeState.direction === 'right'
-                ? `☺ ${friendMove ? senderName : 'ask a friend'}`
-                : '✦ the app'}
-            </span>
-          ) : null}
-          <div className="flex items-center gap-2 text-xs tracking-wide uppercase">
-            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">
-              {current.type}
-            </span>
-            {current.demo ? (
-              <span className="rounded-full border border-line px-2 py-0.5 text-ink-faint">
-                example
+            {swipeState.direction ? (
+              <span
+                className={`pointer-events-none absolute top-1/2 z-10 -translate-y-1/2 rounded-full bg-accent px-3 py-2 text-xs font-semibold text-surface transition-transform ${
+                  swipeState.direction === 'right' ? 'left-3' : 'right-3'
+                } ${swipeState.armed ? 'scale-110' : 'opacity-70'}`}
+              >
+                {swipeState.direction === 'right'
+                  ? `☺ ${friendMove ? senderName : 'ask a friend'}`
+                  : '✦ the app'}
               </span>
             ) : null}
-            {/* Per Inkling, and always changeable. What you noticed on Tuesday is not the
+            <div className="flex items-center gap-2 text-xs tracking-wide uppercase">
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-accent">
+                {current.type}
+              </span>
+              {current.demo ? (
+                <span className="rounded-full border border-line px-2 py-0.5 text-ink-faint">
+                  example
+                </span>
+              ) : null}
+              {/* Per Inkling, and always changeable. What you noticed on Tuesday is not the
               same as what you noticed on Friday, and one setting for both is a setting
               nobody can answer honestly. */}
-            {/* Who can see it, as faces rather than as a word. The word had to be decoded;
+              {/* Who can see it, as faces rather than as a word. The word had to be decoded;
               a row of faces is read. Nothing at all when it is private — the absence is the
               message, and greyed-out faces would say something louder than the thing itself. */}
-            {socialOn ? (
-              <>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() =>
-                    void actions.share(
-                      current.id,
-                      current.visibility === 'friends' ? 'private' : 'friends',
-                    )
-                  }
-                  title={
-                    current.visibility === 'friends'
-                      ? 'Your friends can see this. Tap to keep it private.'
-                      : 'Nobody can be shown this. Tap to share it with friends.'
-                  }
-                  className={`rounded-full border px-2 py-0.5 disabled:opacity-50 ${
-                    current.visibility === 'friends'
-                      ? 'border-accent/50 font-medium text-accent'
-                      : 'border-line text-ink-faint'
-                  }`}
-                >
-                  {current.visibility === 'friends' ? 'Friends' : 'Private'}
-                </button>
-                {current.visibility === 'friends' ? (
-                  <FriendFaces friends={social.friends.filter((f) => f.status === 'accepted')} />
-                ) : null}
-              </>
-            ) : null}
-            {current.schedule.timesSkipped > 0 ? (
-              <span className="text-ink-faint">put down {current.schedule.timesSkipped}×</span>
-            ) : null}
-            {/* Three dots rather than the word "edit": the menu holds four different things, two
-                of which have nothing to do with editing, and "edit" was the smallest word on the
-                card for the biggest set of choices on it. */}
-            <button
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              aria-label="More about this Inkling"
-              className="circle ml-auto h-9 w-9 shrink-0 text-lg leading-none"
-            >
-              ⋯
-            </button>
-          </div>
-
-          {editing ? (
-            <div className="mt-3 flex flex-col gap-2">
-              <input
-                value={draftTitle}
-                onChange={(event) => setDraftTitle(event.target.value)}
-                className="w-full rounded-xl border border-line bg-surface p-3 text-base font-semibold outline-none focus:border-accent"
-              />
-              <textarea
-                value={draftBody}
-                onChange={(event) => setDraftBody(event.target.value)}
-                rows={5}
-                className="w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent"
-              />
-              {/* A blip that started as a question often turns out to be something else. */}
-              <div className="flex flex-wrap gap-1.5">
-                {BLIP_TYPES.map((option) => (
+              {socialOn ? (
+                <>
                   <button
-                    key={option}
                     type="button"
-                    onClick={() => setDraftType(option)}
-                    className={`rounded-full px-2.5 py-1 text-xs capitalize ${
-                      draftType === option
-                        ? 'bg-accent text-surface'
-                        : 'border border-line text-ink-faint'
+                    disabled={busy}
+                    onClick={() =>
+                      void actions.share(
+                        current.id,
+                        current.visibility === 'friends' ? 'private' : 'friends',
+                      )
+                    }
+                    title={
+                      current.visibility === 'friends'
+                        ? 'Your friends can see this. Tap to keep it private.'
+                        : 'Nobody can be shown this. Tap to share it with friends.'
+                    }
+                    className={`rounded-full border px-2 py-0.5 disabled:opacity-50 ${
+                      current.visibility === 'friends'
+                        ? 'border-accent/50 font-medium text-accent'
+                        : 'border-line text-ink-faint'
                     }`}
                   >
-                    {option}
+                    {current.visibility === 'friends' ? 'Friends' : 'Private'}
                   </button>
-                ))}
-              </div>
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setEditing(false)} className="quiet text-xs">
-                  cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void saveEdit()}
-                  className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface"
-                >
-                  Save
-                </button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <Markdown text={current.title} className="mt-3 text-xl leading-snug font-semibold" />
-              {current.body && current.body !== current.title ? (
-                <Markdown text={current.body} className="mt-2 text-sm text-ink-soft" />
+                  {current.visibility === 'friends' ? (
+                    <FriendFaces friends={social.friends.filter((f) => f.status === 'accepted')} />
+                  ) : null}
+                </>
               ) : null}
-            </>
-          )}
+              {current.schedule.timesSkipped > 0 ? (
+                <span className="text-ink-faint">put down {current.schedule.timesSkipped}×</span>
+              ) : null}
+              {/* Three dots rather than the word "edit": the menu holds four different things, two
+                of which have nothing to do with editing, and "edit" was the smallest word on the
+                card for the biggest set of choices on it. */}
+              <button
+                type="button"
+                onClick={() => setMenuOpen(true)}
+                aria-label="More about this Inkling"
+                className="circle ml-auto h-9 w-9 shrink-0 text-lg leading-none"
+              >
+                ⋯
+              </button>
+            </div>
 
-          {current.input?.url ? (
-            <a
-              href={current.input.url}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-2 block truncate text-xs text-accent underline"
-            >
-              {current.input.url}
-            </a>
-          ) : null}
+            {editing ? (
+              <div className="mt-3 flex flex-col gap-2">
+                <input
+                  value={draftTitle}
+                  onChange={(event) => setDraftTitle(event.target.value)}
+                  className="w-full rounded-xl border border-line bg-surface p-3 text-base font-semibold outline-none focus:border-accent"
+                />
+                <textarea
+                  value={draftBody}
+                  onChange={(event) => setDraftBody(event.target.value)}
+                  rows={5}
+                  className="w-full resize-none rounded-xl border border-line bg-surface p-3 text-sm outline-none focus:border-accent"
+                />
+                {/* A blip that started as a question often turns out to be something else. */}
+                <div className="flex flex-wrap gap-1.5">
+                  {BLIP_TYPES.map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setDraftType(option)}
+                      className={`rounded-full px-2.5 py-1 text-xs capitalize ${
+                        draftType === option
+                          ? 'bg-accent text-surface'
+                          : 'border border-line text-ink-faint'
+                      }`}
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => setEditing(false)} className="quiet text-xs">
+                    cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveEdit()}
+                    className="ml-auto rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface"
+                  >
+                    Save
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <Markdown
+                  text={current.title}
+                  className="mt-3 text-xl leading-snug font-semibold"
+                />
+                {current.body && current.body !== current.title ? (
+                  <Markdown text={current.body} className="mt-2 text-sm text-ink-soft" />
+                ) : null}
+              </>
+            )}
 
-          {/* Everything written down, in the order it was written, each showing whatever came
+            {current.input?.url ? (
+              <a
+                href={current.input.url}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 block truncate text-xs text-accent underline"
+              >
+                {current.input.url}
+              </a>
+            ) : null}
+
+            {/* Everything written down, in the order it was written, each showing whatever came
             with it. This used to be two lists — pictures here, words there — which meant a
             photograph and the sentence about it could end up in different places on the
             card. */}
-          {written.length > 0 ? (
-            <ul className="mt-3 flex flex-col gap-3">
-              {written.map((entry_) => (
-                <li key={entry_.id} className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    {entry_.mediaId ? (
-                      <StoredImage
-                        hash={entry_.mediaId}
-                        className="mb-2 max-h-64 rounded-xl border border-line object-cover"
-                      />
-                    ) : null}
-                    {entry_.text ? (
-                      <Markdown text={entry_.text} className="text-sm text-ink-soft" />
-                    ) : null}
-                    {entry_.url ? (
-                      <a
-                        href={entry_.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="mt-1 block truncate text-xs text-accent underline"
-                      >
-                        {entry_.url}
-                      </a>
-                    ) : null}
-                    <EntryContextPanel entry={entry_} move={moveForEntry(entry_.moveId)} />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => void actions.removeEntry(current.id, entry_.id)}
-                    aria-label="Remove this entry"
-                    className="quiet px-1 text-xs leading-none"
-                  >
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          <Blocks blip={current} actions={actions} />
-
-          {slotNow === 'friend' && friendMove && !askOpen ? (
-            <div
-              key={friendMove.messageId}
-              {...swipeState.handlers}
-              style={{
-                ...swipeState.style,
-                // Their colour, from their settings: the quickest cue that this came from a
-                // person rather than from the app, and the same cue wherever they appear.
-                borderColor: friendColour ?? undefined,
-                background: friendColour ? `${friendColour}14` : undefined,
-              }}
-              className="move-in relative mt-5 rounded-2xl border border-line bg-surface/60 p-4"
-            >
-              {/* Left and right of the move, because that is what the swipe moves between: this
-                  suggestion and the other source — not between whole Inklings. */}
-              <span className="pointer-events-none absolute top-1/2 -left-2 flex -translate-y-1/2 items-center rounded-full bg-surface p-0.5 shadow-circle">
-                <Avatar
-                  username={senderName ?? 'a friend'}
-                  userId={friendMove.from}
-                  color={friendColour}
-                  hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
-                  size={20}
-                />
-              </span>
-              <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
-                ✦
-              </span>
-              <div className="flex items-center gap-2.5">
-                <Avatar
-                  username={senderName ?? 'a friend'}
-                  userId={friendMove.from}
-                  color={social.friends.find((f) => f.userId === friendMove.from)?.color}
-                  hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
-                  size={28}
-                />
-                <p className="text-xs tracking-wide text-ink-faint uppercase">
-                  a move from {senderName}
-                </p>
-              </div>
-              {/* The whole title is the button: on a phone, tapping the move is how you do it. */}
-              <button
-                type="button"
-                onClick={() => {
-                  if (swipeState.wasDragged()) return
-                  setComposer({ move: friendMove.spec, fromMessageId: friendMove.messageId })
-                }}
-                className="mt-1 block text-left"
-              >
-                <span className="block text-sm font-medium">{friendMove.spec.title}</span>
-                <span className="mt-1 block text-xs text-ink-soft">
-                  goal: {friendMove.spec.goal}
-                </span>
-              </button>
-              {friendMove.note ? (
-                <p className="mt-2 text-xs text-accent italic">“{friendMove.note}”</p>
-              ) : null}
-
-              {!composer ? <LookUps links={links} loading={materialLoading} /> : null}
-              {!composer && material ? (
-                <Material loading={materialLoading} material={material} />
-              ) : null}
-
-              {!composer ? (
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setComposer({ move: friendMove.spec, fromMessageId: friendMove.messageId })
-                    }
-                    className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface"
-                  >
-                    Do this
-                  </button>
-                  <span className="text-xs text-ink-faint">
-                    {Math.max(1, Math.round(friendMove.spec.timeLimitSec / 60))} min
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setNoting('thanks')}
-                    className="quiet text-xs underline"
-                  >
-                    say thank you
-                  </button>
-                </div>
-              ) : null}
-
-              {/* Two ways past a move from a friend, and they mean different things.
-                "Later" puts it back in the pile: the card shows whoever is next, or the app's
-                own suggestion if nobody else has sent one, and this comes round again in a
-                later round. "Not this move" is about the suggestion itself — it leaves the
-                card for good and stays in the log and in the history with them. */}
-              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
-                {/* Reachable without the row: on a phone the row is gone while a move is on
-                  screen, and "write my own" is a verb rather than a source to browse. */}
-                <button
-                  type="button"
-                  onClick={() => setComposer({ move: null })}
-                  className="quiet underline"
-                >
-                  write my own
-                </button>
-                <button type="button" onClick={nextFriendMove} className="quiet underline">
-                  do this later
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void actions.dismissFriendMove(current.id, friendMove.messageId)}
-                  className="quiet underline disabled:opacity-40"
-                >
-                  not this move
-                </button>
-              </div>
-
-              {noting && !composer ? (
-                <Note
-                  kind={noting}
-                  username={senderName ?? 'a friend'}
-                  moveTitle={friendMove.spec.title}
-                  busy={busy}
-                  onCancel={() => setNoting(null)}
-                  onSend={async (text) => {
-                    const friend = social.friends.find(
-                      (candidate) => candidate.userId === friendMove.from,
-                    )
-                    if (!friend) {
-                      setNoteProblem('they are no longer a friend')
-                      return
-                    }
-                    const problemText = await social.note({
-                      to: friend,
-                      blipId: current.id,
-                      kind: noting,
-                      moveTitle: noting === 'kudos' ? friendMove.spec.title : undefined,
-                      text,
-                    })
-                    setNoteProblem(problemText)
-                    if (!problemText) setNoting(null)
-                  }}
-                  problem={noteProblem}
-                />
-              ) : null}
-
-              {current.friendNotes.length > 0 ? (
-                <ul className="mt-3 flex flex-col gap-1">
-                  {current.friendNotes.map((note) => (
-                    <li key={note.id} className="text-xs text-ink-soft">
-                      <span className="text-ink-faint">
-                        {note.direction === 'in' ? note.username : `you → ${note.username}`}
-                        {note.kind === 'kudos' ? ' · kudos' : ' · thanks'}:{' '}
-                      </span>
-                      {note.text}
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-          ) : null}
-
-          {composer ? (
-            <div className="mt-5 flex flex-col gap-3">
-              {composer.move ? (
-                <p className="text-xs tracking-wide text-accent uppercase">
-                  doing: {composer.move.title}
-                </p>
-              ) : null}
-              {/* What the move turned up, and anything the app suggested, stay here
-                while you write — that is the whole point of having asked. */}
-              {composer.move && links.length > 0 ? (
-                <LookUps links={links} loading={materialLoading} />
-              ) : null}
-              {composer.move && material ? (
-                <Material loading={materialLoading} material={material} className="" />
-              ) : null}
-              <div
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => {
-                  const image = imageFrom(event.dataTransfer)
-                  if (!image) return
-                  event.preventDefault()
-                  setEntryFile(image)
-                }}
-                className="flex flex-col gap-2"
-              >
-                <textarea
-                  value={entry}
-                  onChange={(event) => setEntry(event.target.value)}
-                  onPaste={(event) => {
-                    const image = imageFrom(event.clipboardData)
-                    if (image) setEntryFile(image)
-                  }}
-                  onKeyDown={(event) => {
-                    if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
-                      event.preventDefault()
-                      void saveEntry()
-                    }
-                  }}
-                  rows={6}
-                  placeholder={composer.move ? composer.move.goal : 'What did you get?'}
-                  className="w-full resize-none rounded-2xl border border-line p-4 text-sm outline-none focus:border-accent"
-                />
-                {entryFile ? (
-                  <span className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-2 pl-3 text-xs">
-                    <span className="text-ink-soft">🖼</span>
-                    <span className="min-w-0 flex-1 truncate">{entryFile.name}</span>
+            {written.length > 0 ? (
+              <ul className="mt-3 flex flex-col gap-3">
+                {written.map((entry_) => (
+                  <li key={entry_.id} className="flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      {entry_.mediaId ? (
+                        <StoredImage
+                          hash={entry_.mediaId}
+                          className="mb-2 max-h-64 rounded-xl border border-line object-cover"
+                        />
+                      ) : null}
+                      {entry_.text ? (
+                        <Markdown text={entry_.text} className="text-sm text-ink-soft" />
+                      ) : null}
+                      {entry_.url ? (
+                        <a
+                          href={entry_.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 block truncate text-xs text-accent underline"
+                        >
+                          {entry_.url}
+                        </a>
+                      ) : null}
+                      <EntryContextPanel entry={entry_} move={moveForEntry(entry_.moveId)} />
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setEntryFile(undefined)}
-                      className="quiet underline"
-                      aria-label="Remove the image"
+                      onClick={() => void actions.removeEntry(current.id, entry_.id)}
+                      aria-label="Remove this entry"
+                      className="quiet px-1 text-xs leading-none"
                     >
-                      remove
-                    </button>
-                  </span>
-                ) : null}
-              </div>
-
-              {/* Adding structure belongs where you are writing, not on the card you are
-                reading — so the picker is here, and the blocks it makes show up on the
-                card. */}
-              <div className="flex flex-wrap items-center gap-2">
-                <label
-                  className="circle h-10 w-10 shrink-0 cursor-pointer text-base"
-                  title="Add an image"
-                >
-                  📎
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(event) => setEntryFile(event.target.files?.[0] ?? undefined)}
-                  />
-                </label>
-                <BlockPicker
-                  count={current.blocks.length}
-                  onAdd={(kind) => actions.addBlock(current.id, newBlock(kind))}
-                />
-              </div>
-              {composer.move ? (
-                <div className="flex flex-wrap items-center gap-4 text-xs">
-                  <button
-                    type="button"
-                    onClick={() => void askForGuidance(true)}
-                    disabled={guidanceLoading}
-                    className="quiet underline disabled:no-underline disabled:opacity-60"
-                  >
-                    <ButtonLabel busy={guidanceLoading}>
-                      {guidanceLoading
-                        ? 'thinking…'
-                        : guidance
-                          ? 'help me further'
-                          : 'help me with this'}
-                    </ButtonLabel>
-                  </button>
-                </div>
-              ) : null}
-              <Guidance items={guidance} className="" />
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setComposer(null)} className="quiet text-xs">
-                  cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void saveEntry()}
-                  disabled={busy}
-                  className="ml-auto rounded-full bg-ink px-6 py-3 text-sm font-semibold text-surface disabled:opacity-40"
-                >
-                  <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
-                </button>
-              </div>
-            </div>
-          ) : slotNow === 'ask' || askOpen ? (
-            /* The end of the ring, and where a swipe with nothing left to show lands. Asking is
-               what you do when nobody has suggested anything, or when what they suggested is not
-               it — the same situation, so the same place. */
-            <div className="mt-5">
-              <AskPanel
-                blip={current}
-                social={social}
-                onClose={() => {
-                  setAskOpen(false)
-                  setRingIndex(0)
-                  setSlot('friend')
-                }}
-                onAsked={() => {
-                  setAskOpen(false)
-                  setRingIndex(0)
-                  setRingTouched(false)
-                  setSlot('friend')
-                  discardMove()
-                }}
-                onShare={() => void actions.share(current.id, 'friends')}
-              />
-            </div>
-          ) : slotNow === 'ai' && moveLoading && !askOpen ? (
-            /* While a new one is being found, show that rather than the one you just swiped
-             away: a suggestion sitting there unchanged is indistinguishable from a swipe that
-             did not register, which is exactly how "not this one" used to look broken. */
-            <div className="mt-5 flex items-center gap-3 rounded-2xl bg-accent-soft/70 p-4">
-              <Spinner className="h-4 w-4 text-accent" />
-              <span className="text-sm text-ink-soft">finding something else…</span>
-            </div>
-          ) : slotNow === 'ai' && move && !askOpen ? (
-            <div
-              key={move.id}
-              {...swipeState.handlers}
-              style={swipeState.style}
-              className={`move-in relative mt-5 rounded-2xl bg-accent-soft/70 p-4 ${
-                moveLoading ? 'opacity-60' : ''
-              }`}
-            >
-              <span className="pointer-events-none absolute top-1/2 -left-2 flex -translate-y-1/2 items-center rounded-full bg-surface p-0.5 shadow-circle">
-                <Avatar
-                  username={
-                    pendingMoves[0]
-                      ? nameOf(
-                          social.friends.find((e) => e.userId === pendingMoves[0]?.from) ?? {
-                            username: pendingMoves[0].fromUsername,
-                          },
-                        )
-                      : 'a friend'
-                  }
-                  userId={pendingMoves[0]?.from ?? ''}
-                  color={social.friends.find((f) => f.userId === pendingMoves[0]?.from)?.color}
-                  hash={social.friends.find((f) => f.userId === pendingMoves[0]?.from)?.avatar}
-                  size={20}
-                />
-              </span>
-              <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
-                ✦
-              </span>
-              <p className="text-xs tracking-wide text-accent uppercase">a move, if you want one</p>
-              <button
-                type="button"
-                onClick={() => {
-                  if (swipeState.wasDragged()) return
-                  setComposer({ move })
-                }}
-                className="mt-1 block text-left"
-              >
-                <span className="block text-sm font-medium">{move.title}</span>
-                <span className="mt-1 block text-xs text-ink-soft">goal: {move.goal}</span>
-              </button>
-              {current.savedMove ? (
-                <p className="mt-1 text-xs text-good">
-                  {current.demo
-                    ? 'the move that comes with the example'
-                    : 'saved — this is the move you kept'}
-                </p>
-              ) : null}
-
-              <LookUps links={links} loading={materialLoading} />
-              {material ? <Material loading={materialLoading} material={material} /> : null}
-
-              <div className="mt-3 flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setComposer({ move })}
-                  disabled={moveLoading}
-                  className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
-                >
-                  Do this
-                </button>
-                <span className="text-xs text-ink-faint">
-                  {Math.max(1, Math.round(move.timeLimitSec / 60))} min ·{' '}
-                  {move.generatedBy === 'llm'
-                    ? 'adapted'
-                    : current.demo
-                      ? 'the example'
-                      : 'from the playbook'}
-                </span>
-                <button
-                  type="button"
-                  onClick={reroll}
-                  disabled={moveLoading}
-                  className="quiet ml-auto underline disabled:no-underline disabled:opacity-60"
-                >
-                  <ButtonLabel busy={moveLoading}>
-                    {moveLoading ? 'finding another…' : 'not this one'}
-                  </ButtonLabel>
-                </button>
-              </div>
-
-              <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
-                <button
-                  type="button"
-                  onClick={() => void saveForLater()}
-                  className="quiet underline"
-                >
-                  save for later
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void askForGuidance()}
-                  disabled={guidanceLoading}
-                  className="quiet underline disabled:no-underline disabled:opacity-60"
-                >
-                  <ButtonLabel busy={guidanceLoading}>
-                    {guidanceLoading ? 'thinking…' : 'help me with the next step'}
-                  </ButtonLabel>
-                </button>
-                {/* A different signal from "not this one", which means "not at the moment".
-                  This one says the suggestion itself was wrong, and it is kept. */}
-                <button
-                  type="button"
-                  onClick={() => setRejecting(true)}
-                  className="quiet underline"
-                >
-                  this is bad
-                </button>
-              </div>
-
-              {/* Only when the friend's move is not the one on screen: there is one ask per
-                card, always in the place you were looking when you wanted it. */}
-
-              {rejecting ? (
-                <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line bg-surface/60 p-3">
-                  <p className="text-xs tracking-wide text-ink-faint uppercase">
-                    what is wrong with it?
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {REJECTION_REASONS.map((reason) => (
-                      <button
-                        key={reason}
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          setRejectionReason((chosen) => (chosen === reason ? null : reason))
-                        }
-                        className={`rounded-full px-2.5 py-1 text-xs disabled:opacity-50 ${
-                          rejectionReason === reason
-                            ? 'bg-accent text-surface'
-                            : 'border border-line text-ink-soft'
-                        }`}
-                      >
-                        {reason}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    value={rejectionNote}
-                    onChange={(event) => setRejectionNote(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter') void reject()
-                    }}
-                    placeholder="or say it in your own words"
-                    className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
-                  />
-                  <div className="flex items-center gap-4 text-xs">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void reject()}
-                      className="rounded-full bg-ink px-3.5 py-1.5 font-semibold text-surface disabled:opacity-40"
-                    >
-                      <ButtonLabel busy={busy}>{busy ? 'Marking…' : 'Mark it bad'}</ButtonLabel>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setRejecting(false)
-                        setRejectionReason(null)
-                        setRejectionNote('')
-                      }}
-                      className="quiet underline"
-                    >
-                      cancel
-                    </button>
-                  </div>
-                  <p className="text-xs text-ink-faint">
-                    Another move will be suggested for this Inkling, and this one goes into the
-                    prompt as a correction — kept with what it was working from, so it can be looked
-                    at later.
-                  </p>
-                </div>
-              ) : null}
-
-              <Guidance items={guidance} />
-            </div>
-          ) : null}
-
-          {/* The card's own controls, on the card, above what the card has recorded: the three
-              ways to get a move on a row of their own in the middle — at 390px they do not fit
-              beside anything — and the two corner buttons underneath, one at each edge, because
-              they are about this whole Inkling rather than about the move. */}
-          <div className="mt-4 flex flex-col gap-2">
-            <div className="flex justify-center">
-              <div className="flex overflow-hidden rounded-2xl border border-line bg-surface">
-                <button
-                  type="button"
-                  onClick={() => setAskOpen(true)}
-                  className="border-r border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft"
-                >
-                  Ask Friend
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setComposer({ move: null })}
-                  className="bg-accent-soft px-2.5 py-2 text-xs font-semibold whitespace-nowrap text-accent"
-                >
-                  Add a Move
-                </button>
-                <button
-                  type="button"
-                  onClick={generateMove}
-                  disabled={moveLoading}
-                  className="border-l border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft disabled:opacity-40"
-                >
-                  <ButtonLabel busy={moveLoading}>
-                    {moveLoading ? 'thinking…' : 'Generate'}
-                  </ButtonLabel>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <MoveLog
-            moves={current.moves}
-            onForget={() => {
-              void actions.forgetMoves(current.id)
-              setMoveRevision((value) => value + 1)
-            }}
-          />
-
-          {currentRelated.length > 0 ? (
-            <div className="mt-5 border-t border-line pt-3">
-              <p className="text-xs tracking-wide text-ink-faint uppercase">related</p>
-              <ul className="mt-1 flex flex-col gap-1">
-                {currentRelated.map((entry_) => (
-                  <li key={entry_.blip.id}>
-                    <button
-                      type="button"
-                      onClick={() => onOpenBlip(entry_.blip.id)}
-                      className="text-left text-xs text-ink-soft"
-                    >
-                      <span className="text-ink underline decoration-dotted">
-                        {entry_.blip.title}
-                      </span>{' '}
-                      — {entry_.reasons.join('; ')}
+                      ×
                     </button>
                   </li>
                 ))}
               </ul>
+            ) : null}
+
+            <Blocks blip={current} actions={actions} />
+
+            {slotNow === 'friend' && friendMove && !askOpen ? (
+              <div
+                key={friendMove.messageId}
+                {...swipeState.handlers}
+                style={{
+                  ...swipeState.style,
+                  // Their colour, from their settings: the quickest cue that this came from a
+                  // person rather than from the app, and the same cue wherever they appear.
+                  borderColor: friendColour ?? undefined,
+                  background: friendColour ? `${friendColour}14` : undefined,
+                }}
+                className="move-in relative mt-5 rounded-2xl border border-line bg-surface/60 p-4"
+              >
+                {/* Left and right of the move, because that is what the swipe moves between: this
+                  suggestion and the other source — not between whole Inklings. */}
+                <span className="pointer-events-none absolute top-1/2 -left-2 flex -translate-y-1/2 items-center rounded-full bg-surface p-0.5 shadow-circle">
+                  <Avatar
+                    username={senderName ?? 'a friend'}
+                    userId={friendMove.from}
+                    color={friendColour}
+                    hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
+                    size={20}
+                  />
+                </span>
+                <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
+                  ✦
+                </span>
+                <div className="flex items-center gap-2.5">
+                  <Avatar
+                    username={senderName ?? 'a friend'}
+                    userId={friendMove.from}
+                    color={social.friends.find((f) => f.userId === friendMove.from)?.color}
+                    hash={social.friends.find((f) => f.userId === friendMove.from)?.avatar}
+                    size={28}
+                  />
+                  <p className="text-xs tracking-wide text-ink-faint uppercase">
+                    a move from {senderName}
+                  </p>
+                </div>
+                {/* The whole title is the button: on a phone, tapping the move is how you do it. */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (swipeState.wasDragged()) return
+                    setComposer({ move: friendMove.spec, fromMessageId: friendMove.messageId })
+                  }}
+                  className="mt-1 block text-left"
+                >
+                  <span className="block text-sm font-medium">{friendMove.spec.title}</span>
+                  <span className="mt-1 block text-xs text-ink-soft">
+                    goal: {friendMove.spec.goal}
+                  </span>
+                </button>
+                {friendMove.note ? (
+                  <p className="mt-2 text-xs text-accent italic">“{friendMove.note}”</p>
+                ) : null}
+
+                {!composer ? <LookUps links={links} loading={materialLoading} /> : null}
+                {!composer && material ? (
+                  <Material loading={materialLoading} material={material} />
+                ) : null}
+
+                {!composer ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setComposer({ move: friendMove.spec, fromMessageId: friendMove.messageId })
+                      }
+                      className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface"
+                    >
+                      Do this
+                    </button>
+                    <span className="text-xs text-ink-faint">
+                      {Math.max(1, Math.round(friendMove.spec.timeLimitSec / 60))} min
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setNoting('thanks')}
+                      className="quiet text-xs underline"
+                    >
+                      say thank you
+                    </button>
+                  </div>
+                ) : null}
+
+                {/* Two ways past a move from a friend, and they mean different things.
+                "Later" puts it back in the pile: the card shows whoever is next, or the app's
+                own suggestion if nobody else has sent one, and this comes round again in a
+                later round. "Not this move" is about the suggestion itself — it leaves the
+                card for good and stays in the log and in the history with them. */}
+                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
+                  {/* Reachable without the row: on a phone the row is gone while a move is on
+                  screen, and "write my own" is a verb rather than a source to browse. */}
+                  <button
+                    type="button"
+                    onClick={() => setComposer({ move: null })}
+                    className="quiet underline"
+                  >
+                    write my own
+                  </button>
+                  <button type="button" onClick={nextFriendMove} className="quiet underline">
+                    do this later
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void actions.dismissFriendMove(current.id, friendMove.messageId)}
+                    className="quiet underline disabled:opacity-40"
+                  >
+                    not this move
+                  </button>
+                </div>
+
+                {noting && !composer ? (
+                  <Note
+                    kind={noting}
+                    username={senderName ?? 'a friend'}
+                    moveTitle={friendMove.spec.title}
+                    busy={busy}
+                    onCancel={() => setNoting(null)}
+                    onSend={async (text) => {
+                      const friend = social.friends.find(
+                        (candidate) => candidate.userId === friendMove.from,
+                      )
+                      if (!friend) {
+                        setNoteProblem('they are no longer a friend')
+                        return
+                      }
+                      const problemText = await social.note({
+                        to: friend,
+                        blipId: current.id,
+                        kind: noting,
+                        moveTitle: noting === 'kudos' ? friendMove.spec.title : undefined,
+                        text,
+                      })
+                      setNoteProblem(problemText)
+                      if (!problemText) setNoting(null)
+                    }}
+                    problem={noteProblem}
+                  />
+                ) : null}
+
+                {current.friendNotes.length > 0 ? (
+                  <ul className="mt-3 flex flex-col gap-1">
+                    {current.friendNotes.map((note) => (
+                      <li key={note.id} className="text-xs text-ink-soft">
+                        <span className="text-ink-faint">
+                          {note.direction === 'in' ? note.username : `you → ${note.username}`}
+                          {note.kind === 'kudos' ? ' · kudos' : ' · thanks'}:{' '}
+                        </span>
+                        {note.text}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+            ) : null}
+
+            {composer ? (
+              <div className="mt-5 flex flex-col gap-3">
+                {composer.move ? (
+                  <p className="text-xs tracking-wide text-accent uppercase">
+                    doing: {composer.move.title}
+                  </p>
+                ) : null}
+                {/* What the move turned up, and anything the app suggested, stay here
+                while you write — that is the whole point of having asked. */}
+                {composer.move && links.length > 0 ? (
+                  <LookUps links={links} loading={materialLoading} />
+                ) : null}
+                {composer.move && material ? (
+                  <Material loading={materialLoading} material={material} className="" />
+                ) : null}
+                <div
+                  onDragOver={(event) => event.preventDefault()}
+                  onDrop={(event) => {
+                    const image = imageFrom(event.dataTransfer)
+                    if (!image) return
+                    event.preventDefault()
+                    setEntryFile(image)
+                  }}
+                  className="flex flex-col gap-2"
+                >
+                  <textarea
+                    value={entry}
+                    onChange={(event) => setEntry(event.target.value)}
+                    onPaste={(event) => {
+                      const image = imageFrom(event.clipboardData)
+                      if (image) setEntryFile(image)
+                    }}
+                    onKeyDown={(event) => {
+                      if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                        event.preventDefault()
+                        void saveEntry()
+                      }
+                    }}
+                    rows={6}
+                    placeholder={composer.move ? composer.move.goal : 'What did you get?'}
+                    className="w-full resize-none rounded-2xl border border-line p-4 text-sm outline-none focus:border-accent"
+                  />
+                  {entryFile ? (
+                    <span className="flex items-center gap-3 rounded-2xl border border-line bg-surface/60 p-2 pl-3 text-xs">
+                      <span className="text-ink-soft">🖼</span>
+                      <span className="min-w-0 flex-1 truncate">{entryFile.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setEntryFile(undefined)}
+                        className="quiet underline"
+                        aria-label="Remove the image"
+                      >
+                        remove
+                      </button>
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* Adding structure belongs where you are writing, not on the card you are
+                reading — so the picker is here, and the blocks it makes show up on the
+                card. */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <label
+                    className="circle h-10 w-10 shrink-0 cursor-pointer text-base"
+                    title="Add an image"
+                  >
+                    📎
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(event) => setEntryFile(event.target.files?.[0] ?? undefined)}
+                    />
+                  </label>
+                  <BlockPicker
+                    count={current.blocks.length}
+                    onAdd={(kind) => actions.addBlock(current.id, newBlock(kind))}
+                  />
+                </div>
+                {composer.move ? (
+                  <div className="flex flex-wrap items-center gap-4 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => void askForGuidance(true)}
+                      disabled={guidanceLoading}
+                      className="quiet underline disabled:no-underline disabled:opacity-60"
+                    >
+                      <ButtonLabel busy={guidanceLoading}>
+                        {guidanceLoading
+                          ? 'thinking…'
+                          : guidance
+                            ? 'help me further'
+                            : 'help me with this'}
+                      </ButtonLabel>
+                    </button>
+                  </div>
+                ) : null}
+                <Guidance items={guidance} className="" />
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={() => setComposer(null)} className="quiet text-xs">
+                    cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void saveEntry()}
+                    disabled={busy}
+                    className="ml-auto rounded-full bg-ink px-6 py-3 text-sm font-semibold text-surface disabled:opacity-40"
+                  >
+                    <ButtonLabel busy={busy}>{busy ? 'Saving…' : 'Keep it'}</ButtonLabel>
+                  </button>
+                </div>
+              </div>
+            ) : slotNow === 'ask' || askOpen ? (
+              /* The end of the ring, and where a swipe with nothing left to show lands. Asking is
+               what you do when nobody has suggested anything, or when what they suggested is not
+               it — the same situation, so the same place. */
+              <div className="mt-5">
+                <AskPanel
+                  blip={current}
+                  social={social}
+                  onClose={() => {
+                    setAskOpen(false)
+                    setRingIndex(0)
+                    setSlot('friend')
+                  }}
+                  onAsked={() => {
+                    setAskOpen(false)
+                    setRingIndex(0)
+                    setRingTouched(false)
+                    setSlot('friend')
+                    discardMove()
+                  }}
+                  onShare={() => void actions.share(current.id, 'friends')}
+                />
+              </div>
+            ) : slotNow === 'ai' && moveLoading && !askOpen ? (
+              /* While a new one is being found, show that rather than the one you just swiped
+             away: a suggestion sitting there unchanged is indistinguishable from a swipe that
+             did not register, which is exactly how "not this one" used to look broken. */
+              <div className="mt-5 flex items-center gap-3 rounded-2xl bg-accent-soft/70 p-4">
+                <Spinner className="h-4 w-4 text-accent" />
+                <span className="text-sm text-ink-soft">finding something else…</span>
+              </div>
+            ) : slotNow === 'ai' && move && !askOpen ? (
+              <div
+                key={move.id}
+                {...swipeState.handlers}
+                style={swipeState.style}
+                className={`move-in relative mt-5 rounded-2xl bg-accent-soft/70 p-4 ${
+                  moveLoading ? 'opacity-60' : ''
+                }`}
+              >
+                <span className="pointer-events-none absolute top-1/2 -left-2 flex -translate-y-1/2 items-center rounded-full bg-surface p-0.5 shadow-circle">
+                  <Avatar
+                    username={
+                      pendingMoves[0]
+                        ? nameOf(
+                            social.friends.find((e) => e.userId === pendingMoves[0]?.from) ?? {
+                              username: pendingMoves[0].fromUsername,
+                            },
+                          )
+                        : 'a friend'
+                    }
+                    userId={pendingMoves[0]?.from ?? ''}
+                    color={social.friends.find((f) => f.userId === pendingMoves[0]?.from)?.color}
+                    hash={social.friends.find((f) => f.userId === pendingMoves[0]?.from)?.avatar}
+                    size={20}
+                  />
+                </span>
+                <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
+                  ✦
+                </span>
+                <p className="text-xs tracking-wide text-accent uppercase">
+                  a move, if you want one
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (swipeState.wasDragged()) return
+                    setComposer({ move })
+                  }}
+                  className="mt-1 block text-left"
+                >
+                  <span className="block text-sm font-medium">{move.title}</span>
+                  <span className="mt-1 block text-xs text-ink-soft">goal: {move.goal}</span>
+                </button>
+                {current.savedMove ? (
+                  <p className="mt-1 text-xs text-good">
+                    {current.demo
+                      ? 'the move that comes with the example'
+                      : 'saved — this is the move you kept'}
+                  </p>
+                ) : null}
+
+                <LookUps links={links} loading={materialLoading} />
+                {material ? <Material loading={materialLoading} material={material} /> : null}
+
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setComposer({ move })}
+                    disabled={moveLoading}
+                    className="rounded-full bg-ink px-4 py-2 text-xs font-semibold text-surface disabled:opacity-40"
+                  >
+                    Do this
+                  </button>
+                  <span className="text-xs text-ink-faint">
+                    {Math.max(1, Math.round(move.timeLimitSec / 60))} min ·{' '}
+                    {move.generatedBy === 'llm'
+                      ? 'adapted'
+                      : current.demo
+                        ? 'the example'
+                        : 'from the playbook'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={reroll}
+                    disabled={moveLoading}
+                    className="quiet ml-auto underline disabled:no-underline disabled:opacity-60"
+                  >
+                    <ButtonLabel busy={moveLoading}>
+                      {moveLoading ? 'finding another…' : 'not this one'}
+                    </ButtonLabel>
+                  </button>
+                </div>
+
+                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => void saveForLater()}
+                    className="quiet underline"
+                  >
+                    save for later
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void askForGuidance()}
+                    disabled={guidanceLoading}
+                    className="quiet underline disabled:no-underline disabled:opacity-60"
+                  >
+                    <ButtonLabel busy={guidanceLoading}>
+                      {guidanceLoading ? 'thinking…' : 'help me with the next step'}
+                    </ButtonLabel>
+                  </button>
+                  {/* A different signal from "not this one", which means "not at the moment".
+                  This one says the suggestion itself was wrong, and it is kept. */}
+                  <button
+                    type="button"
+                    onClick={() => setRejecting(true)}
+                    className="quiet underline"
+                  >
+                    this is bad
+                  </button>
+                </div>
+
+                {/* Only when the friend's move is not the one on screen: there is one ask per
+                card, always in the place you were looking when you wanted it. */}
+
+                {rejecting ? (
+                  <div className="mt-3 flex flex-col gap-2 rounded-xl border border-line bg-surface/60 p-3">
+                    <p className="text-xs tracking-wide text-ink-faint uppercase">
+                      what is wrong with it?
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {REJECTION_REASONS.map((reason) => (
+                        <button
+                          key={reason}
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            setRejectionReason((chosen) => (chosen === reason ? null : reason))
+                          }
+                          className={`rounded-full px-2.5 py-1 text-xs disabled:opacity-50 ${
+                            rejectionReason === reason
+                              ? 'bg-accent text-surface'
+                              : 'border border-line text-ink-soft'
+                          }`}
+                        >
+                          {reason}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      value={rejectionNote}
+                      onChange={(event) => setRejectionNote(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') void reject()
+                      }}
+                      placeholder="or say it in your own words"
+                      className="w-full rounded-xl border border-line bg-surface p-2.5 text-xs outline-none focus:border-accent"
+                    />
+                    <div className="flex items-center gap-4 text-xs">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void reject()}
+                        className="rounded-full bg-ink px-3.5 py-1.5 font-semibold text-surface disabled:opacity-40"
+                      >
+                        <ButtonLabel busy={busy}>{busy ? 'Marking…' : 'Mark it bad'}</ButtonLabel>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRejecting(false)
+                          setRejectionReason(null)
+                          setRejectionNote('')
+                        }}
+                        className="quiet underline"
+                      >
+                        cancel
+                      </button>
+                    </div>
+                    <p className="text-xs text-ink-faint">
+                      Another move will be suggested for this Inkling, and this one goes into the
+                      prompt as a correction — kept with what it was working from, so it can be
+                      looked at later.
+                    </p>
+                  </div>
+                ) : null}
+
+                <Guidance items={guidance} />
+              </div>
+            ) : null}
+
+            {/* The card's own controls, on the card, above what the card has recorded: the three
+              ways to get a move on a row of their own in the middle — at 390px they do not fit
+              beside anything — and the two corner buttons underneath, one at each edge, because
+              they are about this whole Inkling rather than about the move. */}
+            <div className="mt-4 flex flex-col gap-2">
+              <div className="flex justify-center">
+                <div className="flex overflow-hidden rounded-2xl border border-line bg-surface">
+                  <button
+                    type="button"
+                    onClick={() => setAskOpen(true)}
+                    className="border-r border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft"
+                  >
+                    Ask Friend
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setComposer({ move: null })}
+                    className="bg-accent-soft px-2.5 py-2 text-xs font-semibold whitespace-nowrap text-accent"
+                  >
+                    Add a Move
+                  </button>
+                  <button
+                    type="button"
+                    onClick={generateMove}
+                    disabled={moveLoading}
+                    className="border-l border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft disabled:opacity-40"
+                  >
+                    <ButtonLabel busy={moveLoading}>
+                      {moveLoading ? 'thinking…' : 'Generate'}
+                    </ButtonLabel>
+                  </button>
+                </div>
+              </div>
             </div>
-          ) : null}
 
-          {current.export?.notePath ? (
-            <p className="mt-4 text-xs text-good">
-              this one became a note: {current.export.notePath}
-            </p>
-          ) : null}
+            <MoveLog
+              moves={current.moves}
+              onForget={() => {
+                void actions.forgetMoves(current.id)
+                setMoveRevision((value) => value + 1)
+              }}
+            />
 
-          {/* Taking the note does not finish the Inkling — you may well come back to it —
+            {currentRelated.length > 0 ? (
+              <div className="mt-5 border-t border-line pt-3">
+                <p className="text-xs tracking-wide text-ink-faint uppercase">related</p>
+                <ul className="mt-1 flex flex-col gap-1">
+                  {currentRelated.map((entry_) => (
+                    <li key={entry_.blip.id}>
+                      <button
+                        type="button"
+                        onClick={() => onOpenBlip(entry_.blip.id)}
+                        className="text-left text-xs text-ink-soft"
+                      >
+                        <span className="text-ink underline decoration-dotted">
+                          {entry_.blip.title}
+                        </span>{' '}
+                        — {entry_.reasons.join('; ')}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            {current.export?.notePath ? (
+              <p className="mt-4 text-xs text-good">
+                this one became a note: {current.export.notePath}
+              </p>
+            ) : null}
+
+            {/* Taking the note does not finish the Inkling — you may well come back to it —
             so this sits on the card rather than replacing the card with a receipt. */}
-        </div>
+          </div>
 
-        {/* On the card's bottom right corner, and there whatever part of the Inkling you are
+          {/* On the card's bottom right corner, and there whatever part of the Inkling you are
               reading: `sticky`, inside the card's own scroller, above the strip that says where
               the next one is. Outside the scroller it landed below the card — the frame it would
               hang from also holds the two lines under the card — and in the flow it scrolled
               away, which is the thing being fixed. */}
-        {!composer ? (
-          <button
-            type="button"
-            onClick={() => void defer(DEFAULT_DEFERRAL)}
-            title={`Put it down until ${deferDay} — it comes back then`}
-            className="sticky bottom-16 z-10 mr-1 flex flex-col items-center gap-1 self-end"
-          >
-            {/* A circle rather than a pill: it is the one control on the card that is always
+          {!composer ? (
+            <button
+              type="button"
+              onClick={() => void defer(DEFAULT_DEFERRAL)}
+              title={`Put it down until ${deferDay} — it comes back then`}
+              className="absolute right-1 bottom-20 z-10 flex flex-col items-center gap-1"
+            >
+              {/* A circle rather than a pill: it is the one control on the card that is always
                 there, and the round shape says so — the shape the buttons along the bottom used
                 to have. */}
-            <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle">
-              ⏱
-            </span>
-            <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap text-surface">
-              {deferShort}
-            </span>
-          </button>
-        ) : null}
+              <span className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-2xl text-surface shadow-circle">
+                ⏱
+              </span>
+              <span className="rounded-full bg-accent px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap text-surface">
+                {deferShort}
+              </span>
+            </button>
+          ) : null}
 
-        {round.showNext && !fabVisible ? (
-          <button
-            type="button"
-            {...round.handlers}
-            onClick={() => round.next()}
-            className={`sticky bottom-0 z-10 mt-2 -mb-2 w-full touch-none py-1 text-center text-[11px] ${
-              round.pull === 'up' && round.armed ? 'font-semibold text-accent' : 'text-ink-faint'
-            }`}
-          >
-            ▼ the next Inkling
-          </button>
-        ) : null}
+          {round.showNext && !fabVisible ? (
+            <button
+              type="button"
+              {...round.handlers}
+              onClick={() => round.next()}
+              className={`sticky bottom-0 z-10 mt-2 -mb-2 w-full touch-none py-1 text-center text-[11px] ${
+                round.pull === 'up' && round.armed ? 'font-semibold text-accent' : 'text-ink-faint'
+              }`}
+            >
+              ▼ the next Inkling
+            </button>
+          ) : null}
 
-        <div className="mt-3 flex justify-center gap-4 text-xs">
-          {/* "tomorrow / a week / a month" used to sit here, and nobody could say what they
+          <div className="mt-3 flex justify-center gap-4 text-xs">
+            {/* "tomorrow / a week / a month" used to sit here, and nobody could say what they
             were for: three buttons that all did the same thing, differing only in a date
             the app is better at choosing than you are. The ✓ above says the date it picked,
             and that is the choice. Retiring covers "not for a long time". */}
-        </div>
-
-        {current.demo && !fabVisible ? (
-          <div className="mt-4 flex justify-center">
-            <button type="button" onClick={() => void remove()} className="quiet text-xs underline">
-              that was an example — remove it
-            </button>
           </div>
-        ) : null}
 
-        {/* Deliberately nothing here while it thinks. There used to be a line saying so, which
+          {current.demo && !fabVisible ? (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={() => void remove()}
+                className="quiet text-xs underline"
+              >
+                that was an example — remove it
+              </button>
+            </div>
+          ) : null}
+
+          {/* Deliberately nothing here while it thinks. There used to be a line saying so, which
           grew the card by a line and then shrank it again — a blank space appearing and
           leaving. The button is already saying "thinking", and it is where you pressed. */}
 
-        {/* Here as well as on the entry screen, because this is where a suggestion is
+          {/* Here as well as on the entry screen, because this is where a suggestion is
           judged — and "the moves are bad" is worth hearing from the card that showed one. Not
           while the + is up, though: two bits of small text under a floating button is a lot of
           noise at the moment you are about to act. */}
-        {fabVisible ? null : (
-          <div className="mt-3 flex justify-center">
-            <Feedback
-              env={feedbackEnv}
-              screen="review"
-              blip={current}
-              move={move}
-              onSend={onFeedback}
-              className="text-xs text-ink-faint"
-            />
-          </div>
-        )}
+          {fabVisible ? null : (
+            <div className="mt-3 flex justify-center">
+              <Feedback
+                env={feedbackEnv}
+                screen="review"
+                blip={current}
+                move={move}
+                onSend={onFeedback}
+                className="text-xs text-ink-faint"
+              />
+            </div>
+          )}
 
-        {/* Its own tray rather than a panel inside the card: exporting is something you do to the
+          {/* Its own tray rather than a panel inside the card: exporting is something you do to the
             Inkling and then leave, and the note it makes is longer than a card's worth of text. */}
-        {exporting ? (
-          <Tray title="export it as a note" onClose={() => setExporting(false)}>
-            <ExportNote
-              blip={current}
-              related={currentRelated.map((entry_) => entry_.blip)}
-              provider={provider}
-              onClose={() => setExporting(false)}
-              onPromoted={(filename) => setLastNote({ title: current.title, path: filename })}
+          {exporting ? (
+            <Tray title="export it as a note" onClose={() => setExporting(false)}>
+              <ExportNote
+                blip={current}
+                related={currentRelated.map((entry_) => entry_.blip)}
+                provider={provider}
+                onClose={() => setExporting(false)}
+                onPromoted={(filename) => setLastNote({ title: current.title, path: filename })}
+              />
+            </Tray>
+          ) : null}
+
+          {menuOpen ? (
+            <Tray title="this Inkling" onClose={() => setMenuOpen(false)}>
+              <button
+                type="button"
+                onClick={() => {
+                  setDraftTitle(current.title)
+                  setDraftBody(current.body)
+                  setDraftType(current.type)
+                  setEditing(true)
+                  setMenuOpen(false)
+                }}
+                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+              >
+                Edit the words
+                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                  the title, what it says, and what kind of thing it is
+                </span>
+              </button>
+              {current.status === 'retired' || current.status === 'promoted' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void revive()
+                  }}
+                  className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+                >
+                  Put it back in play
+                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                    out of the attic, and into the round again
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setConfirming('retire')
+                  }}
+                  className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+                >
+                  Retire it
+                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                    not now — it goes to the attic and can come back
+                  </span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  if (PROMOTE_ENABLED) void promote()
+                  else setExporting(true)
+                }}
+                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
+              >
+                {PROMOTE_ENABLED ? 'Put it in your notes' : 'Export it'}
+                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                  {PROMOTE_ENABLED
+                    ? 'writes a note in your vault, with the next steps as checkboxes'
+                    : 'a note you can download, copy, or share, with the next steps as checkboxes'}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false)
+                  setConfirming('delete')
+                }}
+                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium text-warn"
+              >
+                Delete it
+                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                  for good — it leaves the app and stops appearing anywhere
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMenuOpen(false)}
+                className="quiet mt-1 self-center text-xs underline"
+              >
+                cancel
+              </button>
+            </Tray>
+          ) : null}
+
+          {confirming === 'retire' ? (
+            <Confirm
+              question="Retire?"
+              detail="It goes to the attic and stops coming up. You can revive it whenever you want — this is “not now”, not “not this”."
+              confirmLabel="Yes, retire it"
+              busy={confirmingBusy}
+              onCancel={() => setConfirming(null)}
+              onConfirm={() =>
+                void (async () => {
+                  setConfirmingBusy(true)
+                  await retire()
+                  setConfirmingBusy(false)
+                  setConfirming(null)
+                })()
+              }
             />
-          </Tray>
-        ) : null}
+          ) : null}
 
-        {menuOpen ? (
-          <Tray title="this Inkling" onClose={() => setMenuOpen(false)}>
-            <button
-              type="button"
-              onClick={() => {
-                setDraftTitle(current.title)
-                setDraftBody(current.body)
-                setDraftType(current.type)
-                setEditing(true)
-                setMenuOpen(false)
-              }}
-              className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
-            >
-              Edit the words
-              <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                the title, what it says, and what kind of thing it is
-              </span>
-            </button>
-            {current.status === 'retired' || current.status === 'promoted' ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false)
-                  void revive()
-                }}
-                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
-              >
-                Put it back in play
-                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                  out of the attic, and into the round again
-                </span>
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setMenuOpen(false)
-                  setConfirming('retire')
-                }}
-                className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
-              >
-                Retire it
-                <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                  not now — it goes to the attic and can come back
-                </span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false)
-                if (PROMOTE_ENABLED) void promote()
-                else setExporting(true)
-              }}
-              className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium"
-            >
-              {PROMOTE_ENABLED ? 'Put it in your notes' : 'Export it'}
-              <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                {PROMOTE_ENABLED
-                  ? 'writes a note in your vault, with the next steps as checkboxes'
-                  : 'a note you can download, copy, or share, with the next steps as checkboxes'}
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMenuOpen(false)
-                setConfirming('delete')
-              }}
-              className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium text-warn"
-            >
-              Delete it
-              <span className="mt-0.5 block text-xs font-normal text-ink-faint">
-                for good — it leaves the app and stops appearing anywhere
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMenuOpen(false)}
-              className="quiet mt-1 self-center text-xs underline"
-            >
-              cancel
-            </button>
-          </Tray>
-        ) : null}
+          {confirming === 'delete' ? (
+            <Confirm
+              question="Delete?"
+              detail="It leaves the app and stops appearing anywhere. The log still holds it, but nothing will show it again."
+              confirmLabel="Yes, delete it"
+              tone="danger"
+              busy={confirmingBusy}
+              onCancel={() => setConfirming(null)}
+              onConfirm={() =>
+                void (async () => {
+                  setConfirmingBusy(true)
+                  await remove()
+                  setConfirmingBusy(false)
+                  setConfirming(null)
+                })()
+              }
+            />
+          ) : null}
 
-        {confirming === 'retire' ? (
-          <Confirm
-            question="Retire?"
-            detail="It goes to the attic and stops coming up. You can revive it whenever you want — this is “not now”, not “not this”."
-            confirmLabel="Yes, retire it"
-            busy={confirmingBusy}
-            onCancel={() => setConfirming(null)}
-            onConfirm={() =>
-              void (async () => {
-                setConfirmingBusy(true)
-                await retire()
-                setConfirmingBusy(false)
-                setConfirming(null)
-              })()
-            }
-          />
-        ) : null}
+          {lastNote ? (
+            <p className="mt-3 rounded-2xl bg-canvas p-3 text-center text-xs text-good">
+              “{lastNote.title}” became a note: {lastNote.path}
+            </p>
+          ) : null}
 
-        {confirming === 'delete' ? (
-          <Confirm
-            question="Delete?"
-            detail="It leaves the app and stops appearing anywhere. The log still holds it, but nothing will show it again."
-            confirmLabel="Yes, delete it"
-            tone="danger"
-            busy={confirmingBusy}
-            onCancel={() => setConfirming(null)}
-            onConfirm={() =>
-              void (async () => {
-                setConfirmingBusy(true)
-                await remove()
-                setConfirmingBusy(false)
-                setConfirming(null)
-              })()
-            }
-          />
-        ) : null}
-
-        {lastNote ? (
-          <p className="mt-3 rounded-2xl bg-canvas p-3 text-center text-xs text-good">
-            “{lastNote.title}” became a note: {lastNote.path}
-          </p>
-        ) : null}
-
-        {promoteResults[current.id]?.ok === false ? (
-          <p className="mt-2 text-center text-xs text-warn">
-            could not write the note: {promoteResults[current.id]?.error}
-          </p>
-        ) : null}
+          {promoteResults[current.id]?.ok === false ? (
+            <p className="mt-2 text-center text-xs text-warn">
+              could not write the note: {promoteResults[current.id]?.error}
+            </p>
+          ) : null}
+        </div>
       </div>
     </div>
   )

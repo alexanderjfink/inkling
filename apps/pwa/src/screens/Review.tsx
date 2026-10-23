@@ -755,24 +755,34 @@ function MoveHistory({ blip, mode }: { blip: Blip; mode: MoveHistoryMode }) {
   return (
     <div className="mt-5 border-t border-line pt-3">
       <p className="text-xs tracking-wide text-ink-faint uppercase">moves done · {rows.length}</p>
-      {/* One rule between rows, not around them: the list belongs to the card, and a stack of
-          little cards inside a card is a box drawn inside a box. */}
-      <ul className="mt-2 flex flex-col divide-y divide-line/60">
-        {shown.map((entry) => (
-          <li
-            key={entry.moveId}
-            className="flex items-baseline gap-2.5 py-2 text-xs first:pt-0 last:pb-0"
-          >
-            <span aria-hidden className="text-good">
-              ✓
-            </span>
-            <span className="min-w-0 flex-1 text-ink-soft">{entry.spec.title}</span>
-            <span className="shrink-0 text-ink-faint">
-              {formatWhen(entry.doneAt ?? entry.shownAt)}
-            </span>
-          </li>
-        ))}
-      </ul>
+      {/* Each move is a step, in a box of its own and numbered by where it falls in the whole
+          history — so a list of three says 2, 3, 4 and reads as progress rather than as three
+          unrelated lines. The number is the position in `rows`, not in what is shown: that is
+          what makes "… earlier" mean something. */}
+      <ol className="mt-2.5 flex flex-col gap-1.5">
+        {shown.map((entry) => {
+          const step = rows.indexOf(entry) + 1
+          return (
+            <li
+              key={entry.moveId}
+              className="flex items-center gap-2.5 rounded-xl border border-line bg-surface/60 px-3 py-2"
+            >
+              <span
+                aria-label={`move ${step}`}
+                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent"
+              >
+                {step}
+              </span>
+              <span className="min-w-0 flex-1 text-xs leading-snug text-ink-soft">
+                {entry.spec.title}
+              </span>
+              <span className="shrink-0 text-[11px] text-ink-faint">
+                {formatWhen(entry.doneAt ?? entry.shownAt)}
+              </span>
+            </li>
+          )
+        })}
+      </ol>
       {hidden > 0 ? (
         <button
           type="button"
@@ -2243,7 +2253,9 @@ export function Review({
               corner buttons underneath, one at each edge, because they are about this whole
               Inkling rather than about the move. */}
             <div className="mt-4 flex flex-col gap-2">
-              <div className="flex justify-center">
+              {/* Left on a phone, centred anywhere with room: the phone has the put-it-down chip
+                  in the bottom-right corner, and a centred row of this width reaches into it. */}
+              <div className={`flex ${layout === 'compact' ? 'justify-start' : 'justify-center'}`}>
                 <div className="flex overflow-hidden rounded-2xl border border-line bg-surface">
                   <button
                     type="button"
@@ -2313,10 +2325,14 @@ export function Review({
           </div>
 
           {/* On the card's bottom right corner, and there whatever part of the Inkling you are
-              reading: `sticky`, inside the card's own scroller, above the strip that says where
-              the next one is. Outside the scroller it landed below the card — the frame it would
-              hang from also holds the two lines under the card — and in the flow it scrolled
-              away, which is the thing being fixed. */}
+              reading. It floats rather than sitting at the end of the content, because putting
+              something down is one of the two things you do with a card and it should not be
+              below the fold.
+
+              `pb-24` on the card keeps a band at the bottom for it. The button row stops short of
+              that band — it is left-aligned on a phone instead of centred — because a floating
+              control and a full-width row cannot both have the same corner: measured at 390, the
+              row's right edge is 12px clear of the chip. */}
           {!composer ? (
             <button
               type="button"

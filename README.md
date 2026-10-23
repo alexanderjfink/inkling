@@ -694,6 +694,17 @@ away, and, because it was really a log of prompts, the thing that read as the ap
 track. Now it is the moves you *did*, oldest first, so the newest is the one nearest what you do
 next; offers are no longer shown, because nobody did them.
 
+**Each one is a box with its number in it.** The number is the position in the whole history, not
+in what is visible, so a window of three reads 2, 3, 4 — three steps along, rather than three
+unrelated lines. That is what makes "… earlier" mean something, and why the list is a `<ol>`: it
+is a sequence, not a set.
+
+**The put-it-down chip floats, and the button row stops short of it.** Putting something down is
+one of the two things you do with a card, so it cannot be below the fold; a control pinned near
+the bottom will sooner or later land on whatever the card's last row is, and what it landed on was
+the button row. So the row is left-aligned on a phone (centred anywhere with room) and the card
+keeps a 96px band at the bottom for the chip: measured at 390, 12px of clearance.
+
 How much of it shows is a setting, **Settings → Moves → What the card shows** (`moveHistory`):
 *Recent* (three, with a **…** under them to bring the rest onto the card), *Latest* (one line), or
 *All* (the whole history, for an Inkling that has become a diary). Recent is the default: three

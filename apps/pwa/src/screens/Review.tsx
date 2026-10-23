@@ -755,9 +755,14 @@ function MoveHistory({ blip, mode }: { blip: Blip; mode: MoveHistoryMode }) {
   return (
     <div className="mt-5 border-t border-line pt-3">
       <p className="text-xs tracking-wide text-ink-faint uppercase">moves done · {rows.length}</p>
-      <ul className="mt-1.5 flex flex-col gap-1">
+      {/* One rule between rows, not around them: the list belongs to the card, and a stack of
+          little cards inside a card is a box drawn inside a box. */}
+      <ul className="mt-2 flex flex-col divide-y divide-line/60">
         {shown.map((entry) => (
-          <li key={entry.moveId} className="flex items-baseline gap-2 text-xs">
+          <li
+            key={entry.moveId}
+            className="flex items-baseline gap-2.5 py-2 text-xs first:pt-0 last:pb-0"
+          >
             <span aria-hidden className="text-good">
               ✓
             </span>
@@ -773,7 +778,7 @@ function MoveHistory({ blip, mode }: { blip: Blip; mode: MoveHistoryMode }) {
           type="button"
           onClick={() => setExpanded(true)}
           aria-label={`Show ${hidden} earlier ${hidden === 1 ? 'move' : 'moves'}`}
-          className="quiet mt-1.5 text-xs text-ink-faint"
+          className="quiet mt-2 text-xs text-ink-faint"
         >
           … {hidden} earlier
         </button>
@@ -1534,7 +1539,10 @@ export function Review({
             onTouchMove={wide ? undefined : round.handlers.onTouchMove}
             key={current.id}
             style={round.slide}
-            className={`card ${round.arrival} flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-6`}
+            /* `pb-24` is the corner the put-it-down chip lives in: without it the chip floats over
+             whatever the card's last row happens to be — which, once the card lists the moves
+             you have done, is the buttons. */
+            className={`card ${round.arrival} flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-6 pb-24`}
           >
             {/* The way to the other Inklings in this round, stuck to the top and the bottom of the
               card so it is always there — and `touch-action: none`, so a swipe on it is a swipe
@@ -2314,7 +2322,7 @@ export function Review({
               type="button"
               onClick={() => void defer(DEFAULT_DEFERRAL)}
               title={`Put it down until ${deferDay} — it comes back then`}
-              className="absolute right-1 bottom-20 z-10 flex flex-col items-center gap-1"
+              className="absolute right-1 bottom-4 z-10 flex flex-col items-center gap-1"
             >
               {/* A circle rather than a pill: it is the one control on the card that is always
                 there, and the round shape says so — the shape the buttons along the bottom used

@@ -1792,14 +1792,25 @@ export function Review({
             photograph and the sentence about it could end up in different places on the
             card. */}
             {written.length > 0 ? (
-              <ul className="mt-3 flex flex-col gap-3">
-                {written.map((entry_) => (
-                  <li key={entry_.id} className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
+              /* Numbered and boxed, because this is the part of the card that is *yours* — what
+                 you wrote, once per move — and it was a run of paragraphs separated only by
+                 whitespace, so four things you did read as one thing you wrote. The number is the
+                 order you did them in, and there is no date: a card is a record of attempt, not
+                 a diary. */
+              <ol className="mt-4 flex flex-col gap-2.5">
+                {written.map((entry_, index) => (
+                  <li key={entry_.id} className="flex items-start gap-2.5">
+                    <span
+                      aria-label={`entry ${index + 1}`}
+                      className="mt-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-[10px] font-semibold text-ink-faint"
+                    >
+                      {index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2.5">
                       {entry_.mediaId ? (
                         <StoredImage
                           hash={entry_.mediaId}
-                          className="mb-2 max-h-64 rounded-xl border border-line object-cover"
+                          className="mb-2 max-h-64 rounded-lg border border-line object-cover"
                         />
                       ) : null}
                       {entry_.text ? (
@@ -1821,13 +1832,13 @@ export function Review({
                       type="button"
                       onClick={() => void actions.removeEntry(current.id, entry_.id)}
                       aria-label="Remove this entry"
-                      className="quiet px-1 text-xs leading-none"
+                      className="quiet mt-2 px-1 text-xs leading-none"
                     >
                       ×
                     </button>
                   </li>
                 ))}
-              </ul>
+              </ol>
             ) : null}
 
             <Blocks blip={current} actions={actions} />

@@ -677,6 +677,13 @@ the first capture. Now they take a link or a picture the same way the first capt
 the card shows everything written down in the order it was written rather than in two lists
 where a picture and the sentence about it could end up apart.
 
+**Each entry is a numbered box.** They were paragraphs separated by whitespace, so four things
+you did read as one thing you wrote — and on an Inkling you keep coming back to, that is most of
+the card. The number is the order you did them in and there is **no date**: a card is a record of
+attempts, not a diary. It is a quiet badge in the gutter rather than the accent one the moves
+history uses, because the two lists are answering different questions — what you did, and what
+you made of it.
+
 The three windows at the top are **Today**, **Near Future** and **All**: what is due now, what
 is coming back inside the week, and everything. *Near Future* is the one worth having — the
 difference between "later this week" and "someday" is the difference between a review session

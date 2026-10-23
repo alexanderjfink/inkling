@@ -2,6 +2,7 @@ import {
   type Blip,
   type BlipEvent,
   type FeedbackContext,
+  type MoveHistoryMode,
   PROFILE_COLORS,
   type ShareDefault,
 } from '@inkling/domain'
@@ -172,6 +173,7 @@ export function Settings({
   const [folder, setFolder] = useState('')
   const [socialEnabled, setSocialEnabled] = useState(true)
   const [aiEnabled, setAiEnabled] = useState(false)
+  const [moveHistory, setMoveHistory] = useState<MoveHistoryMode>('recent')
   const [shareDefault, setShareDefault] = useState<ShareDefault>('friends')
   const visible = only ? TABS.filter((entry) => only.includes(entry.id)) : TABS
   /** Thank-yous this account has been sent. Read from the log, like everything else. */
@@ -193,6 +195,7 @@ export function Settings({
     setFolder(config.folder)
     setSocialEnabled(config.socialEnabled)
     setAiEnabled(config.aiEnabled)
+    setMoveHistory(config.moveHistory)
     setShareDefault(config.shareDefault)
     setTwaPackage(config.twaPackage ?? '')
     setTwaFingerprint(config.twaFingerprint ?? '')
@@ -298,6 +301,10 @@ export function Settings({
 
   async function saveAi() {
     if (await save({ aiEnabled })) setSaved('ai')
+  }
+
+  async function saveHistory() {
+    if (await save({ moveHistory })) setSaved('history')
   }
 
   async function saveSocial() {
@@ -778,8 +785,8 @@ export function Settings({
 
           <p className="text-xs text-ink-faint">
             {aiEnabled
-              ? 'The card offers Generate, and help with the next step. Turn it off and those disappear; nothing else changes, and the moves you have already made stay.'
-              : 'Generate is not on the card. The playbook still writes moves from your own words, and you can still ask a friend for one.'}
+              ? 'The model re-words the move for this particular Inkling, and can help with the next step when you are stuck. Turn it off and moves come from the playbook in its own words — nothing else changes, and the moves you have already made stay.'
+              : 'Moves come from the playbook and from friends. Generate still works: it picks from the app’s own list rather than asking a model to re-word one.'}
           </p>
 
           <button
@@ -790,6 +797,55 @@ export function Settings({
           >
             <ButtonLabel busy={saving}>
               {saving ? 'Saving…' : saved === 'ai' ? 'Saved' : 'Save'}
+            </ButtonLabel>
+          </button>
+        </Section>
+      ) : null}
+
+      {tab === 'moves' ? (
+        <Section title="What the card shows">
+          <p className="text-xs text-ink-faint">
+            The moves you have already done with an Inkling, above the buttons. They are listed
+            oldest first, so the most recent is the one nearest what you do next.
+          </p>
+
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                ['recent', 'Recent moves', 'three of them, with a … to see the rest'],
+                ['latest', 'Latest move', 'just the last one'],
+                ['all', 'All moves', 'the whole history'],
+              ] as const
+            ).map(([id, label]) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setMoveHistory(id)}
+                className={`rounded-full px-3 py-1.5 text-xs ${
+                  moveHistory === id ? 'bg-accent text-surface' : 'border border-line text-ink-soft'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-xs text-ink-faint">
+            {moveHistory === 'recent'
+              ? 'Three at a time. A … under them shows the rest without leaving the card.'
+              : moveHistory === 'latest'
+                ? 'One line: the last thing you did with it.'
+                : 'Every move, which is what a card that has become a diary wants.'}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => void saveHistory()}
+            disabled={saving}
+            className={primaryButtonClass}
+          >
+            <ButtonLabel busy={saving}>
+              {saving ? 'Saving…' : saved === 'history' ? 'Saved' : 'Save'}
             </ButtonLabel>
           </button>
         </Section>

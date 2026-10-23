@@ -136,6 +136,7 @@ export {
 export type {
   Blip,
   BlipStatus,
+  MoveHistoryMode,
   FriendAskEntry,
   FriendMoveEntry,
   MoveHistoryEntry,
@@ -143,6 +144,7 @@ export type {
   ScheduleState,
 } from './project'
 export {
+  doneMoves,
   liveBlips,
   moveTitleKey,
   movesAreOne,

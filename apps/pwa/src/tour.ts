@@ -61,7 +61,7 @@ export const TOUR_STEPS: TourStep[] = [
   },
   {
     title: 'A model can help find the move',
-    body: 'Generate asks a model to write that move for you, out of what you have already written — and when a move is not obvious, it can offer help with the next step.\n\nIt starts off on a new account, and you can change your mind here or in Settings → Moves, because the app does not need it: the playbook writes moves from your own words, and a friend can suggest one. Capturing, reviewing and putting things down are identical either way.',
+    body: 'Generate asks a model to write that move for you, out of what you have already written — and when a move is not obvious, it can offer help with the next step.\n\nIt starts off on a new account, and you can change your mind here or in Settings → Moves. Turn it on and the model re-words a move for this particular Inkling, and can help with the next step; turn it off and Generate still works, picking from the playbook’s own list instead. A friend can suggest one either way.',
     action: 'ai',
   },
   {

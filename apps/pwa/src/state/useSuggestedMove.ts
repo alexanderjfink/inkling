@@ -83,14 +83,13 @@ export function useSuggestedMove(
    */
   revision = 0,
   /**
-   * Whether the model may be asked at all.
+   * Whether the model may be asked.
    *
-   * Off is not "a model that happens to be missing": nothing is requested and nothing spins.
-   * A move you saved earlier is still what this reports — it is yours and needs no model — but
-   * the card only has somewhere to show it when the slot exists, so turning the model back on
-   * brings it back rather than losing it.
+   * Off does not mean no move: the playbook writes one on its own, instantly, and that is what
+   * Generate gives you — the same list of things to do, without a model re-wording them for this
+   * particular Inkling. A model is an improvement to a move, not the source of one.
    */
-  enabled = true,
+  useModel = true,
 ): {
   move: MoveSpec | null
   loading: boolean
@@ -166,7 +165,7 @@ export function useSuggestedMove(
     }
 
     // Nobody has asked. This is the whole point: opening a card costs nothing.
-    if (!wanted || !enabled) {
+    if (!wanted) {
       setMove(null)
       setLoading(false)
       return
@@ -179,18 +178,20 @@ export function useSuggestedMove(
       ...target.moves.flatMap((entry) => [entry.moveId, ...(entry.alsoIds ?? [])]),
       ...avoidIds,
     ]
-    void requestMove(key, { blip: target, related, seenMoveIds: seen }, { provider, related }).then(
-      (spec) => {
-        if (cancelled) return
-        setMove(spec)
-        setLoading(false)
-      },
-    )
+    void requestMove(
+      key,
+      { blip: target, related, seenMoveIds: seen },
+      { provider: useModel ? provider : undefined, related },
+    ).then((spec) => {
+      if (cancelled) return
+      setMove(spec)
+      setLoading(false)
+    })
     return () => {
       cancelled = true
     }
     // `related` is covered by relatedIds; `avoidIds` and `wanted` by key; the blip by blipId.
-  }, [key, relatedIds, provider, blipId, savedId, wanted, enabled])
+  }, [key, relatedIds, provider, blipId, savedId, wanted, useModel])
 
   // Seeded rather than initialised: the blip is not known on the first render, and the
   // answer is remembered across the screen being torn down and rebuilt.

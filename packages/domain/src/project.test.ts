@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { BlipEvent, BlipEventBody, BlipType } from '../src/index'
 import {
   DEMO_MOVE,
+  doneMoves,
   liveBlips,
   newId,
   pendingFriendMoves,
@@ -351,6 +352,28 @@ describe('help from a friend', () => {
 
     expect(blip?.moves).toHaveLength(1)
     expect(blip?.moves[0]?.outcome).toBe('done')
+  })
+
+  test('the card shows what was done, oldest first, and nothing that was only offered', () => {
+    // "Moves you have done" is a record, not a log of every prompt: the offers are what made the
+    // list look like it had lost track, and they are not a thing anybody did.
+    const id = newId()
+    const shown = (seq: number, moveId: string, title: string) =>
+      ev(
+        { t: 'moveShown', id, moveId, moveSpec: { ...DEMO_MOVE, id: moveId, title } },
+        seq,
+        `2026-01-0${seq}T00:00:00Z`,
+      )
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      shown(1, 'm1', 'play it badly'),
+      ev({ t: 'moveDone', id, moveId: 'm1' }, 2, '2026-01-02T00:00:00Z'),
+      shown(3, 'm2', 'only offered'),
+      shown(4, 'm3', 'hum it'),
+      ev({ t: 'moveDone', id, moveId: 'm3' }, 5, '2026-01-05T00:00:00Z'),
+    ])
+
+    expect(doneMoves(blip!).map((entry) => entry.spec.title)).toEqual(['play it badly', 'hum it'])
   })
 
   test('it is unanswered until an entry says it answers it', () => {

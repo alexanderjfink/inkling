@@ -143,6 +143,13 @@ function configPatch(body: Record<string, unknown>): ServerConfig {
   if (body.shareDefault === 'friends' || body.shareDefault === 'private') {
     target.shareDefault = body.shareDefault
   }
+  if (
+    body.moveHistory === 'all' ||
+    body.moveHistory === 'recent' ||
+    body.moveHistory === 'latest'
+  ) {
+    target.moveHistory = body.moveHistory
+  }
   const similarity = body.embedSimilarity
   if (similarity === null) {
     target.embedSimilarity = null

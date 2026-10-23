@@ -1,4 +1,4 @@
-import type { ShareDefault } from '@inkling/domain'
+import type { MoveHistoryMode, ShareDefault } from '@inkling/domain'
 import { useCallback, useEffect, useState } from 'react'
 import { apiFetch } from '../api'
 import { needsServerUrl } from '../native'
@@ -27,6 +27,8 @@ export interface PublicConfig {
   aiEnabled: boolean
   /** Whether new Inklings start shared with friends. */
   shareDefault: ShareDefault
+  /** How many of an Inkling's finished moves the card shows. */
+  moveHistory: MoveHistoryMode
   /** Where speech is transcribed, when the server has been given somewhere. */
   transcribeProvider: string | null
   transcribeModel: string | null

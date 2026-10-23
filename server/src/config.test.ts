@@ -239,6 +239,29 @@ describe('config routes', () => {
     expect(server().aiEnabled).toBeUndefined()
   })
 
+  test('how much move history the card shows is stored per account', async () => {
+    const { handle, current } = withBridge()
+    const before = await handle(new Request(`${BASE}/config`)).then((res) => res.json())
+    expect(before.config.moveHistory).toBe('recent')
+
+    await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ moveHistory: 'all' }),
+      }),
+    )
+    expect(current().moveHistory).toBe('all')
+
+    // Rubbish is refused rather than stored and then compared against nothing.
+    await handle(
+      new Request(`${BASE}/config`, {
+        method: 'PUT',
+        body: JSON.stringify({ moveHistory: 'some' }),
+      }),
+    )
+    expect(current().moveHistory).toBe('all')
+  })
+
   test('turning AI off refuses the model routes instead of pretending', async () => {
     // A model that is present and answering, so what refuses the request is the switch.
     const llm = {

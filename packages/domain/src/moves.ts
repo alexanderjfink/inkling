@@ -108,6 +108,60 @@ export const MOVE_LIBRARY: MoveTemplate[] = [
     goal: 'One name, and why them',
   },
 
+  /**
+   * Questions that work on any kind of Inkling.
+   *
+   * Motivational interviewing is built on the observation that people talk themselves into
+   * things, and that a good question is a move: it changes what you know, in a couple of
+   * minutes, without anyone doing the work for you. That is the same definition this app uses
+   * for every other move, so these belong in the same list rather than in a separate mode.
+   *
+   * They are generic — the only ones in the library that are — because "why does this matter
+   * to you" is as good a move on a link as on a yearning. The two-halved ones are deliberate:
+   * "how ready are you, and why not lower" and the two lists are the MI shapes that survive
+   * being written down by somebody alone.
+   */
+  {
+    id: 'question.readiness',
+    blipTypes: ALL_TYPES,
+    title: 'On a scale of one to ten, how ready are you? Why not lower?',
+    why: 'The second half is the useful half: it makes you say what is already there.',
+    timeLimitSec: 120,
+    goal: 'A number, and the reasons it is not lower',
+  },
+  {
+    id: 'question.decisionalBalance',
+    blipTypes: ALL_TYPES,
+    title: 'Two lists: what staying put gets you, and what changing would',
+    why: 'Ambivalence is two real things pulling, and they are easier to read side by side.',
+    timeLimitSec: 180,
+    goal: 'Two lists you would stand behind',
+  },
+  {
+    id: 'question.values',
+    blipTypes: ALL_TYPES,
+    title: 'Say why this matters to you, out loud and in your own words',
+    why: 'A reason in your own words survives the week. A borrowed one does not.',
+    timeLimitSec: 90,
+    goal: 'One sentence you would actually say',
+  },
+  {
+    id: 'question.firstStep',
+    blipTypes: ALL_TYPES,
+    title: 'What is the first step you would actually take?',
+    why: 'Not the right one and not the whole plan — the one you would really do.',
+    timeLimitSec: 90,
+    goal: 'Something doable tomorrow without deciding anything else',
+  },
+  {
+    id: 'question.whatIfNothing',
+    blipTypes: ALL_TYPES,
+    title: 'What happens if nothing changes?',
+    why: 'A cost you have not named is often why a thing keeps coming back.',
+    timeLimitSec: 120,
+    goal: 'The honest answer, not the reassuring one',
+  },
+
   // ── references ──────────────────────────────────────────────────────────────
   {
     id: 'reference.firstLook',
@@ -429,6 +483,11 @@ export function deriveQuery(blip: Blip): string {
  * never-shown beats shown, and short beats long — the shorter a move is, the more
  * likely it is to actually happen.
  */
+/** Whether a move is a question rather than something to go and do. */
+export function isQuestionMove(id: string): boolean {
+  return id.startsWith('question.')
+}
+
 export function candidateTemplates(ctx: MoveContext): MoveTemplate[] {
   const seen = ctx.seenMoveIds ?? []
   const applicable = MOVE_LIBRARY.filter(
@@ -439,7 +498,20 @@ export function candidateTemplates(ctx: MoveContext): MoveTemplate[] {
   const pool = fresh.length > 0 ? fresh : applicable
   const seenCount = (id: string) => seen.filter((entry) => entry === id).length
 
+  /**
+   * Two moves in a row that were both actions earns a question.
+   *
+   * Without this the questions sat at the back of the list and were only reached once every
+   * action had been used up — which is the one moment a question is least useful, because by
+   * then the app sounds like it has run out of ideas. A question is not the last resort of a
+   * move list; it is the one that changes what the next action is.
+   */
+  const questionsOwed = seen.length >= 2 && seen.slice(-2).every((id) => !isQuestionMove(id))
+
   return [...pool].sort((a, b) => {
+    if (questionsOwed && isQuestionMove(a.id) !== isQuestionMove(b.id)) {
+      return isQuestionMove(a.id) ? -1 : 1
+    }
     if (isGeneric(a) !== isGeneric(b)) return isGeneric(a) ? 1 : -1
     if (seenCount(a.id) !== seenCount(b.id)) return seenCount(a.id) - seenCount(b.id)
     return a.timeLimitSec - b.timeLimitSec || a.id.localeCompare(b.id)
@@ -458,6 +530,7 @@ export function buildMovePrompt(
     'with a concrete goal. Shorter is better. Never invent a task that is not on the list.',
     'Prefer a move that gives them something NEW to react to over one that asks them to stare',
     'at the same question again.',
+    'Some moves are questions. Keep those as questions: do not reword one into a task.',
     'If the move you choose is marked as looking something up, also supply a "query": a short,',
     'specific search phrase of two to eight words that would find the right page.',
     'Name the general idea rather than particular products or brands — "social annotation tools"',

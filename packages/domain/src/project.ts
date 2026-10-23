@@ -103,6 +103,27 @@ export interface MoveRejection {
 
 export type BlipStatus = 'active' | 'snoozed' | 'retired' | 'promoted'
 
+/**
+ * How much of that history the card shows.
+ *
+ * A card is a place to act, not an archive: three moves is usually the whole of what you have
+ * done with one Inkling, and one is what you want when each card is a page you turn. All of it
+ * is for the Inklings that have become a diary.
+ */
+export type MoveHistoryMode = 'all' | 'recent' | 'latest'
+
+/** Moves actually done, oldest first — so the newest is nearest the buttons. */
+export function doneMoves(blip: Blip): MoveHistoryEntry[] {
+  return blip.moves
+    .filter((entry) => entry.outcome === 'done')
+    .slice()
+    .sort((a, b) => {
+      const at = a.doneAt ?? a.shownAt
+      const bt = b.doneAt ?? b.shownAt
+      return at === bt ? 0 : at < bt ? -1 : 1
+    })
+}
+
 /** A move a friend suggested for this Inkling. */
 export interface FriendMoveEntry {
   messageId: string

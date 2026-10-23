@@ -455,6 +455,7 @@ export default function App() {
             social={social}
             socialOn={socialOn}
             aiOn={aiOn}
+            historyMode={serverConfig.config?.moveHistory ?? 'recent'}
             fabVisible={!readingDown}
           />
         ) : null}

@@ -129,9 +129,27 @@ you know for certain they agree.
 
 A move is a scaffolded microtask: time-boxed, low-energy, with a concrete goal, doable
 on a phone in one sitting. The playbook in `packages/domain/src/moves.ts` holds around
-35 of them across the six blip types — "set a 2-minute timer and ramble about how this
+forty of them across the six blip types — "set a 2-minute timer and ramble about how this
 came up", "what would have to be true for this to be false?", "argue the opposite for
 two minutes", "do the ugliest possible first version".
+
+**A question is a move.** Motivational interviewing is built on the observation that people talk
+themselves into things, and that a good question does the work — it changes what you know in two
+minutes, and nobody has done the task for you. That is the same definition as every other move
+here, so the MI questions sit *in the same list* rather than behind a mode of their own:
+`question.readiness` ("how ready are you, out of ten? why not lower?"), `question.decisionalBalance`
+(two lists: what staying put gets you, what changing would), `question.values`,
+`question.firstStep`, and `question.whatIfNothing`.
+
+They are the only **generic** questions in the library — everything else about a question is only
+offered for a Blip typed as one — because "why does this matter to you" is as good a move on a
+quest as on a question.
+
+**They get a turn.** Questions sat at the back of the candidate list, so they were only reached
+after every action had been used: the precise moment a question stops being useful, because by
+then the app sounds like it has run out of ideas. Two actions in a row now put the questions
+first for the next offer, and one question hands back to the actions. The model is told to keep
+a question a question rather than reword it into a task.
 
 **Most moves send you somewhere to look.** The paper's complaint about naive resurfacing
 is that it shows you the same blank prompt again; new material is the fix. So a move
@@ -244,15 +262,20 @@ playbook".
 
 **A new account starts with AI off.** The app is complete without it: the playbook writes moves
 from your own words, a friend can suggest one, and capturing, reviewing, deferring and retiring
-are untouched. What the model adds is a second opinion — *Generate* on the card, and help with
-the next step when a move is not obvious.
+are untouched. What the model adds is a second opinion — it re-words the move for this particular
+Inkling, and it can help with the next step when a move is not obvious.
+
+**Generate is not the model.** That distinction took a wrong turn: turning AI off used to remove
+Generate, on the theory that generating is what the model does. It is not — `selectMove` picks a
+move from the playbook without asking anybody, and the model only adapts the wording afterwards.
+Removing the button took away the app's own answers to punish a service it uses to improve them.
+So with AI off, **Generate stays** and answers instantly from the playbook.
 
 It is a switch in **Settings → Moves** (`aiEnabled`), per account, and it is enforced on both
-sides. The app removes every route to a model: the Generate button, the app's half of the move
-slot, the help links, and the embeddings behind related Inklings (topics, links and wording still
-carry the relation). The note's next steps fall back to the heuristics, which need nothing. And
-the server refuses `/llm/*` for that account — a switch that only hides buttons is a switch that
-has already been bypassed.
+sides. With it off the app makes no model calls at all: no re-wording, no help with the next step,
+no embeddings behind related Inklings (topics, links and wording still carry the relation), and the
+note's next steps fall back to the heuristics. The server refuses `/llm/*` for that account — a
+switch that only hides buttons is a switch that has already been bypassed.
 
 **An account with no value stored reads as on.** That is the migration: nobody who was already
 using Generate loses it to a setting invented afterwards. New accounts get `aiEnabled: false`
@@ -260,7 +283,7 @@ written when they are created, which is why the walkthrough offers to turn it on
 assuming it.
 
 Moves you have already made, and the history of them, are untouched by the switch — turning it
-off stops new suggestions, it does not rewrite what you did.
+off stops the model, it does not rewrite what you did.
 
 ## On a big screen
 
@@ -665,8 +688,22 @@ they were for: three buttons that did the same thing, differing only in a date t
 better at choosing than you are. The ✓ says the date it picked, and that is the choice —
 retiring covers "not for a long time".
 
-**moves so far** lists what has been put in front of you and when — behind a tap, so
-the card stays clean. Related Inklings are listed and open on tap.
+**What you have already done is on the card, above the buttons.** It used to be a "moves so far"
+foldout under them, listing every offer as well as every completion — a record that was one tap
+away, and, because it was really a log of prompts, the thing that read as the app having lost
+track. Now it is the moves you *did*, oldest first, so the newest is the one nearest what you do
+next; offers are no longer shown, because nobody did them.
+
+How much of it shows is a setting, **Settings → Moves → What the card shows** (`moveHistory`):
+*Recent* (three, with a **…** under them to bring the rest onto the card), *Latest* (one line), or
+*All* (the whole history, for an Inkling that has become a diary). Recent is the default: three
+moves is usually the whole of what one Inkling has been.
+
+The one thing the old foldout carried that still matters — **forget the moves it only offered** —
+moved into the ⋯ menu, where it is needed rather than in the way: it exists for the moment the app
+has run out of playbook moves it can offer and starts reaching for strange ones.
+
+Related Inklings are still listed below, and open on tap.
 
 **"this is bad" is a different signal from "not this one".** *Not this one* means *not at
 the moment* and is not recorded. *This is bad* means the suggestion itself was wrong, and

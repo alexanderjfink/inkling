@@ -5,6 +5,7 @@ import type {
   DeferralChoice,
   LLMProvider,
   MoveLink,
+  MoveHistoryMode,
   MoveSpec,
   RejectionContext,
   RelatedBlip,
@@ -22,6 +23,7 @@ import {
   nameOf,
   pendingFriendMoves,
   REJECTION_REASONS,
+  doneMoves,
   requestGuidance,
   roundQueue,
 } from '@inkling/domain'
@@ -733,63 +735,50 @@ function Guidance({ items, className = 'mt-3' }: { items: string[] | null; class
 }
 
 /** The moves already put in front of you, quietly, behind a tap. */
-function MoveLog({
-  moves,
-  onForget,
-}: {
-  moves: Blip['moves']
-  /** Present when there is something worth forgetting. */
-  onForget?: () => void
-}) {
-  if (moves.length === 0) return null
-  const offered = moves.filter((entry) => entry.outcome === 'shown').length
+/**
+ * What you have actually done with this Inkling.
+ *
+ * Above the buttons rather than behind a foldout. It is the record of the thing in front of
+ * you, and the last thing you did is the most useful context for the next thing — which is a
+ * bad thing to put one tap away. How much of it shows is a setting, because a card with a
+ * novel on it is a card you scroll instead of act on.
+ */
+function MoveHistory({ blip, mode }: { blip: Blip; mode: MoveHistoryMode }) {
+  const [expanded, setExpanded] = useState(false)
+  const rows = doneMoves(blip)
+  if (rows.length === 0) return null
+
+  const limit = mode === 'latest' ? 1 : mode === 'recent' && !expanded ? 3 : rows.length
+  const shown = rows.slice(-limit)
+  const hidden = rows.length - shown.length
+
   return (
-    <details className="mt-5 border-t border-line pt-3">
-      <summary className="cursor-pointer text-xs tracking-wide text-ink-faint uppercase">
-        moves so far · {moves.length}
-      </summary>
-      <ul className="mt-2 flex flex-col gap-1.5">
-        {[...moves].reverse().map((entry) => (
-          <li key={`${entry.moveId}-${entry.shownAt}`} className="text-xs text-ink-soft">
-            <span
-              className={
-                entry.outcome === 'done'
-                  ? 'text-good'
-                  : entry.outcome === 'rejected'
-                    ? 'text-warn'
-                    : 'text-ink-faint'
-              }
-            >
-              {entry.outcome === 'done' ? '✓' : entry.outcome === 'rejected' ? '✗' : '·'}
-            </span>{' '}
-            {entry.spec.title}
-            <span className="text-ink-faint">
-              {' — '}
-              {entry.outcome === 'done' && entry.doneAt
-                ? `done ${formatWhen(entry.doneAt)}`
-                : entry.outcome === 'skipped'
-                  ? `put down ${formatWhen(entry.shownAt)}`
-                  : entry.outcome === 'rejected'
-                    ? `marked bad ${formatWhen(entry.shownAt)}`
-                    : `offered ${formatWhen(entry.shownAt)}`}
+    <div className="mt-5 border-t border-line pt-3">
+      <p className="text-xs tracking-wide text-ink-faint uppercase">moves done · {rows.length}</p>
+      <ul className="mt-1.5 flex flex-col gap-1">
+        {shown.map((entry) => (
+          <li key={entry.moveId} className="flex items-baseline gap-2 text-xs">
+            <span aria-hidden className="text-good">
+              ✓
+            </span>
+            <span className="min-w-0 flex-1 text-ink-soft">{entry.spec.title}</span>
+            <span className="shrink-0 text-ink-faint">
+              {formatWhen(entry.doneAt ?? entry.shownAt)}
             </span>
           </li>
         ))}
       </ul>
-      {onForget && offered > 0 ? (
-        <div className="mt-3">
-          <button type="button" onClick={onForget} className="quiet text-xs underline">
-            forget the {offered} we only offered
-          </button>
-          <p className="mt-1 text-xs text-ink-faint">
-            This list is what stops the same prompt coming back. If it is wrong — moves here you
-            never saw — the app thinks you have tried everything and starts reaching for stranger
-            angles. Forgetting the offers lets it suggest the obvious ones again. What you actually
-            did is kept.
-          </p>
-        </div>
+      {hidden > 0 ? (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          aria-label={`Show ${hidden} earlier ${hidden === 1 ? 'move' : 'moves'}`}
+          className="quiet mt-1.5 text-xs text-ink-faint"
+        >
+          … {hidden} earlier
+        </button>
       ) : null}
-    </details>
+    </div>
   )
 }
 
@@ -812,6 +801,7 @@ export function Review({
   socialOn,
   /** Whether this account lets the model think of moves. */
   aiOn,
+  historyMode,
   fabVisible,
 }: {
   blips: Blip[]
@@ -837,8 +827,10 @@ export function Review({
   onFeedback: (text: string, context: FeedbackContext) => Promise<unknown>
   social: SocialState
   socialOn: boolean
-  /** Off means no Generate, no help from a model, and nothing to swipe left to. */
+  /** Off means no model: the playbook still writes moves, but nothing is re-worded or advised. */
   aiOn: boolean
+  /** How much of the finished-move history the card shows. */
+  historyMode: MoveHistoryMode
   /** Whether the floating + is on screen: the bottom of the page gives way to it. */
   fabVisible: boolean
 }) {
@@ -989,6 +981,8 @@ export function Review({
   const pickedBlip = picked ? byId.get(picked) : undefined
   const current = pickedBlip ?? roundHead
   const currentRelated = current ? (related.get(current.id) ?? []) : []
+  /** What the card no longer lists, but still needs to be able to forget. */
+  const offered = current?.moves.filter((entry) => entry.outcome === 'shown').length ?? 0
 
   /**
    * A pick that is no longer in the round — because it was decided, deleted, or the scope
@@ -1106,11 +1100,10 @@ export function Review({
    */
   const [slot, setSlot] = useState<'friend' | 'ai'>('friend')
   /**
-   * With the model off there is no second slot to swipe to: the card shows a friend's move, or
-   * the form for asking one, and nothing pretends there is something behind it.
+   * The app's own move is always one swipe away — with the model off it is the playbook's move,
+   * which is still a move. The model only decides how well it is worded.
    */
-  const slotNow: 'friend' | 'ask' | 'ai' =
-    aiOn && slot === 'ai' ? 'ai' : atAskSlot ? 'ask' : 'friend'
+  const slotNow: 'friend' | 'ask' | 'ai' = slot === 'ai' ? 'ai' : atAskSlot ? 'ask' : 'friend'
 
   const swipe = (direction: SwipeDirection) => {
     if (direction === 'right') {
@@ -1120,12 +1113,11 @@ export function Review({
       nextFriendMove()
       return
     }
-    if (!aiOn) return
     setSlot('ai')
     nextAiMove()
   }
 
-  const swipeState = useMoveSwipe(swipe, aiOn)
+  const swipeState = useMoveSwipe(swipe)
 
   /**
    * Open on the move a notification was about.
@@ -1773,13 +1765,9 @@ export function Review({
                     size={20}
                   />
                 </span>
-                {/* The other thing behind this move, on the side you swipe to reach it. With
-                    the model off there is nothing there, so the spark goes with it. */}
-                {aiOn ? (
-                  <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
-                    ✦
-                  </span>
-                ) : null}
+                <span className="pointer-events-none absolute top-1/2 -right-2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-surface text-sm text-accent shadow-circle">
+                  ✦
+                </span>
                 <div className="flex items-center gap-2.5">
                   <Avatar
                     username={senderName ?? 'a friend'}
@@ -2238,10 +2226,14 @@ export function Review({
               </div>
             ) : null}
 
-            {/* The card's own controls, on the card, above what the card has recorded: the three
-              ways to get a move on a row of their own in the middle — at 390px they do not fit
-              beside anything — and the two corner buttons underneath, one at each edge, because
-              they are about this whole Inkling rather than about the move. */}
+            {/* What you have already done, above the ways to do something else. Last first:
+                the newest is the one nearest the buttons. */}
+            <MoveHistory blip={current} mode={historyMode} />
+
+            {/* The card's own controls, on the card: the three ways to get a move on a row of
+              their own in the middle — at 390px they do not fit beside anything — and the two
+              corner buttons underneath, one at each edge, because they are about this whole
+              Inkling rather than about the move. */}
             <div className="mt-4 flex flex-col gap-2">
               <div className="flex justify-center">
                 <div className="flex overflow-hidden rounded-2xl border border-line bg-surface">
@@ -2259,31 +2251,26 @@ export function Review({
                   >
                     Add a Move
                   </button>
-                  {/* Two ways to get a move when the model is off — ask a person, or write
-                      one yourself — and no third button that would have to explain itself. */}
-                  {aiOn ? (
-                    <button
-                      type="button"
-                      onClick={generateMove}
-                      disabled={moveLoading}
-                      className="border-l border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft disabled:opacity-40"
-                    >
-                      <ButtonLabel busy={moveLoading}>
-                        {moveLoading ? 'thinking…' : 'Generate'}
-                      </ButtonLabel>
-                    </button>
-                  ) : null}
+                  {/* Always here, model or not: with the model off this asks the playbook,
+                      which answers instantly and in its own words. */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Ask, and show what comes back: the move lives in the card's other slot,
+                      // so pressing Generate without moving to it looked like nothing happened.
+                      setSlot('ai')
+                      generateMove()
+                    }}
+                    disabled={moveLoading}
+                    className="border-l border-line px-2.5 py-2 text-xs font-medium whitespace-nowrap text-ink-soft disabled:opacity-40"
+                  >
+                    <ButtonLabel busy={moveLoading}>
+                      {moveLoading ? 'thinking…' : 'Generate'}
+                    </ButtonLabel>
+                  </button>
                 </div>
               </div>
             </div>
-
-            <MoveLog
-              moves={current.moves}
-              onForget={() => {
-                void actions.forgetMoves(current.id)
-                setMoveRevision((value) => value + 1)
-              }}
-            />
 
             {currentRelated.length > 0 ? (
               <div className="mt-5 border-t border-line pt-3">
@@ -2471,6 +2458,23 @@ export function Review({
                     : 'a note you can download, copy, or share, with the next steps as checkboxes'}
                 </span>
               </button>
+              {offered > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false)
+                    void actions.forgetMoves(current.id)
+                    setMoveRevision((value) => value + 1)
+                  }}
+                  className="rounded-2xl border border-line px-4 py-3 text-left text-sm font-medium text-ink-soft"
+                >
+                  Forget the moves it only offered ({offered})
+                  <span className="mt-0.5 block text-xs font-normal text-ink-faint">
+                    for when the app thinks you have tried everything and starts reaching. What you
+                    actually did is kept.
+                  </span>
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => {

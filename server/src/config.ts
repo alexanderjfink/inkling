@@ -1,4 +1,4 @@
-import type { LLMProvider, ShareDefault } from '@inkling/domain'
+import type { LLMProvider, MoveHistoryMode, ShareDefault } from '@inkling/domain'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 import { type ModelStatus, createProvider, modelStatus } from './provider'
@@ -70,6 +70,14 @@ export interface ServerConfig {
    * shares anything. Per Inkling overrides it, and turning social off makes it moot.
    */
   shareDefault?: ShareDefault
+  /**
+   * How many of an Inkling's finished moves the card shows.
+   *
+   * On the card rather than in the log because it is a reading preference, not a fact: the same
+   * history exists either way, and this decides how much of it is in front of you while you
+   * decide what to do next.
+   */
+  moveHistory?: MoveHistoryMode
   /**
    * Where speech is transcribed.
    *
@@ -190,6 +198,7 @@ export function publicConfig(config: ServerConfig, runtime: Runtime) {
     socialEnabled: config.socialEnabled !== false,
     aiEnabled: config.aiEnabled !== false,
     shareDefault: config.shareDefault ?? 'friends',
+    moveHistory: config.moveHistory ?? 'recent',
     transcribeProvider: config.transcribeProvider ?? null,
     transcribeModel: config.transcribeModel ?? null,
     transcribeBaseUrl: config.transcribeBaseUrl ?? null,
@@ -359,6 +368,7 @@ export function mergeConfig(current: ServerConfig, patch: ServerConfig): ServerC
       key === 'socialEnabled' ||
       key === 'aiEnabled' ||
       key === 'shareDefault' ||
+      key === 'moveHistory' ||
       key === 'embedSimilarity'
     ) {
       Object.assign(next, { [key]: value })

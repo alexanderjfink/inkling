@@ -110,6 +110,33 @@ describe('playbook', () => {
     expect(second.map((t) => t.id)).not.toContain(first[0]?.id)
   })
 
+  test('two actions in a row earn a question', () => {
+    // The questions used to sit at the back, reached only once every action had been used — the
+    // one moment they are least useful, because by then the app sounds like it has run out.
+    const blip = makeBlip('idea', 'learn a few chords')
+    const actions = candidateTemplates({ blip })
+      .filter((template) => !template.id.startsWith('question.'))
+      .slice(0, 2)
+      .map((template) => template.id)
+
+    const next = candidateTemplates({ blip, seenMoveIds: actions })
+    expect(next[0]?.id.startsWith('question.')).toBe(true)
+
+    // And a question then hands back to the actions: no ping-pong.
+    const after = candidateTemplates({ blip, seenMoveIds: [...actions, next[0]?.id ?? ''] })
+    expect(after[0]?.id.startsWith('question.')).toBe(false)
+  })
+
+  test('the questions work on a quest as well as a question', () => {
+    // Motivational interviewing is not only for things phrased as questions: "why does this
+    // matter to you" is as good a move on a quest as on a question.
+    const ids = candidateTemplates({ blip: makeBlip('quest', 'walk the coast path') }).map(
+      (template) => template.id,
+    )
+    expect(ids).toContain('question.values')
+    expect(ids).toContain('question.readiness')
+  })
+
   test('when every move has been seen, it starts over rather than returning nothing', () => {
     const blip = makeBlip('question', 'What are my principles?')
     const all = MOVE_LIBRARY.filter((t) => t.blipTypes.includes('question')).map((t) => t.id)

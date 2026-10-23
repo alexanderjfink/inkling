@@ -699,6 +699,18 @@ in what is visible, so a window of three reads 2, 3, 4 — three steps along, ra
 unrelated lines. That is what makes "… earlier" mean something, and why the list is a `<ol>`: it
 is a sequence, not a set.
 
+**Whose idea it was is in the badge**, because "what I did" and "what I was prompted to do" are
+different halves of a record. A move you set yourself has a filled accent badge and a tinted box;
+one a friend suggested is in the green that means a person; the app's own stay quiet, with the
+count of yours as a two-word legend beside the heading. It is a `title`, a badge colour and a
+border — no extra line of text, because the row already has three things in it.
+
+**"Add a Move" is a move, not a loose entry.** It used to record only what you wrote, so the
+history showed every prompt the app had offered and nothing you had decided yourself — which is
+the half of the record that says what *you* thought was worth doing. It is now completed as a
+move with `generatedBy: 'you'`, titled from the first line of what you wrote, with an id of its
+own: two moves you set yourself stay two moves even when they say the same words.
+
 **The put-it-down chip floats, and the button row stops short of it.** Putting something down is
 one of the two things you do with a card, so it cannot be below the fold; a control pinned near
 the bottom will sooner or later land on whatever the card's last row is, and what it landed on was

@@ -418,7 +418,7 @@ const FALLBACK_TEMPLATE = GENERIC_REACT
 
 export function toMoveSpec(
   template: MoveTemplate,
-  generatedBy: 'playbook' | 'llm' = 'playbook',
+  generatedBy: MoveSpec['generatedBy'] = 'playbook',
 ): MoveSpec {
   return {
     id: template.id,

@@ -188,11 +188,11 @@ export interface MoveSpec {
   /**
    * Where the move came from.
    *
-   * `friend` is the third source, and the card says so: a move somebody thought of for you
-   * is a different thing from one a playbook or a model produced, and saying which is the
-   * difference between a suggestion and a gift.
+   * `friend` and `you` are the two sources worth naming: a move somebody thought of for you
+   * is a different thing from one a playbook produced, and a move you decided on yourself is
+   * a different thing again — it is the one with no prompt behind it at all.
    */
-  generatedBy: 'playbook' | 'llm' | 'friend'
+  generatedBy: 'playbook' | 'llm' | 'friend' | 'you'
   /**
    * Phrases worth looking up for this move, in the order they are worth looking at.
    *

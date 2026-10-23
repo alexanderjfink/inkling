@@ -736,6 +736,30 @@ function Guidance({ items, className = 'mt-3' }: { items: string[] | null; class
 
 /** The moves already put in front of you, quietly, behind a tap. */
 /**
+ * A move the person set themselves, out of what they wrote.
+ *
+ * The first line is the move, the same rule the app uses everywhere else — and the same rule
+ * the card uses to name an Inkling from what was written. The id has to be unique per move:
+ * two moves you set yourself are two moves even when they say the same words.
+ */
+function ownMove(text: string): MoveSpec {
+  const first = text
+    .split('\n')
+    .map((line) => line.trim())
+    .find((line) => line.length > 0)
+  const title = (first ?? 'a move you set yourself').slice(0, 120)
+  return {
+    id: `you.${crypto.randomUUID()}`,
+    title,
+    why: 'because you decided to',
+    timeLimitSec: 0,
+    goal: title,
+    playbook: 'you',
+    generatedBy: 'you',
+  }
+}
+
+/**
  * What you have actually done with this Inkling.
  *
  * Above the buttons rather than behind a foldout. It is the record of the thing in front of
@@ -754,22 +778,59 @@ function MoveHistory({ blip, mode }: { blip: Blip; mode: MoveHistoryMode }) {
 
   return (
     <div className="mt-5 border-t border-line pt-3">
-      <p className="text-xs tracking-wide text-ink-faint uppercase">moves done · {rows.length}</p>
+      <div className="flex items-baseline justify-between gap-2">
+        <p className="text-xs tracking-wide text-ink-faint uppercase">moves done · {rows.length}</p>
+        {/* A legend of two words, because a tint with no key is a puzzle. Only when there is
+            something of yours to point at. */}
+        {rows.some((entry) => entry.spec.generatedBy === 'you') ? (
+          <p className="text-[10px] text-ink-faint">
+            <span aria-hidden className="text-accent">
+              ●
+            </span>{' '}
+            yours
+          </p>
+        ) : null}
+      </div>
       {/* Each move is a step, in a box of its own and numbered by where it falls in the whole
           history — so a list of three says 2, 3, 4 and reads as progress rather than as three
           unrelated lines. The number is the position in `rows`, not in what is shown: that is
           what makes "… earlier" mean something. */}
       <ol className="mt-2.5 flex flex-col gap-1.5">
         {shown.map((entry) => {
+          /**
+           * Whose idea it was, in the badge rather than in another line of text.
+           *
+           * A move you set yourself is filled in and its box is tinted, a friend's is in the
+           * green that means a person, and the app's stays quiet — so a row you chose reads
+           * differently at a glance from a row you were handed.
+           */
+          const source = entry.spec.generatedBy
           const step = rows.indexOf(entry) + 1
+          const own = source === 'you'
+          const friend = source === 'friend'
           return (
             <li
               key={entry.moveId}
-              className="flex items-center gap-2.5 rounded-xl border border-line bg-surface/60 px-3 py-2"
+              title={
+                own
+                  ? 'you set this one'
+                  : friend
+                    ? 'a friend suggested this'
+                    : 'the app suggested this'
+              }
+              className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 ${
+                own ? 'border-accent/50 bg-accent-soft/25' : 'border-line bg-surface/60'
+              }`}
             >
               <span
-                aria-label={`move ${step}`}
-                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[10px] font-semibold text-accent"
+                aria-label={`move ${step}, ${own ? 'yours' : friend ? 'from a friend' : 'from the app'}`}
+                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold ${
+                  own
+                    ? 'bg-accent text-surface'
+                    : friend
+                      ? 'bg-good/25 text-good'
+                      : 'bg-accent-soft text-accent'
+                }`}
               >
                 {step}
               </span>
@@ -1336,8 +1397,20 @@ export function Review({
           entryContext({ material, guidance }),
         )
       } else {
-        if (draft.text || draft.url || draft.file) await actions.addEntry(current.id, draft)
-        await actions.snoozeAfter(current.id, 'engaged', current.schedule.timesEngaged)
+        /**
+         * A move written here is a move, not an entry without a parent.
+         *
+         * "Add a Move" used to record only what you wrote, so a card's history showed every
+         * prompt it had offered and nothing you had decided yourself — the half of the record
+         * that says what *you* thought was worth doing. `generatedBy: 'you'` is what the card
+         * marks it with, and it is the reason the history can say which rows were yours.
+         */
+        const text = draft.text?.trim() ?? ''
+        if (text || draft.url || draft.file) {
+          await actions.completeMove(current.id, ownMove(text), draft)
+        } else {
+          await actions.snoozeAfter(current.id, 'engaged', current.schedule.timesEngaged)
+        }
       }
       settle('advanced')
     } finally {

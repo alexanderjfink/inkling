@@ -316,6 +316,34 @@ describe('help from a friend', () => {
     expect(blip?.moves[0]?.alsoIds).toEqual(['friend.whatisthesmallesttest'])
   })
 
+  test('two moves you set yourself are two, even in the same words', () => {
+    // The words match, so a friend's move would merge with either — but two things you decided
+    // to do are two things you did, however similarly you described them.
+    const id = newId()
+    const own = (seq: number, moveId: string) =>
+      ev(
+        {
+          t: 'moveShown',
+          id,
+          moveId,
+          moveSpec: {
+            ...DEMO_MOVE,
+            id: moveId,
+            title: 'walk to the corner',
+            generatedBy: 'you' as const,
+          },
+        },
+        seq,
+        `2026-01-0${seq}T00:00:00Z`,
+      )
+    const [blip] = project([
+      captured(id, 'learn a few chords', 0, '2026-01-01T00:00:00Z'),
+      own(1, 'you.a'),
+      own(2, 'you.b'),
+    ])
+    expect(blip?.moves).toHaveLength(2)
+  })
+
   test('doing it under the other id marks the one row done', () => {
     const id = newId()
     const [blip] = project([

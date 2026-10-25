@@ -695,11 +695,15 @@ they were for: three buttons that did the same thing, differing only in a date t
 better at choosing than you are. The ✓ says the date it picked, and that is the choice —
 retiring covers "not for a long time".
 
-**What you have already done is on the card, above the buttons.** It used to be a "moves so far"
-foldout under them, listing every offer as well as every completion — a record that was one tap
-away, and, because it was really a log of prompts, the thing that read as the app having lost
-track. Now it is the moves you *did*, oldest first, so the newest is the one nearest what you do
-next; offers are no longer shown, because nobody did them.
+**What you have already done is on the card, above the buttons, folded away.** It lists the moves
+you *did*, oldest first, so the newest is the one nearest what you do next; offers are not in it,
+because nobody did them, and the offers were what made the old "moves so far" read as a log that
+had lost track.
+
+It is **closed until you press it**. The entries above already say what you did — once per move, in
+order, in their own boxes — so the history is the same record with the provenance on it: good to
+have, heavy to read past. The whole "moves done · N" line is a `<summary>`, which is a button to a
+keyboard and a thumb, rather than a `div` with a click handler.
 
 **Each one is a box with its number in it.** The number is the position in the whole history, not
 in what is visible, so a window of three reads 2, 3, 4 — three steps along, rather than three

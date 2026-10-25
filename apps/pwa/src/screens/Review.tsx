@@ -760,12 +760,11 @@ function ownMove(text: string): MoveSpec {
 }
 
 /**
- * What you have actually done with this Inkling.
+ * What you have actually done with this Inkling, folded away.
  *
- * Above the buttons rather than behind a foldout. It is the record of the thing in front of
- * you, and the last thing you did is the most useful context for the next thing — which is a
- * bad thing to put one tap away. How much of it shows is a setting, because a card with a
- * novel on it is a card you scroll instead of act on.
+ * Behind a press, because the entries above already say what you did — once per move, in the
+ * order you did them — and this is the same history with the provenance on it. Good to have,
+ * heavy to read past. How much of it is inside the fold is a setting.
  */
 function MoveHistory({ blip, mode }: { blip: Blip; mode: MoveHistoryMode }) {
   const [expanded, setExpanded] = useState(false)
@@ -776,21 +775,33 @@ function MoveHistory({ blip, mode }: { blip: Blip; mode: MoveHistoryMode }) {
   const shown = rows.slice(-limit)
   const hidden = rows.length - shown.length
 
+  const yours = rows.some((entry) => entry.spec.generatedBy === 'you')
+
   return (
-    <div className="mt-5 border-t border-line pt-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="text-xs tracking-wide text-ink-faint uppercase">moves done · {rows.length}</p>
+    <details className="group mt-5 border-t border-line pt-3">
+      {/* The whole line is the button, and its own disclosure mark: a summary is a button to a
+          keyboard and a thumb, which a div with an onClick is not. */}
+      <summary className="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
+        <span className="text-xs tracking-wide text-ink-faint uppercase">
+          moves done · {rows.length}
+        </span>
         {/* A legend of two words, because a tint with no key is a puzzle. Only when there is
             something of yours to point at. */}
-        {rows.some((entry) => entry.spec.generatedBy === 'you') ? (
-          <p className="text-[10px] text-ink-faint">
+        {yours ? (
+          <span className="text-[10px] text-ink-faint">
             <span aria-hidden className="text-accent">
               ●
             </span>{' '}
             yours
-          </p>
+          </span>
         ) : null}
-      </div>
+        <span
+          aria-hidden
+          className="text-sm text-ink-faint transition-transform group-open:rotate-90"
+        >
+          ›
+        </span>
+      </summary>
       {/* Each move is a step, in a box of its own and numbered by where it falls in the whole
           history — so a list of three says 2, 3, 4 and reads as progress rather than as three
           unrelated lines. The number is the position in `rows`, not in what is shown: that is
@@ -854,7 +865,7 @@ function MoveHistory({ blip, mode }: { blip: Blip; mode: MoveHistoryMode }) {
           … {hidden} earlier
         </button>
       ) : null}
-    </div>
+    </details>
   )
 }
 

@@ -194,7 +194,7 @@ export function Notifications({
         >
           <span className="circle h-9 w-9 shrink-0 text-base leading-none">☺</span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold">Friends Review</span>
+            <span className="block text-sm font-semibold">Help a friend make moves</span>
             <span className="block truncate text-xs text-ink-soft">
               What your friends are working on, and a move if you have one
             </span>

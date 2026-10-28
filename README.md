@@ -1155,11 +1155,21 @@ of names hides the interactions, which are the point.
 
 The friends list, and adding one, is one press further on.
 
-### Friends review
+### Help a friend make moves
 
-**Other people's Inklings, as a round you can finish.** A card on the entry screen — always
-there when social is on, not a badge that appears when somebody is stuck — opens a list of what
-your friends have shared. Ten of them: a sit, not a scroll.
+**Other people's Inklings, one card at a time.** The button is on the entry screen, always there
+when social is on — not a badge that appears when somebody is stuck — and it opens a round of ten:
+a sit, not a scroll.
+
+**It is the same card as your own review**, because it is the same act. The card is the scroll
+container, a flick that starts at its end moves on, the same two strips say where the previous and
+next Inklings are, and the counter reads "2 of 10 · asked first". Paging is a habit rather than a
+layout: a second set of gestures for the same thing would read as the app not knowing which screen
+it is on. `useRoundSwipe` is now one hook, used by both.
+
+**The colour is the difference.** The whole card is bordered in the friend's colour, their name
+and the block that says what they asked are in it, and their pictures come from the route that
+only serves what they shared. Whose shelf you are on should be visible before the title is read.
 
 **Asks first, oldest first, all of them.** Somebody saying they are stuck is not queued behind a
 limit; everything else fills the rest. Then, newest shared first and round-robin across friends,
@@ -1168,10 +1178,14 @@ something for it or pressed *not for me* (a log entry, so it stays gone on your 
 which is what keeps it finite without hiding anything.
 
 **What a card shows** is what a suggestion needs: their words, the pictures on it, the capped
-entries they have written, and the titles of moves already tried — so you are not the third
-person to say "have you tried photographing it". Only Inklings they chose to share, only while
-the server agrees they are shared. Nothing of their schedule: what is due for them is theirs, and
-a friend being shown "overdue" is pressure by proxy.
+entries they have written — numbered the way your own entries are — and the titles of moves
+already tried, so you are not the third person to say "have you tried photographing it". Only
+Inklings they chose to share, only while the server agrees they are shared. Nothing of their
+schedule: what is due for them is theirs, and a friend being shown "overdue" is pressure by proxy.
+
+**Sending** happens in the card, in the same one-box composer as everywhere else, and the card
+says "sent to Sam" before the next one arrives — the small acknowledgement that your own review
+gets from a green tick.
 
 **How their Inklings resurface**: by an ask, by something newly shared, and by your not having
 helped with it yet. Not by their review schedule, and not on a feed.

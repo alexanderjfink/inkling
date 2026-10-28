@@ -55,7 +55,7 @@ const TITLES: Record<Screen, string> = {
   help: 'Help',
   friends: 'Friends',
   friend: 'A friend',
-  'friends-review': 'Friends Review',
+  'friends-review': 'Help a friend make moves',
   notifications: 'Notifications',
 }
 
@@ -368,7 +368,11 @@ export default function App() {
 
        A wide screen gets a rail beside a wider frame. The phone keeps the single centred column
        it has always had — the wider layouts are additive, not a rewrite of this one. */
-    <div className={`flex ${screen === 'review' ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}>
+    <div
+      className={`flex ${
+        screen === 'review' || screen === 'friends-review' ? 'h-dvh overflow-hidden' : 'min-h-dvh'
+      }`}
+    >
       {layout !== 'wide' ? null : (
         <Rail
           screen={screen}
@@ -384,7 +388,9 @@ export default function App() {
       <div
         className={`mx-auto flex min-w-0 flex-1 flex-col p-4 ${
           layout === 'compact' ? 'max-w-xl' : 'max-w-[1400px] px-8 py-6'
-        } ${screen === 'review' ? 'h-dvh overflow-hidden' : 'min-h-dvh'}`}
+        } ${
+          screen === 'review' || screen === 'friends-review' ? 'h-dvh overflow-hidden' : 'min-h-dvh'
+        }`}
       >
         {/* The entry screen carries its own header, because it is where you start. */}
         {screen !== 'add' ? (

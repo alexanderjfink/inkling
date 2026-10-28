@@ -282,17 +282,13 @@ export function Add({
                 {/* A face, because it is a person asking; the ✎ is what the card below it is for. */}
                 <span className="circle h-10 w-10 shrink-0 text-base leading-none">☺</span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold">
-                    {asking.length === 0
-                      ? 'Friends Review'
-                      : asking.length === 1
-                        ? `${asking[0] ? nameOf(friends.find((f) => f.userId === asking[0]?.userId) ?? { username: asking[0].username }) : 'somebody'} wants your help`
-                        : `${asking.length} friends want your help`}
-                  </span>
+                  <span className="block text-sm font-semibold">Help a friend make moves</span>
                   <span className="block truncate text-xs text-ink-soft">
                     {asking.length === 0
                       ? 'What your friends are working on — and a move if you have one'
-                      : 'Look through what they have shared, then suggest something'}
+                      : asking.length === 1
+                        ? `${asking[0] ? nameOf(friends.find((f) => f.userId === asking[0]?.userId) ?? { username: asking[0].username }) : 'somebody'} asked you — start with them`
+                        : `${asking.length} friends asked you — start with them`}
                   </span>
                 </span>
               </button>

@@ -5,27 +5,32 @@ import {
   type Friend,
   buildFriendsRound,
   dismissedFriendInklings,
-  friendShareKey,
   suggestedFriendInklings,
 } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
-import { FriendInkling } from '../components/FriendInkling'
-import { Spinner } from '../components/Spinner'
+import { Avatar } from '../components/Avatar'
+import { FriendImage } from '../components/FriendImage'
+import { Linkified } from '../components/Linkified'
+import { Markdown } from '../components/Markdown'
+import { ButtonLabel, Spinner } from '../components/Spinner'
+import { Suggest } from '../components/Suggest'
+import { useRoundSwipe } from '../state/useRoundSwipe'
 import type { SocialState } from '../state/useSocial'
 
-/** A sit, not a scroll. Ten is the user's number, and it is about ten Inklings of attention. */
+/** A sit, not a scroll. Ten is the user's number, and about ten Inklings of attention. */
 const ROUND = 10
 
 /**
- * Other people's Inklings, in the order that makes them worth a look.
+ * Other people's Inklings, one card at a time.
  *
- * This is the one screen in the app that is about somebody else's stuff, so it works the way
- * the app works: a finite round, asks first, and an end. A list of friends' Inklings that
- * refills itself as you scroll is a feed, and a feed is the thing this app is not.
+ * The same shape as your own review — the card is the scroll container, a flick that starts at
+ * the end moves on, the same strips at the top and bottom — because paging is a habit rather than
+ * a layout, and a second set of gestures for the same act would read as the app not knowing
+ * which screen it is on.
  *
- * It is also the answer to "how do friends' Inklings resurface?" — not on their schedule, which
- * is theirs, but when they ask, when they share something new, and when you have not looked at
- * it yet. Nothing of their due dates is shown, here or anywhere.
+ * What differs is the colour: the card is bordered and washed in the friend's own colour, the
+ * same cue they have everywhere else, so it is obvious whose Inkling you are looking at before
+ * you read a word of it.
  */
 export function FriendsReview({
   social,
@@ -42,12 +47,15 @@ export function FriendsReview({
   serverUrl: string
   onOpenFriends: () => void
   onOpenFriend: (friend: Friend) => void
-  /** One of your own Inklings, from the "you have one about this too" line. */
   onOpenMine: (id: string) => void
 }) {
   const [shared, setShared] = useState<Array<Friend & { inklings: AskContext[] }> | null>(null)
-  /** Put aside this visit. The event is what makes it stick; this is what makes it leave now. */
-  const [hidden, setHidden] = useState<Set<string>>(new Set())
+  const [index, setIndex] = useState(0)
+  const [composing, setComposing] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const [problem, setProblem] = useState<string | null>(null)
+  /** Set for a moment after sending, so the card can say it went. */
+  const [sentTo, setSentTo] = useState<string | null>(null)
 
   useEffect(() => {
     let alive = true
@@ -57,8 +65,8 @@ export function FriendsReview({
     return () => {
       alive = false
     }
-    // Once, on purpose: a round is a sit. Asking again on every render would also refetch on
-    // every suggestion, and the round's whole point is that it does not move under you.
+    // Once, on purpose: a round is a sit. Refetching on every render would also refetch on every
+    // suggestion, and the round's whole point is that it does not move under you.
   }, [])
 
   const dismissed = useMemo(() => dismissedFriendInklings(events), [events])
@@ -86,19 +94,39 @@ export function FriendsReview({
     () => new Map(social.friends.map((friend) => [friend.userId, friend])),
     [social.friends],
   )
-
-  const visible = round.filter(
-    (item) => !hidden.has(friendShareKey(item.friendId, item.context.blipId)),
-  )
-  const asked = visible.filter((item) => item.kind === 'ask').length
   const mine = useMemo(
     () => blips.filter((blip) => !blip.deleted && blip.status !== 'retired'),
     [blips],
   )
 
-  const putAside = (friendId: string, blipId: string) => {
-    setHidden((previous) => new Set(previous).add(friendShareKey(friendId, blipId)))
-    void social.dismissInkling(friendId, blipId)
+  /** An item leaves the round when it is sent or put aside, so the index has to be kept honest. */
+  const at = Math.min(index, Math.max(0, round.length - 1))
+  const current = round[at]
+  const friend = current ? friendById.get(current.friendId) : undefined
+  const ask = current
+    ? social.asks.find((entry) => entry.messageId === current.messageId)
+    : undefined
+  const overlap = current ? overlapFor(current.context, mine) : undefined
+
+  const swipe = useRoundSwipe({
+    next: () => {
+      setComposing(false)
+      setSentTo(null)
+      setIndex((value) => Math.min(value + 1, round.length - 1))
+    },
+    previous: () => {
+      setComposing(false)
+      setSentTo(null)
+      setIndex((value) => Math.max(value - 1, 0))
+    },
+    hasNext: at < round.length - 1,
+    hasPrevious: at > 0,
+  })
+
+  const putAside = () => {
+    if (!current) return
+    setComposing(false)
+    void social.dismissInkling(current.friendId, current.context.blipId)
   }
 
   if (social.off) {
@@ -113,8 +141,8 @@ export function FriendsReview({
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-ink-soft">
-          Nothing to review yet. A friend has to accept before either of you can see what the other
-          has shared — that is the only way in.
+          Nobody to help yet. A friend has to accept before either of you can see what the other has
+          shared — that is the only way in.
         </p>
         <button type="button" onClick={onOpenFriends} className="self-start text-xs text-accent">
           Add a friend
@@ -123,74 +151,269 @@ export function FriendsReview({
     )
   }
 
+  if (!current || !friend) {
+    return (
+      <div className="flex flex-col gap-3">
+        {shared === null ? (
+          <p className="flex items-center gap-2 text-xs text-ink-faint">
+            <Spinner className="h-3.5 w-3.5" />
+            looking through what they have shared…
+          </p>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-2xl border border-line bg-surface/50 p-4">
+            <p className="text-sm text-ink-soft">
+              That is everyone. Nothing your friends have shared needs a move from you right now.
+            </p>
+            <button
+              type="button"
+              onClick={onOpenFriends}
+              className="self-start text-xs text-accent"
+            >
+              Look through a friend’s Inklings
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const colour = friend.color
+
   return (
-    <div className="flex max-w-2xl flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <p className="text-sm text-ink-soft">
-          {asked > 0
-            ? `${asked} ${asked === 1 ? 'friend has' : 'friends have'} asked you for a move.`
-            : 'Nobody has asked. These are things your friends have shared.'}
-        </p>
-        <p className="text-xs text-ink-faint">
-          Asks come first. The rest is whatever they have shared and you have not helped with yet —
-          one round at a time, so it can be finished.
-        </p>
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="mb-3 flex items-center gap-3">
+        <span className="text-xs whitespace-nowrap text-ink-faint">
+          {at + 1} of {round.length}
+          {round.some((item) => item.kind === 'ask') ? ' · asked first' : ''}
+        </span>
+        <button type="button" onClick={onOpenFriends} className="quiet ml-auto text-xs underline">
+          everyone
+        </button>
       </div>
 
-      {shared === null && visible.length === 0 ? (
-        <p className="flex items-center gap-2 text-xs text-ink-faint">
-          <Spinner className="h-3.5 w-3.5" />
-          looking through what they have shared…
-        </p>
-      ) : null}
-
-      {visible.map((item) => {
-        const friend = friendById.get(item.friendId)
-        if (!friend) return null
-        const ask = social.asks.find((entry) => entry.messageId === item.messageId)
-        return (
-          <FriendInkling
-            key={`${item.friendId}:${item.context.blipId}`}
-            friend={friend}
-            context={item.context}
-            serverUrl={serverUrl}
-            askNote={item.kind === 'ask' ? (ask?.note ?? '') : undefined}
-            askedAt={item.askedAt}
-            overlap={overlapFor(item.context, mine)}
-            onOpenMine={onOpenMine}
-            onSuggest={(move, note) =>
-              social.suggest({
-                to: friend,
-                askId: item.messageId ?? '',
-                blipId: item.context.blipId,
-                move,
-                note: note || undefined,
-              })
-            }
-            onDismiss={() => putAside(item.friendId, item.context.blipId)}
-            onOpenFriend={() => onOpenFriend(friend)}
-          />
-        )
-      })}
-
-      {visible.length === 0 && shared !== null ? (
-        <div className="flex flex-col gap-2 rounded-2xl border border-line bg-surface/50 p-4">
-          <p className="text-sm text-ink-soft">
-            That is everyone. Nothing your friends have shared needs a move from you right now.
-          </p>
-          <button type="button" onClick={onOpenFriends} className="self-start text-xs text-accent">
-            Look through a friend’s Inklings
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={onOpenFriends}
-          className="self-start text-xs text-ink-faint underline"
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <div
+          ref={swipe.cardRef}
+          onWheel={swipe.handlers.onWheel}
+          onTouchStart={swipe.handlers.onTouchStart}
+          onTouchMove={swipe.handlers.onTouchMove}
+          key={`${current.friendId}:${current.context.blipId}`}
+          style={{
+            ...swipe.slide,
+            // Their colour around the whole card, not only the block inside it: whose shelf you
+            // are on should be visible before the title is read.
+            ...(colour ? { borderColor: colour, borderWidth: '2px', borderStyle: 'solid' } : {}),
+          }}
+          className={`card ${swipe.arrival} flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain p-6`}
         >
-          that is the round — look through a friend’s Inklings
-        </button>
-      )}
+          {swipe.showPrevious ? (
+            <button
+              type="button"
+              {...swipe.handlers}
+              onClick={() => swipe.previous()}
+              className={`sticky top-0 z-10 -mt-2 mb-2 w-full touch-none py-1 text-center text-[11px] ${
+                swipe.pull === 'down' && swipe.armed
+                  ? 'font-semibold text-accent'
+                  : 'text-ink-faint'
+              }`}
+            >
+              ▲ the previous Inkling
+            </button>
+          ) : null}
+
+          {/* Whose it is, in their colour, before anything else: the one cue that says whose
+              shelf you are on. */}
+          <div className="flex items-center gap-2.5">
+            <Avatar
+              username={friend.name ?? friend.username}
+              userId={friend.userId}
+              color={colour}
+              hash={friend.avatar}
+              size={26}
+            />
+            <span className="text-sm font-medium" style={colour ? { color: colour } : undefined}>
+              {friend.name ?? friend.username}
+            </span>
+            <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs text-accent">
+              {current.context.type}
+            </span>
+            <button
+              type="button"
+              onClick={() => onOpenFriend(friend)}
+              className="quiet ml-auto text-xs underline"
+            >
+              their Inklings
+            </button>
+          </div>
+
+          {sentTo ? (
+            <div className="mt-5 flex flex-col gap-3">
+              <p className="text-sm text-ink-soft">
+                Sent to {sentTo} — they will see it the next time they open Inklings.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSentTo(null)
+                  setIndex((value) => Math.min(value, Math.max(0, round.length - 1)))
+                }}
+                className="self-start rounded-full bg-ink px-5 py-2.5 text-sm font-semibold text-surface"
+              >
+                Next
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* What they asked, when they asked. The move subcard's place on your own card, in
+                  their colour, because this is the thing that most wants a person. */}
+              {current.kind === 'ask' ? (
+                <div
+                  className="mt-4 rounded-2xl border p-4"
+                  style={{
+                    borderColor: colour ? `${colour}88` : undefined,
+                    background: colour ? `${colour}12` : undefined,
+                  }}
+                >
+                  <p
+                    className="text-xs tracking-wide uppercase"
+                    style={colour ? { color: colour } : undefined}
+                  >
+                    {friend.name ?? friend.username} asked you for a move
+                  </p>
+                  {ask?.note ? (
+                    <p className="mt-1 text-sm text-ink-soft">“{ask.note}”</p>
+                  ) : (
+                    <p className="mt-1 text-sm text-ink-soft">
+                      They are stuck on this one and thought you might see something they cannot.
+                    </p>
+                  )}
+                </div>
+              ) : null}
+
+              <Markdown
+                text={current.context.title}
+                className="mt-4 text-xl leading-snug font-semibold"
+              />
+              {current.context.body ? (
+                <Markdown text={current.context.body} className="mt-2 text-sm text-ink-soft" />
+              ) : null}
+              {current.context.topics.length > 0 ? (
+                <p className="mt-2 text-xs text-ink-faint">{current.context.topics.join(' · ')}</p>
+              ) : null}
+
+              {(current.context.mediaIds ?? []).length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {(current.context.mediaIds ?? []).map((hash) => (
+                    <FriendImage
+                      key={hash}
+                      serverUrl={serverUrl}
+                      userId={friend.userId}
+                      hash={hash}
+                      className="max-h-64 rounded-xl border border-line object-cover"
+                    />
+                  ))}
+                </div>
+              ) : null}
+
+              {/* What they have written about it, numbered the way your own entries are. */}
+              {current.context.entries.length > 0 ? (
+                <ol className="mt-4 flex flex-col gap-2.5">
+                  {current.context.entries.map((written, position) => (
+                    <li
+                      key={`${position}-${written.slice(0, 12)}`}
+                      className="flex items-start gap-2.5"
+                    >
+                      <span
+                        aria-label={`their entry ${position + 1}`}
+                        className="mt-2 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-[10px] font-semibold text-ink-faint"
+                      >
+                        {position + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 rounded-xl border border-line bg-surface/50 px-3 py-2.5 text-sm text-ink-soft">
+                        <Linkified text={written} />
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : null}
+
+              {current.context.offered.length > 0 ? (
+                <p className="mt-4 text-xs text-ink-faint">
+                  already tried: {current.context.offered.slice(-3).join(' · ')}
+                </p>
+              ) : null}
+
+              {overlap ? (
+                <button
+                  type="button"
+                  onClick={() => onOpenMine(overlap.id)}
+                  className="mt-3 block text-left text-xs text-accent"
+                >
+                  you have one about this too — “{overlap.title}”
+                </button>
+              ) : null}
+
+              {problem ? <p className="mt-3 text-xs text-warn">{problem}</p> : null}
+
+              {/* The action row, in the place your own card keeps its three-way control. */}
+              <div className="mt-5 border-t border-line pt-4">
+                {composing ? (
+                  <Suggest
+                    context={current.context}
+                    onCancel={() => setComposing(false)}
+                    onSend={async (move, note) => {
+                      setBusy(true)
+                      setProblem(null)
+                      const result = await social.suggest({
+                        to: friend,
+                        askId: current.messageId ?? '',
+                        blipId: current.context.blipId,
+                        move,
+                        note: note || undefined,
+                      })
+                      setBusy(false)
+                      if (result === null) {
+                        setComposing(false)
+                        setSentTo(friend.name ?? friend.username)
+                      } else {
+                        setProblem(result)
+                      }
+                      return result
+                    }}
+                  />
+                ) : (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setComposing(true)}
+                      disabled={busy}
+                      className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-surface disabled:opacity-40"
+                    >
+                      <ButtonLabel busy={busy}>suggest a move</ButtonLabel>
+                    </button>
+                    <button type="button" onClick={putAside} className="quiet text-xs underline">
+                      not for me
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {swipe.showNext ? (
+            <button
+              type="button"
+              {...swipe.handlers}
+              onClick={() => swipe.next()}
+              className={`sticky bottom-0 z-10 mt-3 -mb-2 w-full touch-none py-1 text-center text-[11px] ${
+                swipe.pull === 'up' && swipe.armed ? 'font-semibold text-accent' : 'text-ink-faint'
+              }`}
+            >
+              ▼ the next Inkling
+            </button>
+          ) : null}
+        </div>
+      </div>
     </div>
   )
 }

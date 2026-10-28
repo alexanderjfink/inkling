@@ -33,7 +33,9 @@ export {
   buildFriendTimeline,
   buildSocialTimeline,
   hasThanked,
+  dismissedFriendInklings,
   seenNoticeIds,
+  suggestedFriendInklings,
   thanksReceivedNote,
   unseenFriendMoves,
 } from './friends'
@@ -114,12 +116,19 @@ export type {
   SocialMessage,
   SocialMessageKind,
 } from './social'
+export type {
+  FriendAsk,
+  FriendShare,
+  FriendsRoundItem,
+} from './social'
 export {
   ASK_ENTRIES_MAX,
   ASK_MEDIA_MAX,
   FRIEND_MOVE_MAX_SEC,
   NOTE_MAX,
   askContextFor,
+  buildFriendsRound,
+  friendShareKey,
   isSocialMessageKind,
 } from './social'
 export type { NextStepsDraft, NoteOptions } from './obsidian'

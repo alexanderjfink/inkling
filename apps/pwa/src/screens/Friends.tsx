@@ -25,13 +25,21 @@ export function Friends({
   social,
   onOpen,
   onNotifications,
+  invite,
+  onInviteUsed,
+  me,
 }: {
   social: SocialState
   /** Open one friend's history: what you have asked them, and what they have asked you. */
   onOpen: (friend: Friend) => void
   onNotifications: () => void
+  /** A username from an invite link, ready to ask. */
+  invite?: string | null
+  onInviteUsed?: () => void
+  /** Your own username, for the link you hand out. */
+  me?: string
 }) {
-  const [username, setUsername] = useState('')
+  const [username, setUsername] = useState(invite ?? '')
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
 
@@ -187,6 +195,15 @@ export function Friends({
         className="flex flex-col gap-3 border-t border-line pt-4"
       >
         <p className="text-xs tracking-wide text-ink-faint uppercase">add a friend</p>
+        {invite ? (
+          <p className="text-xs text-ink-soft">
+            Somebody sent you this link. Press “Ask to be friends” and they will see it next time
+            they open Inklings.{' '}
+            <button type="button" onClick={onInviteUsed} className="quiet underline">
+              not now
+            </button>
+          </p>
+        ) : null}
         <input
           value={username}
           onChange={(event) => setUsername(event.target.value)}
@@ -210,6 +227,26 @@ export function Friends({
           until they accept.
         </p>
       </form>
+
+      {/* A link is how a friend actually gets here: nobody swaps usernames across a kitchen.
+          It carries nothing but the name, and the server it already points at. */}
+      {me ? (
+        <div className="flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() =>
+              void navigator.clipboard?.writeText(`${window.location.origin}/?add=${me}`)
+            }
+            className="self-start rounded-full border border-line px-4 py-2 text-xs text-ink-soft"
+          >
+            copy an invite link
+          </button>
+          <p className="text-xs text-ink-faint">
+            It opens Inkling with your username filled in, so they only have to press “Ask to be
+            friends”. Nothing else travels in it.
+          </p>
+        </div>
+      ) : null}
 
       {social.loading ? (
         <p className="flex items-center gap-2 text-xs text-ink-faint">

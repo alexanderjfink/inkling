@@ -1136,6 +1136,29 @@ async function handleSocial(
     return json({ error: 'method not allowed' }, 405)
   }
 
+  /**
+   * Everything your friends have chosen to share, in one request.
+   *
+   * The friends round needs all of it at once, and five round trips to five people's logs to
+   * draw one screen is five chances to be slow. Capped per friend: a round is ten, and nobody
+   * needs somebody's whole shelf to decide what to say about one of them.
+   */
+  if (rest.length === 1 && rest[0] === 'inklings' && request.method === 'GET') {
+    const shared = []
+    for (const friend of friendsOf(user.id, friendships, usernames, colors, avatars, names)) {
+      if (friend.status !== 'accepted') continue
+      const inklings = await readSharedInklings(resolveStore(storeSource, friend.userId))
+      shared.push({
+        ...friend,
+        inklings: inklings
+          .slice()
+          .sort((a, b) => ((a.updated ?? '') < (b.updated ?? '') ? 1 : -1))
+          .slice(0, 12),
+      })
+    }
+    return json({ friends: shared })
+  }
+
   // --- what a friend has chosen to share ------------------------------------------------
   if (rest.length === 3 && rest[0] === 'friends' && rest[2] === 'inklings') {
     const other = rest[1] ?? ''
@@ -1289,6 +1312,32 @@ async function handleSocial(
       blipId: str(body, 'blipId').slice(0, 64),
       move,
       note: str(body, 'note').trim().slice(0, NOTE_MAX) || undefined,
+    }
+    await social.send(message)
+    return json({ message })
+  }
+
+  // --- they did the move you suggested ---------------------------------------------------
+  if (rest.length === 1 && rest[0] === 'used' && request.method === 'POST') {
+    const body = await readJson(request)
+    const to = str(body, 'to')
+    if (!friendOf(to) || !areFriends(user.id, to, friendships)) {
+      return json({ error: 'you are not friends' }, 403)
+    }
+    const blipId = str(body, 'blipId').slice(0, 64)
+    const moveTitle = str(body, 'moveTitle').trim().slice(0, 200)
+    if (!blipId || !moveTitle) return json({ error: 'which Inkling, and which move' }, 400)
+
+    const message: SocialMessage = {
+      id: newId(),
+      kind: 'used',
+      from: user.id,
+      fromUsername: user.username,
+      to,
+      at: new Date().toISOString(),
+      blipId,
+      moveTitle,
+      fit: body?.fit === true,
     }
     await social.send(message)
     return json({ message })

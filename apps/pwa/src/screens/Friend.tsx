@@ -2,10 +2,8 @@ import type { AskContext, Blip, BlipEvent, Friend, FriendTimelineEntry } from '@
 import { buildFriendTimeline, nameOf } from '@inkling/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { Avatar } from '../components/Avatar'
-import { FriendImage } from '../components/FriendImage'
-import { Linkified } from '../components/Linkified'
+import { FriendInkling } from '../components/FriendInkling'
 import { ButtonLabel, Spinner } from '../components/Spinner'
-import { Suggest } from '../components/Suggest'
 import { formatAgo, formatShortDate } from '../format'
 import type { SocialState } from '../state/useSocial'
 
@@ -46,7 +44,6 @@ export function FriendScreen({
 }) {
   const [filter, setFilter] = useState<Filter>('all')
   const [theirInklings, setTheirInklings] = useState<AskContext[] | null>(null)
-  const [suggesting, setSuggesting] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [problem, setProblem] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -209,69 +206,21 @@ export function FriendScreen({
           </p>
         ) : theirInklings && theirInklings.length > 0 ? (
           theirInklings.map((context) => (
-            <div
+            <FriendInkling
               key={context.blipId}
-              className="rounded-2xl border border-line bg-surface/60 p-3 text-left"
-            >
-              <p className="text-sm font-medium">{context.title}</p>
-              {context.body ? (
-                <p className="mt-1 text-xs whitespace-pre-wrap text-ink-soft">
-                  <Linkified text={context.body} />
-                </p>
-              ) : null}
-              <p className="mt-0.5 text-xs text-ink-faint">
-                {context.type}
-                {context.topics.length > 0 ? ` · ${context.topics.join(' · ')}` : ''}
-              </p>
-              {context.entries.length > 0 ? (
-                <ul className="mt-1 flex flex-col gap-0.5">
-                  {context.entries.map((written) => (
-                    <li key={written} className="text-xs text-ink-soft">
-                      <Linkified text={written} />
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-              {/* Their pictures. Served only because the Inkling they are on was shared —
-                  the same route, and the same check, as the ones in a request for help. */}
-              {(context.mediaIds ?? []).length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {(context.mediaIds ?? []).map((hash) => (
-                    <FriendImage
-                      key={hash}
-                      serverUrl={serverUrl}
-                      userId={friend.userId}
-                      hash={hash}
-                      className="max-h-40 rounded-xl border border-line object-cover"
-                    />
-                  ))}
-                </div>
-              ) : null}
-              <button
-                type="button"
-                onClick={() =>
-                  setSuggesting((current) => (current === context.blipId ? null : context.blipId))
-                }
-                className="mt-2 rounded-full border border-accent/50 px-3 py-1.5 text-xs font-medium text-accent"
-              >
-                {suggesting === context.blipId ? 'never mind' : 'suggest a move'}
-              </button>
-              {suggesting === context.blipId ? (
-                <Suggest
-                  context={context}
-                  onCancel={() => setSuggesting(null)}
-                  onSend={(move, note) =>
-                    social.suggest({
-                      to: friend,
-                      askId: '',
-                      blipId: context.blipId,
-                      move,
-                      note: note || undefined,
-                    })
-                  }
-                />
-              ) : null}
-            </div>
+              friend={friend}
+              context={context}
+              serverUrl={serverUrl}
+              onSuggest={(move, note) =>
+                social.suggest({
+                  to: friend,
+                  askId: '',
+                  blipId: context.blipId,
+                  move,
+                  note: note || undefined,
+                })
+              }
+            />
           ))
         ) : (
           <p className="text-xs text-ink-faint">

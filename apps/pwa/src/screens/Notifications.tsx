@@ -40,6 +40,7 @@ export function Notifications({
   serverUrl,
   onClearPicked,
   onOpenFriends,
+  onOpenReview,
   onOpenBlip,
 }: {
   social: SocialState
@@ -51,6 +52,8 @@ export function Notifications({
   serverUrl: string
   onClearPicked: () => void
   onOpenFriends: () => void
+  /** The friends round: the other half of the social area, and where the helping happens. */
+  onOpenReview: () => void
   /** Open the Inkling a move landed on, which is where doing it happens. */
   /** The move to open on, when the entry is about a particular one. */
   onOpenBlip: (id: string, messageId?: string) => void
@@ -180,6 +183,24 @@ export function Notifications({
   return (
     <div className="flex flex-col gap-5 pb-8">
       <SocialTabs view="notifications" onNotifications={() => {}} onFriends={onOpenFriends} />
+
+      {/* The timeline is what has happened; the review is what is waiting to happen. One press
+          apart, because somebody reading "Priya sent you a move" is already in the mood to help. */}
+      {social.off ? null : (
+        <button
+          type="button"
+          onClick={onOpenReview}
+          className="card flex items-center gap-3 p-3 text-left transition active:scale-[0.99]"
+        >
+          <span className="circle h-9 w-9 shrink-0 text-base leading-none">☺</span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">Friends Review</span>
+            <span className="block truncate text-xs text-ink-soft">
+              What your friends are working on, and a move if you have one
+            </span>
+          </span>
+        </button>
+      )}
 
       {social.off ? (
         <p className="rounded-2xl border border-line bg-surface/70 p-4 text-sm text-ink-soft">
@@ -521,6 +542,8 @@ function say(entry: FriendTimelineEntry, name: string): string {
       return `you suggested “${entry.moveTitle}” for their`
     case 'they-sent-move':
       return `${name} sent you a move for`
+    case 'they-used-move':
+      return `${name} did “${entry.moveTitle}”, the move you suggested for`
     case 'you-thanked':
       return `you thanked ${name}`
     case 'they-thanked':

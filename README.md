@@ -1155,6 +1155,48 @@ of names hides the interactions, which are the point.
 
 The friends list, and adding one, is one press further on.
 
+### Friends review
+
+**Other people's Inklings, as a round you can finish.** A card on the entry screen — always
+there when social is on, not a badge that appears when somebody is stuck — opens a list of what
+your friends have shared. Ten of them: a sit, not a scroll.
+
+**Asks first, oldest first, all of them.** Somebody saying they are stuck is not queued behind a
+limit; everything else fills the rest. Then, newest shared first and round-robin across friends,
+so one person's shelf cannot become the round. A share leaves the round when you have suggested
+something for it or pressed *not for me* (a log entry, so it stays gone on your other device) —
+which is what keeps it finite without hiding anything.
+
+**What a card shows** is what a suggestion needs: their words, the pictures on it, the capped
+entries they have written, and the titles of moves already tried — so you are not the third
+person to say "have you tried photographing it". Only Inklings they chose to share, only while
+the server agrees they are shared. Nothing of their schedule: what is due for them is theirs, and
+a friend being shown "overdue" is pressure by proxy.
+
+**How their Inklings resurface**: by an ask, by something newly shared, and by your not having
+helped with it yet. Not by their review schedule, and not on a feed.
+
+**"You have one about this too"** appears on a card when one of your own Inklings shares a topic
+with theirs — a shared word somebody typed, not an embedding, so it works with no model at all.
+
+### Telling the suggester it was used
+
+**Doing a friend's move sends a "used" message back.** It was the half of a favour nobody could
+see: you spent the moment, they never heard, and the next one feels less worth doing. It goes out
+with the entry, and **"this was the right one"** rides on the same message — a toggle in the
+composer, because that is the moment you know, and because a second message to send later is a
+second message that never gets sent.
+
+It arrives as news in the notifications, in the archive with thanks and notes: a thing that
+happened rather than a thing that needs you.
+
+### Inviting by link
+
+Nobody swaps usernames across a kitchen. **Copy an invite link** on the friends screen — the
+address you are already on plus `?add=<your username>` — and opening it puts that name in the
+add-a-friend field after signing in. No token, no server state: the link is the address and a
+name, and adding a friend is the same request either way.
+
 ### A friend, and what has passed between you
 
 Tapping a friend opens their history: everything that has gone both ways, newest first, with

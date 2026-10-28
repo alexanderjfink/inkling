@@ -88,6 +88,20 @@ export type SocialMessage =
     }
   | {
       id: string
+      kind: 'used'
+      from: string
+      fromUsername: string
+      to: string
+      at: ISODate
+      /** The Inkling it was on, as the person who has it knows it. */
+      blipId: string
+      /** The move, by title, because the suggester's log keys it by nothing else. */
+      moveTitle: string
+      /** "This was the right one", when they said so. */
+      fit?: boolean
+    }
+  | {
+      id: string
       kind: 'thanks'
       from: string
       fromUsername: string
@@ -111,7 +125,132 @@ export const ASK_MEDIA_MAX = 4
 export const FRIEND_MOVE_MAX_SEC = 900
 
 export function isSocialMessageKind(value: unknown): value is SocialMessageKind {
-  return value === 'ask' || value === 'move' || value === 'kudos' || value === 'thanks'
+  return (
+    value === 'ask' ||
+    value === 'move' ||
+    value === 'kudos' ||
+    value === 'thanks' ||
+    value === 'used'
+  )
+}
+
+/**
+ * The friends review: other people's Inklings, in the order that makes them worth a look.
+ *
+ * Two sources, and they are not equal. An **ask** is somebody saying they are stuck — it goes
+ * first, oldest first, and the round never drops one to make room. A **share** is something they
+ * chose to be visible: still worth a look, and the reason this is not only a queue of pleas.
+ *
+ * The round is finite on purpose. Everything else in the app is a sit you can finish, and a list
+ * of other people's Inklings that refills itself is a feed. So a share leaves the round when you
+ * have suggested something for it or waved it away, and one friend's shelf cannot fill it.
+ */
+export interface FriendShare {
+  friendId: string
+  context: AskContext
+}
+
+export interface FriendAsk {
+  friendId: string
+  messageId: string
+  context: AskContext
+  at: ISODate
+}
+
+export interface FriendsRoundItem {
+  kind: 'ask' | 'inkling'
+  friendId: string
+  context: AskContext
+  /** Set for an ask: the message, so answering can name it. */
+  messageId?: string
+  /** When they asked. Orders the asks, and says how long somebody has been waiting. */
+  askedAt?: ISODate
+}
+
+/** How the round is identified in the dismissed and suggested sets. */
+export function friendShareKey(friendId: string, blipId: string): string {
+  return `${friendId}:${blipId}`
+}
+
+export function buildFriendsRound({
+  asks,
+  shares,
+  dismissed = new Set<string>(),
+  suggested = new Set<string>(),
+  limit = 10,
+}: {
+  asks: FriendAsk[]
+  shares: FriendShare[]
+  /** Keys from {@link friendShareKey} that you have waved away. */
+  dismissed?: Set<string>
+  /** Keys you have already suggested a move for. */
+  suggested?: Set<string>
+  limit?: number
+}): FriendsRoundItem[] {
+  const round: FriendsRoundItem[] = []
+  const taken = new Set<string>()
+
+  const openAsks = asks
+    .filter((ask) => !dismissed.has(friendShareKey(ask.friendId, ask.context.blipId)))
+    .slice()
+    .sort((a, b) => (a.at === b.at ? 0 : a.at < b.at ? -1 : 1))
+
+  for (const ask of openAsks) {
+    const key = friendShareKey(ask.friendId, ask.context.blipId)
+    if (taken.has(key)) continue
+    taken.add(key)
+    round.push({
+      kind: 'ask',
+      friendId: ask.friendId,
+      context: ask.context,
+      messageId: ask.messageId,
+      askedAt: ask.at,
+    })
+  }
+
+  /**
+   * One per friend, then the next, rather than one friend's whole shelf.
+   *
+   * A round that is eight of Sam's Inklings is a round about Sam. Taking a turn each keeps it
+   * a round about your friends, and the newest share of each is the one most likely to be what
+   * they are working on now.
+   */
+  const queues = new Map<string, AskContext[]>()
+  for (const share of shares) {
+    const key = friendShareKey(share.friendId, share.context.blipId)
+    if (dismissed.has(key) || suggested.has(key) || taken.has(key)) continue
+    const queue = queues.get(share.friendId) ?? []
+    if (queue.some((context) => context.blipId === share.context.blipId)) continue
+    queue.push(share.context)
+    queues.set(share.friendId, queue)
+  }
+
+  const newest = (contexts: AskContext[]) =>
+    contexts.reduce(
+      (at, context) => (context.updated && context.updated > at ? context.updated : at),
+      '',
+    )
+
+  const order = [...queues.entries()]
+    .map(([friendId, contexts]) => ({
+      friendId,
+      contexts: contexts.slice().sort((a, b) => ((a.updated ?? '') < (b.updated ?? '') ? 1 : -1)),
+    }))
+    .sort((a, b) => (newest(a.contexts) < newest(b.contexts) ? 1 : -1))
+
+  let added = true
+  while (added && round.length < limit) {
+    added = false
+    for (const friend of order) {
+      if (round.length >= limit) break
+      const context = friend.contexts.shift()
+      if (!context) continue
+      added = true
+      round.push({ kind: 'inkling', friendId: friend.friendId, context })
+    }
+  }
+
+  return round
 }
 
 /**
@@ -137,6 +276,7 @@ export function askContextFor(blip: Blip): AskContext {
       .filter((text) => text.trim().length > 0)
       .slice(-ASK_ENTRIES_MAX),
     offered: blip.moves.map((move) => move.spec.title).slice(-ASK_ENTRIES_MAX),
+    updated: blip.updated,
     // A few, in the order they were added: enough to show what they are looking at without
     // turning a message into a gallery.
     mediaIds: blip.entries

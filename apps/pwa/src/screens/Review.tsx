@@ -956,6 +956,8 @@ export function Review({
     move: MoveSpec | null
     /** Set when the move came from a friend, so the entry can name which one it answers. */
     fromMessageId?: string
+    /** "This was the right one" — said while finishing it, sent with the "done" message. */
+    fit?: boolean
   } | null>(null)
   const [entry, setEntry] = useState('')
   /** Whatever came with what is being written: a picture, pasted, dropped or picked. */
@@ -1407,6 +1409,28 @@ export function Review({
           draft,
           entryContext({ material, guidance }),
         )
+        /**
+         * Tell whoever suggested it that it was done.
+         *
+         * A suggestion used to disappear into somebody's week with no answer: you spent the
+         * moment, they never heard, and the next favour feels less worth doing. It goes out
+         * with the entry, and "this was the right one" rides on the same message rather than
+         * being a second thing to send.
+         */
+        const source = composer.fromMessageId
+          ? current.friendMoves.find((entry_) => entry_.messageId === composer.fromMessageId)
+          : undefined
+        const friend = source
+          ? social.friends.find((entry_) => entry_.userId === source.from)
+          : undefined
+        if (friend && socialOn) {
+          void social.used({
+            to: friend,
+            blipId: current.id,
+            moveTitle: composer.move.title,
+            fit: composer.fit === true,
+          })
+        }
       } else {
         /**
          * A move written here is a move, not an entry without a parent.
@@ -2111,6 +2135,25 @@ export function Review({
                   </div>
                 ) : null}
                 {aiOn ? <Guidance items={guidance} className="" /> : null}
+                {/* Said as you finish it, because that is when you know. It rides along with the
+                    "done" message, so it is one tap rather than a second thing to send later. */}
+                {composer.fromMessageId ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setComposer((current) =>
+                        current ? { ...current, fit: !current.fit } : current,
+                      )
+                    }
+                    className={`self-start rounded-full border px-3 py-1.5 text-xs ${
+                      composer.fit
+                        ? 'border-accent bg-accent-soft font-medium text-accent'
+                        : 'border-line text-ink-soft'
+                    }`}
+                  >
+                    {composer.fit ? '✓ this was the right one' : 'this was the right one'}
+                  </button>
+                ) : null}
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={() => setComposer(null)} className="quiet text-xs">
                     cancel

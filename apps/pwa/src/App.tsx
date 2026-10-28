@@ -13,6 +13,7 @@ import { CaptureTray } from './components/CaptureTray'
 import { SavedTick } from './components/SavedTick'
 import { FriendScreen } from './screens/Friend'
 import { Friends } from './screens/Friends'
+import { FriendsReview } from './screens/FriendsReview'
 import { Help } from './screens/Help'
 import { Notifications } from './screens/Notifications'
 import { Review } from './screens/Review'
@@ -42,6 +43,7 @@ type Screen =
   | 'help'
   | 'friends'
   | 'friend'
+  | 'friends-review'
   | 'notifications'
 
 const TITLES: Record<Screen, string> = {
@@ -53,6 +55,7 @@ const TITLES: Record<Screen, string> = {
   help: 'Help',
   friends: 'Friends',
   friend: 'A friend',
+  'friends-review': 'Friends Review',
   notifications: 'Notifications',
 }
 
@@ -61,6 +64,20 @@ export default function App() {
   const incoming = useMemo(() => readSharedContent(), [])
   const [shared, setShared] = useState(incoming)
   const [screen, setScreen] = useState<Screen>('add')
+  /**
+   * A username handed over in an invite link.
+   *
+   * Read once, at open, and kept until it is used or dismissed — so signing in first still
+   * lands on the right screen with the name already in the field. It carries nothing else:
+   * the link is the address plus a username, and the server is the one the link points at.
+   */
+  const [invite, setInvite] = useState<string | null>(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('add')
+    } catch {
+      return null
+    }
+  })
   /**
    * The phone layout is not touched by the wider ones: `compact` renders exactly what it did
    * before there was a desktop, and everything else is additive.
@@ -148,9 +165,14 @@ export default function App() {
    */
   useEffect(() => {
     if (!auth.user?.id) return
-    setScreen('add')
+    // An invite link is somebody asking to be friends; landing on the home screen and leaving
+    // it there would be the link not finishing its sentence.
+    const next: Screen = invite ? 'friends' : 'add'
+    setScreen(next)
     setFocusId(null)
-    window.history.replaceState({ screen: 'add' }, '')
+    window.history.replaceState({ screen: next }, '')
+    // `invite` is deliberately not a dependency: this is about arriving, and changing the
+    // invite later should not move the screen again.
   }, [auth.user?.id])
 
   /** Sync waits for a session: before signing in every request would be a 401. */
@@ -426,6 +448,7 @@ export default function App() {
             asking={social.asks}
             friends={social.friends}
             onNotifications={() => go('notifications')}
+            onFriendsReview={() => go('friends-review')}
             friendsWaiting={friendsWaiting}
             transcribeUrl={
               serverConfig.config?.transcribeModel ? server.serverUrl.replace(/\/+$/, '') : null
@@ -468,9 +491,30 @@ export default function App() {
             onOpen={(id) => openBlip(id)}
           />
         ) : null}
+        {ready && screen === 'friends-review' ? (
+          <FriendsReview
+            social={social}
+            events={events}
+            blips={blips}
+            serverUrl={server.serverUrl}
+            onOpenFriends={() => go('friends')}
+            onOpenFriend={(friend) => {
+              setFriendId(friend.userId)
+              go('friend')
+            }}
+            onOpenMine={(id) => openBlip(id)}
+          />
+        ) : null}
+
         {ready && screen === 'friends' ? (
           <Friends
             social={social}
+            invite={invite}
+            me={auth.user?.username}
+            onInviteUsed={() => {
+              setInvite(null)
+              window.history.replaceState({ screen: 'friends' }, '', window.location.pathname)
+            }}
             onNotifications={() => go('notifications')}
             onOpen={(friend) => {
               setFriendId(friend.userId)
@@ -511,6 +555,7 @@ export default function App() {
             serverUrl={server.serverUrl}
             onClearPicked={() => setPicked(null)}
             onOpenFriends={() => go('friends')}
+            onOpenReview={() => go('friends-review')}
             onOpenBlip={(id, messageId) => openBlip(id, messageId)}
           />
         ) : null}

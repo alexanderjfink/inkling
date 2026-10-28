@@ -13,10 +13,11 @@ export type RailScreen =
   | 'review'
   | 'all'
   | 'friends'
+  | 'friend'
+  | 'friends-review'
   | 'settings'
   | 'you'
   | 'notifications'
-  | 'friend'
   | 'help'
 
 const ITEMS: Array<{ screen: RailScreen; label: string; glyph: string }> = [

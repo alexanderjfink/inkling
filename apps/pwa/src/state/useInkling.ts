@@ -119,6 +119,17 @@ export interface InklingActions {
    * clear it on the laptop as well.
    */
   markMoveSeen(id: string, messageId: string): Promise<BlipEvent>
+  /** Stop showing somebody else's Inkling in the friends round. Nothing is told to them. */
+  dismissFriendInkling(friendId: string, blipId: string): Promise<BlipEvent>
+  /** Somebody did a move you suggested. Written down so the notification survives a reload. */
+  addFriendMoveUsed(input: {
+    id: string
+    friendId: string
+    friendUsername: string
+    blipId: string
+    moveTitle: string
+    fit: boolean
+  }): Promise<BlipEvent>
   /** The same for a question: read, not answered. */
   markAskSeen(id: string, messageId: string): Promise<BlipEvent>
   /**
@@ -333,6 +344,12 @@ export function useInkling(accountId: string | null = null) {
       },
       markMoveSeen(id, messageId) {
         return storage().append({ t: 'friendMoveSeen', id, messageId })
+      },
+      dismissFriendInkling(friendId, blipId) {
+        return storage().append({ t: 'friendInklingDismissed', id: newId(), friendId, blipId })
+      },
+      addFriendMoveUsed(input) {
+        return storage().append({ t: 'friendMoveUsed', ...input })
       },
       markAskSeen(id, messageId) {
         return storage().append({ t: 'friendAskSeen', id, messageId })

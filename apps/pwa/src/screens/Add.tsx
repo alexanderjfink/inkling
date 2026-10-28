@@ -51,6 +51,7 @@ export function Add({
   asking,
   friends,
   onNotifications,
+  onFriendsReview,
   friendsWaiting,
   transcribeUrl,
   onAddBlock,
@@ -87,6 +88,8 @@ export function Add({
   /** Who your friends are, so the card below can call them by the name they chose. */
   friends: Friend[]
   onNotifications: () => void
+  /** The friends round: always reachable from the home screen when social is on. */
+  onFriendsReview: () => void
   /** Friends waiting on something from you, shown on the button. */
   friendsWaiting: number
   /** A server that can hear, if one is set up. Null means the browser's own recogniser. */
@@ -265,22 +268,31 @@ export function Add({
             about. */}
             <p className="mb-1 text-center text-sm text-ink-faint">Make Moves on your Inklings</p>
             {/* Above the field on purpose: with the keyboard up, anything below it is gone. */}
-            {socialOn && asking.length > 0 ? (
+            {/* Always there when there are friends at all: the review is a place you can go,
+                not a badge that appears when somebody is stuck. An ask changes what it says, and
+                how loudly — it does not decide whether the door exists. */}
+            {socialOn ? (
               <button
                 type="button"
-                onClick={onNotifications}
-                className="card flex items-center gap-3 border border-accent/40 p-4 text-left transition active:scale-[0.99]"
+                onClick={onFriendsReview}
+                className={`card flex items-center gap-3 p-4 text-left transition active:scale-[0.99] ${
+                  asking.length > 0 ? 'border border-accent/40' : ''
+                }`}
               >
                 {/* A face, because it is a person asking; the ✎ is what the card below it is for. */}
                 <span className="circle h-10 w-10 shrink-0 text-base leading-none">☺</span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold">
-                    {asking.length === 1
-                      ? `${asking[0] ? nameOf(friends.find((f) => f.userId === asking[0]?.userId) ?? { username: asking[0].username }) : 'somebody'} wants your help`
-                      : 'Friends want your help!'}
+                    {asking.length === 0
+                      ? 'Friends Review'
+                      : asking.length === 1
+                        ? `${asking[0] ? nameOf(friends.find((f) => f.userId === asking[0]?.userId) ?? { username: asking[0].username }) : 'somebody'} wants your help`
+                        : `${asking.length} friends want your help`}
                   </span>
                   <span className="block truncate text-xs text-ink-soft">
-                    {asking[0]?.context.title}
+                    {asking.length === 0
+                      ? 'What your friends are working on — and a move if you have one'
+                      : 'Look through what they have shared, then suggest something'}
                   </span>
                 </span>
               </button>

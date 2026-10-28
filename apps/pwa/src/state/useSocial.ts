@@ -14,6 +14,8 @@ import {
   askForMove,
   declineFriend,
   friendInklings,
+  friendInklingsAll,
+  sendUsed,
   pullInbox,
   removeFriend,
   sendMove,
@@ -86,6 +88,17 @@ export interface SocialState {
   }) => Promise<string | null>
   /** What a friend has chosen to share. */
   theirInklings: (userId: string) => Promise<AskContext[]>
+  /** Every friend's shared Inklings, for the friends round: one request, not one per friend. */
+  reviewInklings: () => Promise<Array<Friend & { inklings: AskContext[] }>>
+  /** Stop showing somebody else's Inkling in the round. Nothing is sent to them. */
+  dismissInkling: (friendId: string, blipId: string) => Promise<string | null>
+  /** Tell a friend their suggestion was done — the half of a favour that was invisible. */
+  used: (input: {
+    to: Friend
+    blipId: string
+    moveTitle: string
+    fit?: boolean
+  }) => Promise<string | null>
 }
 
 /**
@@ -322,6 +335,12 @@ export function useSocial({
         return { ok: true }
       }),
 
+    used: ({ to, blipId, moveTitle, fit }) =>
+      attempt(async () => {
+        const result = await sendUsed(serverUrl, { to: to.userId, blipId, moveTitle, fit })
+        return result.ok ? { ok: true } : result
+      }),
+
     clearMove: async ({ messageId, blipId }) => {
       try {
         await actions.markMoveSeen(blipId, messageId)
@@ -358,6 +377,24 @@ export function useSocial({
       }
       return result.value
     },
+
+    reviewInklings: async () => {
+      const result = await friendInklingsAll(serverUrl)
+      if (!result.ok) {
+        setError(result.error)
+        return []
+      }
+      return result.value
+    },
+
+    dismissInkling: async (friendId, blipId) => {
+      try {
+        await actions.dismissFriendInkling(friendId, blipId)
+        return null
+      } catch {
+        return 'could not put that aside'
+      }
+    },
   }
 }
 
@@ -391,6 +428,17 @@ async function ingest(message: SocialMessage, actions: InklingActions): Promise<
         fromUsername: message.fromUsername,
         moveSpec: message.move,
         note: message.note,
+      })
+      return
+
+    case 'used':
+      await actions.addFriendMoveUsed({
+        id: newId(),
+        friendId: message.from,
+        friendUsername: message.fromUsername,
+        blipId: message.blipId,
+        moveTitle: message.moveTitle,
+        fit: message.fit === true,
       })
       return
 

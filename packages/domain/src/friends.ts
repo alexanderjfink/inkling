@@ -1,4 +1,5 @@
 import type { BlipEvent, ISODate } from './events'
+import { friendShareKey } from './social'
 
 /**
  * One friend, and everything that has passed between you.
@@ -19,6 +20,8 @@ export type FriendTimelineKind =
   | 'they-asked'
   | 'you-sent-move'
   | 'they-sent-move'
+  /** They did the move you suggested. The half of a favour that used to be invisible. */
+  | 'they-used-move'
   | 'you-thanked'
   | 'they-thanked'
   | 'you-noted'
@@ -204,6 +207,22 @@ export function buildSocialTimeline(
       continue
     }
 
+    if (event.t === 'friendMoveUsed') {
+      entries.push({
+        key: event.id,
+        at: event.at,
+        userId: event.friendId,
+        username: event.friendUsername,
+        messageId: event.id,
+        direction: 'out',
+        kind: 'they-used-move',
+        title: titles.get(event.blipId) ?? 'an Inkling',
+        moveTitle: event.moveTitle,
+        blipId: event.blipId,
+      })
+      continue
+    }
+
     if (event.t === 'friendMoveSent') {
       entries.push({
         key: event.messageId,
@@ -247,6 +266,32 @@ export function buildSocialTimeline(
  * Read from the log like everything else. "Seen" and "dealt with" are kept apart on purpose:
  * a question can be read without being answered, and the list needs to be able to say so.
  */
+/**
+ * Inklings of other people's that you have waved away.
+ *
+ * The one thing that keeps a list of other people's Inklings from refilling for ever: a share
+ * leaves the round when you have suggested something or said "not for me", and neither is a
+ * judgement of it — only of whether you are the person to help with it.
+ */
+export function dismissedFriendInklings(events: BlipEvent[]): Set<string> {
+  const set = new Set<string>()
+  for (const event of events) {
+    if (event.t === 'friendInklingDismissed') set.add(friendShareKey(event.friendId, event.blipId))
+  }
+  return set
+}
+
+/** Shares you have already suggested a move for, so the round does not ask you twice. */
+export function suggestedFriendInklings(events: BlipEvent[]): Set<string> {
+  const set = new Set<string>()
+  for (const event of events) {
+    if (event.t === 'friendMoveSent' && event.blipId) {
+      set.add(friendShareKey(event.to, event.blipId))
+    }
+  }
+  return set
+}
+
 export function seenNoticeIds(events: BlipEvent[]): Set<string> {
   const seen = new Set<string>()
   for (const event of events) {

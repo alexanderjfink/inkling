@@ -303,6 +303,11 @@ export interface AskContext {
   /** Moves already put in front of them, so a friend does not offer the same one. */
   offered: string[]
   /**
+   * When it last changed, so a friend looking through what has been shared can see what is new
+   * and put the freshest first. A timestamp, not a schedule: what is due for them is theirs.
+   */
+  updated?: ISODate
+  /**
    * The pictures on it, by content hash.
    *
    * Hashes rather than the pictures: a message is a line of JSON in a file, and a photograph
@@ -502,6 +507,31 @@ export type BlipEventBody =
    * the telling — not the fact.
    */
   | { t: 'friendMoveSeen'; id: string; messageId: string }
+  /**
+   * An Inkling of somebody else's that you have decided not to help with.
+   *
+   * Not a judgement of it — it is theirs — and nothing is told to them. It means "stop showing
+   * me this one in the friends round", which is the only way a list of other people's things
+   * stays finite.
+   */
+  | { t: 'friendInklingDismissed'; id: string; friendId: string; blipId: string }
+  /**
+   * A move you suggested was done.
+   *
+   * The other half of a suggestion, and the half nobody could see: you sent an idea into
+   * somebody's week and had no way of knowing whether it landed. Written down here when their
+   * "used" arrives, so it is a fact on this device and survives the server being unreachable.
+   */
+  | {
+      t: 'friendMoveUsed'
+      id: string
+      friendId: string
+      friendUsername: string
+      blipId: string
+      moveTitle: string
+      /** Whether they said it was exactly right, not merely done. */
+      fit: boolean
+    }
   /**
    * The same, for a question somebody asked.
    *

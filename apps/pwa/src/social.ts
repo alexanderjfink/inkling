@@ -81,6 +81,25 @@ export async function friendInklings(
   return result.ok ? { ok: true, value: result.value.inklings ?? [] } : result
 }
 
+/** Tell somebody their suggestion was done — and whether it was exactly right. */
+export function sendUsed(
+  url: string,
+  input: { to: string; blipId: string; moveTitle: string; fit?: boolean },
+): Promise<SocialOutcome<{ message: SocialMessage }>> {
+  return call(url, '/used', json(input))
+}
+
+/** Every accepted friend's shared Inklings, for the friends round. */
+export async function friendInklingsAll(
+  url: string,
+): Promise<SocialOutcome<Array<Friend & { inklings: AskContext[] }>>> {
+  const result = await call<{ friends: Array<Friend & { inklings: AskContext[] }> }>(
+    url,
+    '/inklings',
+  )
+  return result.ok ? { ok: true, value: result.value.friends ?? [] } : result
+}
+
 /**
  * Anything new addressed to me, from a byte offset into my own postbox.
  *

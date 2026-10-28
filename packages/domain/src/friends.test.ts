@@ -327,6 +327,36 @@ describe('the history between two people', () => {
     expect(byKind.get('they-thanked')).toBe('in')
   })
 
+  test('doing a move you suggested is a thing that happened to you', () => {
+    // The half of a favour that used to be invisible: you suggest something, they do it, and
+    // nothing comes back. It is an "out" entry — help you gave, arriving as news.
+    const entries = buildSocialTimeline(
+      [
+        ev(
+          {
+            t: 'friendMoveUsed',
+            id: 'used-1',
+            friendId: SAM.userId,
+            friendUsername: SAM.username,
+            blipId: 'blip-mine',
+            moveTitle: 'Play one chord badly, twice',
+            fit: true,
+          },
+          0,
+          '2026-01-04T00:00:00Z',
+        ),
+      ],
+      titles,
+    )
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]?.kind).toBe('they-used-move')
+    expect(entries[0]?.direction).toBe('out')
+    expect(entries[0]?.moveTitle).toBe('Play one chord badly, twice')
+    expect(entries[0]?.title).toBe('learn the keyboard')
+    expect(entries[0]?.username).toBe('sam')
+  })
+
   test('the whole timeline knows who each thing was with', () => {
     const entries = buildSocialTimeline(
       [
